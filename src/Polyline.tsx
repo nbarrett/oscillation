@@ -1,5 +1,12 @@
 import { Polyline } from 'react-leaflet';
 import { LatLngTuple } from "leaflet";
+import { useEffect } from "react";
+import { DirectionsResponse, SerializableRouteDirectionsRequest } from "./models/route-models";
+import { routeDirectionsState } from "./atoms/route-atoms";
+import { useRecoilValue } from "recoil";
+import { log } from './util/logging-config';
+import { createSerializableRouteDirectionsRequest } from "./mappings/route-mappings";
+import { Player } from "./models/player-models";
 
 const oldpoints: LatLngTuple[] = [
     [52.2308124251888, 21.011003851890568],
@@ -4058,9 +4065,21 @@ const points: LatLngTuple[] = [
     ]
 ];
 
-export function PolylineWithData() {
-    const positions: LatLngTuple[] = points.map(tuple => [tuple[1], tuple[0]]);
-    console.log("PolylineWithData:positions:", positions)
+export function PolylineWithData(props: { players: Player[] }) {
+
+    const start: LatLngTuple = [props.players[0].position[1], props.players[0].position[0]];
+    const end: LatLngTuple = [props.players[1].position[1], props.players[1].position[0]];
+    const routeDirectionsRequest: SerializableRouteDirectionsRequest = createSerializableRouteDirectionsRequest({
+        start,
+        end
+    });
+    const directionsResponse: DirectionsResponse = useRecoilValue<DirectionsResponse>(routeDirectionsState(routeDirectionsRequest));
+    const positions: LatLngTuple[] = directionsResponse?.features[0]?.geometry?.coordinates?.map(tuple => [tuple[1], tuple[0]]) || [];
+
+    useEffect(() => {
+        log.info("PolylineWithData:positions:", positions);
+    }, [positions]);
+
     return (
         <Polyline
             color={'red'}

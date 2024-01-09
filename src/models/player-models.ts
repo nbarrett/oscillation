@@ -1,4 +1,4 @@
-import { Icon, LatLngExpression, LatLngTuple } from "leaflet";
+import { Icon, LatLngTuple } from "leaflet";
 
 export interface Player {
     position: LatLngTuple;

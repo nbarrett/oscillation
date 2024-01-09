@@ -2,16 +2,17 @@ import blueCar from "./blue-car.png";
 import redCar from "./red-car.png";
 import whiteCar from "./white-car.png";
 import markerIconImage from "leaflet/dist/images/marker-icon.png";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import "leaflet/dist/leaflet.css";
 import "./App.css";
 import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 import L, { Icon, LatLng, LatLngTuple } from "leaflet";
 import { Legend } from "./Legend";
-import { Player } from "./models";
 import Link from "@mui/material/Link";
 import { Box, Stack } from "@mui/material";
 import { PolylineWithData } from "./Polyline";
+import { log } from "./util/logging-config";
+import { Player } from "./models/player-models";
 
 const startingPosition: LatLngTuple = [51.505, -0.09];
 
@@ -48,7 +49,7 @@ export function MapWithCars() {
     const [map, setMap] = useState<L.Map>();
 
     useEffect(() => {
-        console.log("MapWithCars:players:", players, "lat 1->2:", players[1].position[0] - players[0].position[0], "lng 1->2:", players[1].position[1] - players[0].position[1]);
+        log.debug("MapWithCars:players:", players, "lat 1->2:", players[1].position[0] - players[0].position[0], "lng 1->2:", players[1].position[1] - players[0].position[1]);
     }, [players]);
 
     function zoomToPlayer(player: Player) {
@@ -58,19 +59,18 @@ export function MapWithCars() {
     return <>
         <Stack direction={"row"} spacing={1}>
             <div>Player positions:</div>
-            {players.map(player => <>
+            {players.map(player => <Fragment key={player.name}>
                 <Link onClick={() => zoomToPlayer(player)} sx={{cursor: "pointer"}}
                       key={player.name}>{player.name}</Link>
                 <Box>lat-long: {player.position[0]},{player.position[1]}</Box>
-                {/*<Box>long: {player.position[1]}</Box>*/}
-            </>)}</Stack>
+            </Fragment>)}</Stack>
         <MapContainer center={startingPosition} zoom={17} scrollWheelZoom={true}
                       ref={(map: L.Map) => setMap(map)}>
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>
             {players.map((player: Player, key: number) => <PlayerCar key={key} player={player} players={players}
                                                                      setPlayers={setPlayers}/>)}
             <Legend map={map as L.Map}/>
-            <PolylineWithData/>
+            <PolylineWithData players={players}/>
         </MapContainer></>;
 }
 

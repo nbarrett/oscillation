@@ -7,24 +7,27 @@ import Icon from '@mui/material/Icon';
 import { Grid, Stack } from "@mui/material";
 import { Copyright } from "./Copyright";
 import { MapWithCars } from "./MapWithCars";
+import { RecoilRoot } from 'recoil';
 
 
 export default function App() {
     return (
-        <Container maxWidth={false}>
-            <Stack pt={2} direction={"row"} alignContent={"center"}>
-                <Icon sx={{height: 60, width: 150}}>
-                    <img src="https://labs.os.uk/static/media/os-logo.svg"/>
-                </Icon>
-                <Typography variant="h5" component="h1" gutterBottom>
-                    Oscillation
-                </Typography>
-            </Stack>
-            <MapWithCars/>
-            <Grid container alignItems={"start"}>
-                <Grid item xs><ProTip/></Grid>
-                <Grid item xs><Copyright/></Grid>
-            </Grid>
-        </Container>
+        <RecoilRoot>
+            <Container maxWidth={false}>
+                <Stack pt={2} direction={"row"} alignContent={"center"}>
+                    <Icon sx={{height: 60, width: 150}}>
+                        <img src="https://labs.os.uk/static/media/os-logo.svg"/>
+                    </Icon>
+                    <Typography variant="h5" component="h1" gutterBottom>
+                        Oscillation
+                    </Typography>
+                </Stack>
+                <MapWithCars/>
+                <Grid container alignItems={"start"}>
+                    <Grid item xs><ProTip/></Grid>
+                    <Grid item xs><Copyright/></Grid>
+                </Grid>
+            </Container>
+        </RecoilRoot>
     );
 }
