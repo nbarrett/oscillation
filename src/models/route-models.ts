@@ -1,13 +1,28 @@
 import { LatLngTuple } from "leaflet";
 
+export const defaultZoom = 17;
+
+export enum Profile {
+    DRIVING_CAR = "driving-car",
+    DRIVING_HGV = "driving-hgv",
+    CYCLING_REGULAR = "cycling-regular",
+    CYCLING_ROAD = "cycling-road",
+    CYCLING_MOUNTAIN = "cycling-mountain",
+    CYCLING_ELECTRIC = "cycling-electric",
+    FOOT_WALKING = "foot-walking",
+    FOOT_HIKING = "foot-hiking",
+    WHEELCHAIR = "wheelchair",
+}
+
 export interface RouteDirectionsRequest {
+    profile: Profile;
     start: LatLngTuple;
     end: LatLngTuple;
 }
 
 
 export interface SerializableRouteDirectionsRequest extends RouteDirectionsRequest {
-    toJSON: () => string
+    toJSON: () => string;
 }
 
 export interface Step {

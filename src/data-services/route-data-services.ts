@@ -1,3 +1,4 @@
+import queryString from "query-string";
 import { handleJSONResponseForParameters } from "./common-data.services";
 import { DirectionsResponse, RouteDirectionsRequest } from "../models/route-models";
 
@@ -9,5 +10,5 @@ export function postDirections(routeDirectionsRequest: RouteDirectionsRequest): 
 }
 
 export function queryDirections(routeDirectionsRequest: RouteDirectionsRequest): Promise<DirectionsResponse> {
-    return handleJSONResponseForParameters(`/api/directions?start=${routeDirectionsRequest.start}&end=${routeDirectionsRequest.end}`);
+    return handleJSONResponseForParameters(`/api/directions?${queryString.stringify(routeDirectionsRequest)}`);
 }

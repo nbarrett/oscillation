@@ -8,6 +8,7 @@ import toLower from "lodash-es/toLower";
 import { log } from "./logging-config";
 import { UserData } from "../models/user-models";
 import { asNumber } from "./numbers";
+import camelCase from "lodash-es/camelCase";
 
 export function replaceAll(find: any, replace: any, str: any): string | number {
   let replacedValue;
@@ -68,6 +69,9 @@ export function stripLineBreaks(str, andTrim: boolean) {
   return andTrim && replacedValue ? replacedValue.trim() : replacedValue;
 }
 
+export function asTitle(string: any): string {
+  return startCase(camelCase(string))
+}
 export function titleCase(str): string {
   return startCase(toLower(str));
 }

@@ -1,5 +1,6 @@
 import L from "leaflet";
 import { useEffect } from "react";
+import { log } from "../util/logging-config";
 
 export function Legend(props: { map: L.Map }) {
 
@@ -7,11 +8,11 @@ export function Legend(props: { map: L.Map }) {
 
     useEffect(() => {
         if (props.map) {
-            console.log("legend:onAdd", legend);
+            log.debug("legend:onAdd", legend);
             legend.onAdd = () => {
                 const div = L.DomUtil.create("div", "description");
                 L.DomEvent.disableClickPropagation(div);
-                const text = "<b>Lorem Ipsum</b> is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book...";
+                const text = "<b>Map Instructions</b><div>We can put information in here to help players understand how to use the map or play the game.</div>";
                 div.innerHTML = text;
                 return div;
             };

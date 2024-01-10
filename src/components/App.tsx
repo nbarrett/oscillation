@@ -8,19 +8,21 @@ import { Grid, Stack } from "@mui/material";
 import { Copyright } from "./Copyright";
 import { MapWithCars } from "./MapWithCars";
 import { RecoilRoot } from 'recoil';
+import ProfileSelector from "./ProfileSelector";
 
 
 export default function App() {
     return (
         <RecoilRoot>
             <Container maxWidth={false}>
-                <Stack pt={2} direction={"row"} alignContent={"center"}>
-                    <Icon sx={{height: 60, width: 150}}>
+                <Stack pt={2} direction={"row"} alignItems={"center"} spacing={2}>
+                    <Icon sx={{pt:1 ,height: 60, width: 150}}>
                         <img src="https://labs.os.uk/static/media/os-logo.svg"/>
                     </Icon>
-                    <Typography variant="h5" component="h1" gutterBottom>
+                    <Typography variant="h4" component="h1" gutterBottom>
                         Oscillation
                     </Typography>
+                    <ProfileSelector/>
                 </Stack>
                 <MapWithCars/>
                 <Grid container alignItems={"start"}>

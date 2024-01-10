@@ -2,8 +2,15 @@ import { log } from "./logging-config";
 import { booleanOf } from "./strings";
 
 export enum StoredValue {
-  ROUTE_DIRECTIONS = "route-directions"
+  CURRENT_PLAYER = "current-player",
+  DRIVING_PROFILE = "driving-profile",
+  MAP_CENTRE_POSITION = "map-centre-position",
+  MAP_CLICK_POSITION = "map-centre-position",
+  MAP_ZOOM = "map-zoom",
+  PLAYERS = "players",
+  ROUTE_DIRECTIONS = "route-directions",
 }
+
 export function initialValueFor(parameter: string, defaultValue?: any): string {
   const localStorageValue = localStorage.getItem(parameter);
   const value = localStorageValue || defaultValue;
