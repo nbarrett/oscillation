@@ -5,7 +5,7 @@ export enum StoredValue {
   CURRENT_PLAYER = "current-player",
   DRIVING_PROFILE = "driving-profile",
   MAP_CENTRE_POSITION = "map-centre-position",
-  MAP_CLICK_POSITION = "map-centre-position",
+  MAP_CLICK_POSITION = "map-click-position",
   MAP_ZOOM = "map-zoom",
   PLAYERS = "players",
   ROUTE_DIRECTIONS = "route-directions",
