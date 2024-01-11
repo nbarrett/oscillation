@@ -3,12 +3,15 @@ import request from "request";
 import { Profile } from "../models/route-models";
 
 export const app = express();
+const port = process.env["PORT"] || 3002;
+const viteMode = process.env["VITE"];
+
 app.get("/api/test", (_, res) => res.json({greeting: "this is a test!"}));
 app.get("/api/directions", (req: Request, res: Response) => {
     const apiKey = `5b3ce3597851110001cf6248ce753974beff43f290cdfe4c1a50d56a`;
     const start = req.query.start;
     const end = req.query.end;
-    const profile = req.query.profile as Profile
+    const profile = req.query.profile as Profile;
     request({
         method: 'GET',
         url: `https://api.openrouteservice.org/v2/directions/${profile}?api_key=${apiKey}&start=${start}&end=${end}`,
@@ -28,13 +31,18 @@ app.get("/api/directions", (req: Request, res: Response) => {
             res.status(500).json(e.toString());
         }
     });
-
-    if (!process.env["VITE"]) {
-        const frontendFiles = process.cwd() + "/dist";
-        app.use(express.static(frontendFiles));
-        app.get("/*", (_, res) => {
-            res.send(frontendFiles + "/index.html");
-        });
-        app.listen(process.env["PORT"]);
-    }
 });
+
+
+if (viteMode) {
+    console.log("running in viteMode:", viteMode);
+} else {
+    console.log("running in viteMode:", viteMode);
+    const frontendFiles = process.cwd() + "/dist";
+    app.use(express.static(frontendFiles));
+    app.get("/*", (_, res) => {
+        res.send(frontendFiles + "/index.html");
+    });
+
+    app.listen(port, () => console.log("Server started on port ", port));
+}

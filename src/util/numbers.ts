@@ -1,13 +1,13 @@
-import { chain, isNaN, isNumber } from "lodash";
+import { isNaN, isNumber } from "lodash-es";
 import { log } from "./logging-config";
 
 export function sumValues(items: any[], fieldName) {
     if (!items) {
         return 0;
     }
-    return chain(items).map(fieldName).reduce((memo, num) => {
+    return items.map(fieldName).reduce((memo: any, num) => {
         return memo + asNumber(num);
-    }, 0).value();
+    }, 0);
 }
 
 export function asNumber(numberString?: any, decimalPlaces?: number): number {

@@ -19,7 +19,7 @@ export const routeDirectionsState: (routeDirectionsRequest: SerializableRouteDir
   effects: (routeDirectionsRequest: SerializableRouteDirectionsRequest) => [
     ({setSelf}) => {
       const request: RouteDirectionsRequest = removeToJSONFrom<RouteDirectionsRequest>(routeDirectionsRequest);
-      if (request?.start && request?.end) {
+      if (request?.start && request?.end && request?.profile) {
         log.info("routeDirectionsState:querying api with request:", request);
         queryDirections(request).then(directionsResponse => {
           log.info("routeDirectionsState:queried directionsResponse with routeDirectionsRequest", request, "returned:", directionsResponse);
