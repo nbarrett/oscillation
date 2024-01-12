@@ -22,6 +22,9 @@ export default function App() {
                     <Typography variant="h4" component="h1" gutterBottom>
                         Oscillation
                     </Typography>
+                    <Typography variant="h6" component="h1" gutterBottom>
+                        Version 0.1
+                    </Typography>
                     <ProfileSelector/>
                 </Stack>
                 <MapWithCars/>
