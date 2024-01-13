@@ -1,14 +1,20 @@
 # OSCILLATION 200 
 ## Introduction
 ![game-box](images-story/game-box.png)
-This game was created by my father, Kerry Barrett in the 1980 and early 90s. For all of Kerry's life, he was an emplyee of 
-the Ordnance Survey as a surveyor and loved his job and all aspects of maps. 
+This game was created by my father, Kerry Barrett in the 1980 and early 90s. 
+For all of Kerry's life, he was an employee of 
+the Ordnance Survey as a surveyor, loved his job and all aspects of maps. 
 He was convinced that a game could be made out a map and as well as being fun, could also 
 educate people about maps in the process. He spent several years designing the game and even had a meeting with [Waddingtons](https://en.wikipedia.org/wiki/Waddingtons), the 
 game manufacturer to present his idea.
-[Waddingtons](https://en.wikipedia.org/wiki/Waddingtons) thought that the game had potential but saw that there were a few limitations related to how cluttered the board got with pieces. Also sometimes the map was too small to see things properly and squares on the map got cluttered when multiple players got close to each other.
-They asked Kerry to come up with some alternative ideas but this was the last meeting he had with a games manufacturer, as he fell ill and later died in 2012. 
-Only one prototype was ever made and it has been played by family members and friends on many occasions. You can see some photos from recent years below:
+[Waddingtons](https://en.wikipedia.org/wiki/Waddingtons) thought that the game had potential but spotted a few limitations related 
+to how cluttered the board became with game playing pieces. Also, sometimes the map was too small to see things properly and squares on 
+the map got cluttered when multiple players got close to each other.
+They asked Kerry to come up with some alternative ideas but this was the last meeting he had with a games manufacturer, 
+as he fell ill and later died in 2012. 
+Only one prototype was ever made and it has been played by family members and friends on many occasions. You can see some photos from recent years below.
+Over Christmas period of 2023, I decided to create a digital version of the game as a tribute to my father and to see if I could overcome the limitations that Waddingtons had identified.
+
 
 ### Guy and Lynds play in 2020
 ![guy-and-lynds-2020](images-story/guy-and-lynds-2020.png)
@@ -22,7 +28,7 @@ Only one prototype was ever made and it has been played by family members and fr
 ![game-with-friends-2020](images-story/game-with-friends-2020.png)
 ### Denise Rachel and Stuart play in 2021
 ![img.png](images-story/game-with-friends-2021.png)
-### Family game, Christmas 2023
+### The younger family play! Christmas 2023
 ![family-game-2023](images-story/family-game-2023.png)
 ## OSCILLATION 200 Tooling Preferences
 The game is to be coded with the following libraries and frameworks:
