@@ -43,7 +43,7 @@
 }
 
 .leaflet-container {
-  height: 800px;
+  height: 80vh;
   width: 100%;
 }
 
@@ -61,4 +61,13 @@
   box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
   border-radius: 5px;
   border: 1px solid grey;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 0.3s infinite linear;
 }

@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useRef } from "react";
 import { log } from "../util/logging-config";
 import { LatLng, LatLngTuple } from "leaflet";
 import { Marker, Popup } from "react-leaflet";
+import { PolylineWithData } from "./Polyline";
 
 function positionFrom(markerRef: React.MutableRefObject<any>): LatLngTuple {
     const latLng: LatLng = markerRef.current.getLatLng();
@@ -20,20 +21,26 @@ export function PlayerCar(props: { player: Player }) {
         () => ({
             dragstart() {
                 const position = positionFrom(markerRef);
-                log.info("drag start for ", props?.player?.name, "is:", markerRef.current);
-                setPlayer({...props.player, position: position});
-            },
-            dragend: function () {
-                log.info("marker position for ", props?.player?.name, "is:", markerRef.current);
-                const position = positionFrom(markerRef);
-                setPlayer(existing => ({
-                    ...existing,
-                    nextPosition: position
-                }));
+                log.info("drag start for:", props?.player?.name, "position:", position);
                 setPlayers(existing => {
                     return existing.map(player => player?.name === props?.player?.name ? ({
                         ...player,
-                        position
+                        position: position
+                    }) : player);
+                });
+                setPlayer({...props.player, position: position});
+            },
+            dragend: function () {
+                                const position = positionFrom(markerRef);
+                log.info("dragend for:", props?.player?.name, "position:", position);
+                // setPlayer(existing => ({
+                //     ...existing,
+                //     nextPosition: position
+                // }));
+                setPlayers(existing => {
+                    return existing.map(player => player?.name === props?.player?.name ? ({
+                        ...player,
+                        nextPosition: position
                     }) : player);
                 });
             },
@@ -48,9 +55,10 @@ export function PlayerCar(props: { player: Player }) {
 
 
     return (
+        <><PolylineWithData player={props?.player}/>
         <Marker position={props?.player?.position} icon={props?.player?.icon}
                 draggable eventHandlers={eventHandlers}
                 ref={markerRef}>
             <Popup position={[71.505, 9]}>I am {props?.player?.name}!</Popup>
-        </Marker>);
+        </Marker></>);
 }

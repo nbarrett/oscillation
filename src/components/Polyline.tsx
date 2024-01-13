@@ -8,16 +8,14 @@ import { log } from '../util/logging-config';
 import { createSerializableRouteDirectionsRequest, toApiTuple } from "../mappings/route-mappings";
 import { Player } from "../models/player-models";
 
-export function PolylineWithData(props: { players: Player[] }) {
+export function PolylineWithData(props: { player: Player }) {
 
-    // const start: LatLngTuple = toApiTupleFromPlayer(props.players[0]);
-    // const end: LatLngTuple = toApiTupleFromPlayer(props.players[1]);
     const profile = useRecoilValue<Profile>(profileState);
-    const player: Player = useRecoilValue<Player>(currentPlayerState);
+    // const player: Player = useRecoilValue<Player>(currentPlayerState);
     const routeDirectionsRequest: SerializableRouteDirectionsRequest = createSerializableRouteDirectionsRequest({
         profile,
-        start: toApiTuple(player?.position),
-        end: toApiTuple(player?.nextPosition)
+        start: toApiTuple(props.player?.position),
+        end: toApiTuple(props.player?.nextPosition)
     });
     const directionsResponse: DirectionsResponse = useRecoilValue<DirectionsResponse>(routeDirectionsState(routeDirectionsRequest));
     const positions: LatLngTuple[] = directionsResponse?.features[0]?.geometry?.coordinates?.map((tuple: number[]) => toApiTuple(tuple)) || [];

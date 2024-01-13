@@ -10,7 +10,6 @@ import L, { Icon, LatLng, LatLngTuple } from "leaflet";
 import { Legend } from "./Legend";
 import Link from "@mui/material/Link";
 import { Box, Stack } from "@mui/material";
-import { PolylineWithData } from "./Polyline";
 import { log } from "../util/logging-config";
 import { Player } from "../models/player-models";
 import { useRecoilState, useRecoilValue } from "recoil";
@@ -96,15 +95,16 @@ export function MapWithCars() {
                     <Box>lat-long: {formatLatLong(new LatLng(player.position[0], player.position[1]))}</Box>
                 </Fragment>)}
             </Stack>
-            <MapContainer center={startingPosition} zoom={zoom} scrollWheelZoom={true}
-                          ref={(map: L.Map) => setMap(map)}>
-                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>
-                {players.map((player: Player, key: number) => <PlayerCar key={key} player={player}/>)}
-                <Legend map={map as L.Map}/>
-                <PolylineWithData players={players}/>
-                <RecordMapCentreAndZoom/>
-                <RecordMapClick/>
-            </MapContainer>
+            <div style={{height: '80vh', width: '100%'}}>
+                <MapContainer center={startingPosition} zoom={zoom} scrollWheelZoom={true}
+                              ref={(map: L.Map) => setMap(map)} style={{ height: '100%' }}>
+                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>
+                    {players.map((player: Player, key: number) => <PlayerCar key={key} player={player}/>)}
+                    <Legend map={map as L.Map}/>
+                    <RecordMapCentreAndZoom/>
+                    <RecordMapClick/>
+                </MapContainer>
+            </div>
         </>);
 }
 

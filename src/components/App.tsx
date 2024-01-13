@@ -9,6 +9,7 @@ import { Copyright } from "./Copyright";
 import { MapWithCars } from "./MapWithCars";
 import { RecoilRoot } from 'recoil';
 import ProfileSelector from "./ProfileSelector";
+import Dice from "./Dice";
 
 
 export default function App() {
@@ -27,6 +28,7 @@ export default function App() {
                     </Typography>
                     <ProfileSelector/>
                 </Stack>
+                <Dice/>
                 <MapWithCars/>
                 <Grid container alignItems={"start"}>
                     <Grid item xs><ProTip/></Grid>

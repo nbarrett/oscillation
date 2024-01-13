@@ -8,6 +8,7 @@ export enum StoredValue {
   MAP_CLICK_POSITION = "map-click-position",
   MAP_ZOOM = "map-zoom",
   PLAYERS = "players",
+  GAME = "game",
   ROUTE_DIRECTIONS = "route-directions",
 }
 

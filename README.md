@@ -10,19 +10,20 @@ game manufacturer to present his idea.
 They asked Kerry to come up with some alternative ideas but this was the last meeting he had with a games manufacturer, as he fell ill and later died in 2012. 
 Only one prototype was ever made and it has been played by family members and friends on many occasions. You can see some photos from recent years below:
 
-### Game with friends 2020
-![game-with-friends-2020](images-story/game-with-friends-2020.png)
+### Guy and Lynds play in 2020
+![guy-and-lynds-2020](images-story/guy-and-lynds-2020.png)
 ### The board in play
 ![the-board-in-play](images-story/the-board-in-play.png)
 ### Edge of roads card
 ![edge-of-roads-card](images-story/edge-of-roads-card.png)
-### Guy and Lynds play in 2020
-![guy-and-lynds-2020](images-story/guy-and-lynds-2020.png)
 ### Guy wins the game!
 ![guy-wins-the-game](images-story/guy-wins-the-game.png)
+### Game with friends 2020
+![game-with-friends-2020](images-story/game-with-friends-2020.png)
+### Denise Rachel and Stuart play in 2021
+![img.png](images-story/game-with-friends-2021.png)
 ### Family game, Christmas 2023
 ![family-game-2023](images-story/family-game-2023.png)
- 
 ## OSCILLATION 200 Tooling Preferences
 The game is to be coded with the following libraries and frameworks:
 * The application is to be developed as a web application
@@ -125,9 +126,10 @@ The game is to be coded with the following libraries and frameworks:
     * However, the disadvantaged player can redeem his token AND the next one on his next turn only. If any leap-frogged
       player has no token to lose, they miss their next throw.
     * The extra token must be returned to the Staging Post as soon as the fifth token is collected by removing it by
-      hand,
-      leaving that player one more to visit and collect to make a set.
-      The gets back to the Finishing•Point with five different tokens is the
+      hand, leaving that player one more to visit and collect to make a set.
+
+9. Winning the game
+   * The gets back to the Finishing Point with five different tokens is the Winner
 
 ## The game so far
 
