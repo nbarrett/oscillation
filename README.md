@@ -1,10 +1,10 @@
-# OSCILLATION 200 
+# OSCILLATION 
 ## Introduction
 ![game-box](images-story/game-box.png)
 This game was created by my father, Kerry Barrett in the 1980 and early 90s. 
 For all of Kerry's life, he was an employee of 
 the Ordnance Survey as a surveyor, loved his job and all aspects of maps. 
-He was convinced that a game could be made out a map and as well as being fun, could also 
+He was convinced that inside every map, a fun and interesting game could be found, which when played could 
 educate people about maps in the process. He spent several years designing the game and even had a meeting with [Waddingtons](https://en.wikipedia.org/wiki/Waddingtons), the 
 game manufacturer to present his idea.
 [Waddingtons](https://en.wikipedia.org/wiki/Waddingtons) thought that the game had potential but spotted a few limitations related 
@@ -46,9 +46,9 @@ The game is to be coded with the following libraries and frameworks:
   all other players' screens in real time.
  
 
-## OSCILLATION 200 Game instructions
+## Oscillation Game instructions
 1. THE GAME
-    * OSCILLATION opens up a new dimension in board games as the players contribute in determining the positions of the
+    * Oscillation opens up a new dimension in board games as the players contribute in determining the positions of the
       Start finish objectives, which can be varied to give differing lengths of game.
     * With so many combinations available it is unlikely that any two games are identical.
     * The rules can apply to any defined area of a 1:50,000 Ordnance Survey map.
@@ -148,4 +148,4 @@ npm run dev
 
 ## Game Demo
 
-There's a demo of the game running at https://oscillation-production.up.railway.app
+There's a demo of the game so far running at https://oscillation-production.up.railway.app. Note that the game is still in development and is not yet complete, so please don't expect all features in the instructions to be found! 
