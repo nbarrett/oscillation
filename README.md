@@ -15,7 +15,10 @@ as he fell ill and later died in 2012.
 Only one prototype was ever made and it has been played by family members and friends on many occasions. You can see some photos from recent years below.
 Over Christmas period of 2023, I decided to create a digital version of the game as a tribute to my father and to see if I could overcome the limitations that Waddingtons had identified.
 
+## Game Demo
+There's a demo of the game so far running at https://oscillation-production.up.railway.app. Note that the game is still in development and is not yet complete, so please don't expect all features in the instructions to be found! 
 
+## Pictures of the prototype game being played
 ### Guy and Lynds play in 2020
 ![guy-and-lynds-2020](images-story/guy-and-lynds-2020.png)
 ### The board in play
@@ -145,7 +148,3 @@ Install it and run:
 npm install
 npm run dev
 ```
-
-## Game Demo
-
-There's a demo of the game so far running at https://oscillation-production.up.railway.app. Note that the game is still in development and is not yet complete, so please don't expect all features in the instructions to be found! 
