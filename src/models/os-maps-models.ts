@@ -22,8 +22,6 @@ export interface AccessTokenResponse {
     token_type: string;
 }
 
-const data: AccessTokenResponse = {"access_token":"U0Yxps6hkrhFcGIBeOELvgH0TnKy","expires_in":"299","issued_at":"1705361308761","token_type":"Bearer"}
-
 export enum MapLayer {
     LEISURE_27700 = "LEISURE_27700",
     LIGHT_27700 = "LIGHT_27700",
