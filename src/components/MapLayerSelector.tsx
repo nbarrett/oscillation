@@ -31,7 +31,7 @@ export default function MapLayerSelector() {
     }
 
     return (
-        <Tooltip arrow placement={"bottom-end"} title={<div>Th tick/cross is there to indicate which map layers work and which don't</div>}>
+        <Tooltip enterDelay={3000} arrow placement={"bottom-end"} title={<div>Th tick/cross is there to indicate which map layers work and which don't</div>}>
             <TextField disabled={mappingProvider === MappingProvider.OPEN_STREET_MAPS}
                                                      sx={{minWidth: 220}} select size={"small"}
                                                      label={"Map Layer"}
