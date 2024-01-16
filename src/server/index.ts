@@ -9,11 +9,6 @@ const viteMode = process.env["VITE"];
 const key = process.env["OS_MAPS_API_KEY"];
 const secret = process.env["OS_MAPS_API_SECRET"];
 
-if (!key || !secret) {
-    throw Error("Please provide an API key and secret on the command line.\nUsage: server.js <API key> <API Secret>");
-}
-console.log("Using API key: " + key);
-
 app.get("/api/test", (_, res) => res.json({greeting: "this is a test!"}));
 app.get("/api/directions", (req: Request, res: Response) => {
     const apiKey = `5b3ce3597851110001cf6248ce753974beff43f290cdfe4c1a50d56a`;
@@ -42,6 +37,11 @@ app.get("/api/directions", (req: Request, res: Response) => {
 });
 
 app.get('/api/token', function (req, res) {
+    if (!key || !secret) {
+        throw Error("Please provide an API key and secret on the command line.\nUsage: server.js <API key> <API Secret>");
+    }
+    console.log("Using API key: " + key);
+
     const params = new URLSearchParams();
     params.append('grant_type', 'client_credentials');
 
