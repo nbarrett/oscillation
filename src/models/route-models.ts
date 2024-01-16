@@ -14,6 +14,21 @@ export enum Profile {
     WHEELCHAIR = "wheelchair",
 }
 
+export enum MappingProvider {
+    OPEN_STREET_MAPS = "OPEN_STREET_MAPS",
+    OS_MAPS_ZXY = "OS_MAPS_ZXY",
+    OS_MAPS_WMTS = "OS_MAPS_WMTS",
+
+}
+
+export interface MapLayerAttributes {
+    name: string;
+    displayName: string;
+    urlPath: string;
+    renders: boolean;
+}
+
+
 export interface RouteDirectionsRequest {
     profile: Profile;
     start: LatLngTuple;

@@ -5,13 +5,13 @@ import { removeToJSONFrom } from "../mappings/atom-mappings";
 import { queryDirections } from "../data-services/route-data-services";
 import {
   defaultZoom,
-  DirectionsResponse,
-  Profile,
+  DirectionsResponse, Profile,
   RouteDirectionsRequest,
   SerializableRouteDirectionsRequest
 } from "../models/route-models";
 import { Player } from "../models/player-models";
 import { LatLngTuple } from "leaflet";
+import { MapLayer } from "../models/os-maps-models";
 
 export const routeDirectionsState: (routeDirectionsRequest: SerializableRouteDirectionsRequest) => RecoilState<DirectionsResponse> = atomFamily({
   key: StoredValue.ROUTE_DIRECTIONS,

@@ -2,13 +2,16 @@ import { log } from "./logging-config";
 import { booleanOf } from "./strings";
 
 export enum StoredValue {
+  ACCESS_TOKEN = "access-token",
   CURRENT_PLAYER = "current-player",
   DRIVING_PROFILE = "driving-profile",
+  GAME = "game",
+  MAPPING_PROVIDER = "mapping-provider",
   MAP_CENTRE_POSITION = "map-centre-position",
   MAP_CLICK_POSITION = "map-click-position",
+  MAP_LAYER = "map-layer",
   MAP_ZOOM = "map-zoom",
   PLAYERS = "players",
-  GAME = "game",
   ROUTE_DIRECTIONS = "route-directions",
 }
 

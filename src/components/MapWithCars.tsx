@@ -5,9 +5,8 @@ import markerIconImage from "leaflet/dist/images/marker-icon.png";
 import React, { Fragment, useEffect, useState } from "react";
 import "leaflet/dist/leaflet.css";
 import "./App.css";
-import { MapContainer, TileLayer } from "react-leaflet";
+import { MapContainer, TileLayer, WMSTileLayer } from "react-leaflet";
 import L, { Icon, LatLng, LatLngTuple } from "leaflet";
-import { Legend } from "./Legend";
 import Link from "@mui/material/Link";
 import { Box, Stack } from "@mui/material";
 import { log } from "../util/logging-config";
@@ -20,10 +19,15 @@ import {
     mapZoomState,
     playersState
 } from "../atoms/route-atoms";
-import { PlayerCar } from "./PlayerCar";
+import { formatLatLong, toLatLngFromLatLngTuple } from "../mappings/route-mappings";
+import { accessTokenState, mappingProviderState, mapLayerState } from "../atoms/os-maps-atoms";
+import { AccessTokenResponse, MapLayers, MapLayer } from "../models/os-maps-models";
+import { Legend } from "./Legend";
 import { RecordMapCentreAndZoom } from "./RecordMapCentreAndZoom";
 import { RecordMapClick } from "./RecordMapClick";
-import { formatLatLong, toLatLngFromLatLngTuple } from "../mappings/route-mappings";
+import { MapLayerAttributes, MappingProvider } from "../models/route-models";
+import { PlayerCar } from "./PlayerCar";
+import { info } from "loglevel";
 
 const startingPosition: LatLngTuple = [51.505, -0.09];
 
@@ -56,18 +60,53 @@ function generatePlayers(icons: Icon[]): Player[] {
 
 export function MapWithCars() {
 
+    const mapLayer: MapLayer = useRecoilValue<MapLayer>(mapLayerState);
+    const mappingProvider: MappingProvider = useRecoilValue<MappingProvider>(mappingProviderState);
     const [players, setPlayers] = useRecoilState<Player[]>(playersState);
     const player: Player = useRecoilValue<Player>(currentPlayerState);
     const zoom: number = useRecoilValue<number>(mapZoomState);
     const mapClickPosition: LatLngTuple = useRecoilValue<LatLngTuple>(mapClickPositionState);
+    const accessTokenResponse: AccessTokenResponse = useRecoilValue<AccessTokenResponse>(accessTokenState);
     const mapCentrePosition: LatLngTuple = useRecoilValue<LatLngTuple>(mapCentreState);
+    const mapLayerAttributes: MapLayerAttributes = MapLayers[mapLayer];
     const [map, setMap] = useState<L.Map>();
+    const key = encodeURIComponent(accessTokenResponse?.access_token);
+    const urlOSMapsZXY = `https://api.os.uk/maps/raster/v1/zxy/${mapLayerAttributes?.urlPath}/{z}/{x}/{y}.png?key=${key}`;
+    const urlOSMapsWMTS = `https://api.os.uk/maps/raster/v1/wmts?key=${key}&tileMatrixSet=EPSG:27700&version=1.0.0&style=default&layer=${mapLayerAttributes?.urlPath}&service=WMTS&request=GetTile&tileCol={x}&tileRow={y}&tileMatrix={z}`;
+    const urlOpenStreetMapsZXY = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+    const tileUrl = deriveTileUrl();
+
+    function deriveTileUrl() {
+        switch (mappingProvider) {
+            case MappingProvider.OPEN_STREET_MAPS:
+                return urlOpenStreetMapsZXY;
+            case MappingProvider.OS_MAPS_ZXY:
+                return urlOSMapsZXY;
+            case MappingProvider.OS_MAPS_WMTS:
+                return urlOSMapsWMTS;
+        }
+    }
+
+
+    info("attempting to use urlOSMapsWMTS:", urlOSMapsWMTS);
 
     useEffect(() => {
         const players = generatePlayers([whiteCarIcon, blueCarIcon, redCarIcon]);
         log.info("initialising players to:", players);
         setPlayers(players);
     }, []);
+
+    useEffect(() => {
+        log.info("mappingProvider:", mappingProvider, "urlOSMapsZXY:", urlOSMapsZXY, "urlOSMapsWMTS:", urlOSMapsWMTS, "urlOpenStreetMapsZXY:", urlOpenStreetMapsZXY, "tileUrl:", tileUrl);
+    }, [urlOSMapsZXY, urlOSMapsWMTS, urlOpenStreetMapsZXY, tileUrl, mappingProvider]);
+
+    useEffect(() => {
+        log.info("accessTokenResponse:", accessTokenResponse, "tileUrl:", tileUrl);
+    }, [accessTokenResponse, tileUrl]);
+
+    useEffect(() => {
+        log.info("mapLayerAttributes:", mapLayerAttributes);
+    }, [mapLayerAttributes]);
 
     useEffect(() => {
         if (players.length > 0) {
@@ -78,6 +117,7 @@ export function MapWithCars() {
     function zoomToPlayer(player: Player) {
         map?.flyTo(player.position);
     }
+
 
     return (
         <>
@@ -97,8 +137,10 @@ export function MapWithCars() {
             </Stack>
             <div style={{height: '80vh', width: '100%'}}>
                 <MapContainer center={startingPosition} zoom={zoom} scrollWheelZoom={true}
-                              ref={(map: L.Map) => setMap(map)} style={{ height: '100%' }}>
-                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>
+                              ref={(map: L.Map) => setMap(map)} style={{height: '100%'}}>
+                    <TileLayer url={tileUrl}
+                               attribution={'© <a href="https://www.ordnancesurvey.co.uk/">Ordnance Survey Crown copyright and database rights 2022 OS 100018976</a> <a href="https://www.ordnancesurvey.co.uk/">Ordnance Survey</a>'}
+                    />
                     {players.map((player: Player, key: number) => <PlayerCar key={key} player={player}/>)}
                     <Legend map={map as L.Map}/>
                     <RecordMapCentreAndZoom/>
@@ -106,5 +148,7 @@ export function MapWithCars() {
                 </MapContainer>
             </div>
         </>);
+    {
+    }
 }
 
