@@ -10,6 +10,8 @@ import { MapWithCars } from "./MapWithCars";
 import { RecoilRoot } from 'recoil';
 import ProfileSelector from "./ProfileSelector";
 import Dice from "./Dice";
+import MapLayerSelector from "./MapLayerSelector";
+import MappingProviderSelector from "./MappingProviderSelector";
 
 
 export default function App() {
@@ -17,7 +19,7 @@ export default function App() {
         <RecoilRoot>
             <Container maxWidth={false}>
                 <Stack pt={2} direction={"row"} alignItems={"center"} spacing={2}>
-                    <Icon sx={{pt:1 ,height: 60, width: 150}}>
+                    <Icon sx={{pt: 1, height: 60, width: 150}}>
                         <img src="https://labs.os.uk/static/media/os-logo.svg"/>
                     </Icon>
                     <Typography variant="h4" component="h1" gutterBottom>
@@ -27,6 +29,8 @@ export default function App() {
                         Version 0.1
                     </Typography>
                     <ProfileSelector/>
+                    <MappingProviderSelector/>
+                    <MapLayerSelector/>
                 </Stack>
                 <Dice/>
                 <MapWithCars/>
