@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import MenuItem from '@mui/material/MenuItem';
 import { enumValues } from "../util/enums";
 import { MappingProvider } from "../models/route-models";
-import { TextField } from "@mui/material";
+import { Stack, TextField } from "@mui/material";
 import { useRecoilState, useRecoilValue } from "recoil";
 import { log } from "../util/logging-config";
 import { mapLayerState, mappingProviderState } from "../atoms/os-maps-atoms";
@@ -38,8 +38,11 @@ export default function MapLayerSelector() {
                        onChange={handleChange}>
                 {enumValues(MapLayer).map((value, index) => {
                     const attribute: MapLayerAttributes = MapLayers[value];
-                    return <MenuItem key={attribute.name} value={attribute.name}>{attribute.style}
-                        <TickCrossIcon isTick={attribute.renders}/>
+                    return <MenuItem key={attribute.name} value={attribute.name}>
+                        <Stack direction={"row"} alignItems={"center"} spacing={1}>
+                            <div>{attribute.displayName}</div>
+                            <TickCrossIcon isTick={attribute.renders}/>
+                        </Stack>
                     </MenuItem>;
                 })}
             </TextField>
