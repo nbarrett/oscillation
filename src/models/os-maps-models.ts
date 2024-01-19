@@ -64,7 +64,7 @@ export const MapLayers: { [key in MapLayer]: MapLayerAttributes } = {
         tileMatrixSet: "EPSG:27700",
         minZoom: 0,
         maxZoom: 13,
-        renders: true
+        renders: false
     },
     LIGHT_3857: {
         name: MapLayer.LIGHT_3857,
