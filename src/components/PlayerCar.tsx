@@ -72,7 +72,7 @@ export function PlayerCar(props: { player: Player }) {
         } else if (active) {
             return `It's ${props?.player?.name}'s turn and it's time to ${asTitle(gameState.gameData.gameTurnState)}`;
         } else {
-            return `It's ${props?.player?.name}'s turn - you must wait for  ${asTitle(gameState.gameData.currentPlayerName)} to finish first`;
+            return `It's ${gameState.gameData.currentPlayerName}'s turn - you must wait for them to finish first!`;
         }
     }
 
