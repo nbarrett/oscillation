@@ -11,8 +11,10 @@ export enum StoredValue {
   MAP_CLICK_POSITION = "map-click-position",
   MAP_LAYER = "map-layer",
   MAP_ZOOM = "map-zoom",
-  PLAYERS = "players",
+  MAR = "map",
+  PLAYER_ZOOM_REQUEST     = "player-zoom-request",
   ROUTE_DIRECTIONS = "route-directions",
+  SELECTED_PLAYER = "selected-player",
 }
 
 export function initialValueFor(parameter: string, defaultValue?: any): string {

@@ -29,7 +29,7 @@ export default function ProfileSelector() {
     }
 
     return (
-        <TextField sx={{minWidth: 220}} select size={"small"}
+        <TextField fullWidth sx={{minWidth: 220}} select size={"small"}
                    label={"Driving Profile"}
                    id="demo-simple-select"
                    value={profile||""}
