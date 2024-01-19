@@ -3,8 +3,8 @@ import { useEffect } from "react";
 import { log } from "../util/logging-config";
 import { formatLatLong } from "../mappings/route-mappings";
 import { useRecoilState, useSetRecoilState } from "recoil";
-import { mapCentreState, mapClickPositionState, mapZoomState } from "../atoms/route-atoms";
 import { LatLngTuple } from "leaflet";
+import { mapCentreState, mapClickPositionState, mapZoomState } from "../atoms/game-atoms";
 
 export function RecordMapClick() {
     const map = useMap();

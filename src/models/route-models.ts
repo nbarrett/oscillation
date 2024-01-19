@@ -21,13 +21,6 @@ export enum MappingProvider {
 
 }
 
-export interface MapLayerAttributes {
-    name: string;
-    displayName: string;
-    urlPath: string;
-    renders: boolean;
-}
-
 
 export interface RouteDirectionsRequest {
     profile: Profile;

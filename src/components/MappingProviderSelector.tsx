@@ -30,7 +30,7 @@ export default function MappingProviderSelector() {
     }
 
     return (
-        <TextField sx={{minWidth: 220}} select size={"small"}
+        <TextField fullWidth sx={{minWidth: 220}} select size={"small"}
                    label={"Mapping Provider"}
                    value={mappingProvider || ""}
                    onChange={handleChange}>

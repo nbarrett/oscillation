@@ -4,6 +4,7 @@ import { log } from "../util/logging-config";
 import { refreshAccessToken, refreshAccessTokenRaw } from "../data-services/os-maps-data-services";
 import { AccessTokenResponse, MapLayer } from "../models/os-maps-models";
 import { MappingProvider } from "../models/route-models";
+import L from "leaflet";
 
 export const accessTokenState: RecoilState<AccessTokenResponse> = atom({
     key: StoredValue.ACCESS_TOKEN,
@@ -21,6 +22,11 @@ export const accessTokenState: RecoilState<AccessTokenResponse> = atom({
 
 export const mapLayerState: RecoilState<MapLayer> = atom({
     key: StoredValue.MAP_LAYER,
+    default: null,
+});
+
+export const mapState: RecoilState<L.Map> = atom({
+    key: StoredValue.MAR,
     default: null,
 });
 

@@ -71,3 +71,8 @@
 .spin {
   animation: spin 0.3s infinite linear;
 }
+
+
+.leaflet-popup {
+  padding-bottom: 30px;
+}

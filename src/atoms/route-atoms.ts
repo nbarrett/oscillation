@@ -4,14 +4,11 @@ import { log } from "../util/logging-config";
 import { removeToJSONFrom } from "../mappings/atom-mappings";
 import { queryDirections } from "../data-services/route-data-services";
 import {
-  defaultZoom,
-  DirectionsResponse, Profile,
+  DirectionsResponse,
+  Profile,
   RouteDirectionsRequest,
   SerializableRouteDirectionsRequest
 } from "../models/route-models";
-import { Player } from "../models/player-models";
-import { LatLngTuple } from "leaflet";
-import { MapLayer } from "../models/os-maps-models";
 
 export const routeDirectionsState: (routeDirectionsRequest: SerializableRouteDirectionsRequest) => RecoilState<DirectionsResponse> = atomFamily({
   key: StoredValue.ROUTE_DIRECTIONS,
@@ -32,34 +29,9 @@ export const routeDirectionsState: (routeDirectionsRequest: SerializableRouteDir
   ]
 });
 
-export const playersState: RecoilState<Player[]> = atom({
-  key: StoredValue.PLAYERS,
-  default: [],
-});
-
-export const currentPlayerState: RecoilState<Player> = atom({
-  key: StoredValue.CURRENT_PLAYER,
-  default: null,
-});
-
 export const profileState: RecoilState<Profile> = atom({
   key: StoredValue.DRIVING_PROFILE,
   default: null,
-});
-
-export const mapCentreState: RecoilState<LatLngTuple> = atom({
-  key: StoredValue.MAP_CENTRE_POSITION,
-  default: null,
-});
-
-export const mapClickPositionState: RecoilState<LatLngTuple> = atom({
-  key: StoredValue.MAP_CLICK_POSITION,
-  default: null,
-});
-
-export const mapZoomState: RecoilState<number> = atom({
-  key: StoredValue.MAP_ZOOM,
-  default: defaultZoom,
 });
 
 

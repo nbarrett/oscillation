@@ -1,11 +1,12 @@
 import { Player } from "../models/player-models";
-import { useSetRecoilState } from "recoil";
-import { currentPlayerState, playersState } from "../atoms/route-atoms";
 import React, { useEffect, useMemo, useRef } from "react";
 import { log } from "../util/logging-config";
-import { LatLng, LatLngTuple } from "leaflet";
+import { LatLng, LatLngExpression, LatLngTuple } from "leaflet";
 import { Marker, Popup } from "react-leaflet";
-import { PolylineWithData } from "./Polyline";
+import { PlayerMoveRoute } from "./PlayerMoveRoute";
+import { GameTurnState } from "../models/game-models";
+import { useGameState } from "../hooks/use-game-state";
+import { asTitle, pluraliseWithCount } from "../util/strings";
 
 function positionFrom(markerRef: React.MutableRefObject<any>): LatLngTuple {
     const latLng: LatLng = markerRef.current.getLatLng();
@@ -14,51 +15,75 @@ function positionFrom(markerRef: React.MutableRefObject<any>): LatLngTuple {
 
 export function PlayerCar(props: { player: Player }) {
 
-    const setPlayers = useSetRecoilState<Player[]>(playersState);
-    const setPlayer = useSetRecoilState<Player>(currentPlayerState);
     const markerRef = useRef<any>(null);
+    const gameState = useGameState();
+    const active = props.player.name === gameState?.gameData?.currentPlayerName;
+    const activeLabel = active ? "active" : "not active";
+    const draggable = active && gameState.gameData.gameTurnState === GameTurnState.DICE_ROLLED;
     const eventHandlers = useMemo(
         () => ({
             dragstart() {
-                const position = positionFrom(markerRef);
-                log.info("drag start for:", props?.player?.name, "position:", position);
-                setPlayers(existing => {
-                    return existing.map(player => player?.name === props?.player?.name ? ({
-                        ...player,
-                        position: position
-                    }) : player);
-                });
-                setPlayer({...props.player, position: position});
+                if (active) {
+                    const position = positionFrom(markerRef);
+                    log.info("drag start for:", props?.player?.name, "position:", position);
+                    gameState.setPlayerData("position", position);
+                } else {
+                    log.warn("drag start not possible for:", props?.player?.name, "as", activeLabel);
+                }
             },
             dragend: function () {
-                                const position = positionFrom(markerRef);
-                log.info("dragend for:", props?.player?.name, "position:", position);
-                // setPlayer(existing => ({
-                //     ...existing,
-                //     nextPosition: position
-                // }));
-                setPlayers(existing => {
-                    return existing.map(player => player?.name === props?.player?.name ? ({
-                        ...player,
-                        nextPosition: position
-                    }) : player);
-                });
+                if (active) {
+                    const position = positionFrom(markerRef);
+                    log.info("drag end for:", props?.player?.name, "position:", position);
+                    gameState.setPlayerData("nextPosition", position);
+                } else {
+                    log.warn("drag start not possible for:", props?.player?.name, "as", activeLabel);
+                }
+
+            },
+            mouseover: function (data) {
+                log.info(activeLabel, "mouseover for:", props?.player?.name, "data:", data);
+                markerRef.current.openPopup();
+            },
+            mouseout: function (data) {
+                log.info(activeLabel, "mouseout for:", props?.player?.name, "data:", data);
             },
         }),
-        [],
+        [props.player, active],
     );
 
     useEffect(() => {
-        log.debug("opening popup for ", props?.player?.name, "ref:", markerRef.current);
-        markerRef.current.openPopup();
     }, [markerRef]);
 
+    useEffect(() => {
+        if (active && markerRef) {
+            log.info("opening popup for ", props?.player?.name, "ref:", markerRef.current, "gameTurnState:", gameState.gameData.gameTurnState);
+            markerRef.current.openPopup();
+        } else {
+            log.info("not opening popup for ", props?.player?.name, "ref:", markerRef.current, "gameTurnState:", gameState.gameData.gameTurnState);
+        }
+    }, [active, markerRef, gameState.gameData.gameTurnState]);
+
+    const popupPosition: LatLngExpression = [75.505, 190];
+
+    function popupCaption() {
+        if (draggable) {
+            return `Okay ${props?.player?.name} - move ${pluraliseWithCount(gameState.gameData.diceResult, "square")}!`;
+        } else if (active) {
+            return `It's ${props?.player?.name}'s turn and it's time to ${asTitle(gameState.gameData.gameTurnState)}`;
+        } else {
+            return `It's ${props?.player?.name}'s turn - you must wait for  ${asTitle(gameState.gameData.currentPlayerName)} to finish first`;
+        }
+    }
 
     return (
-        <><PolylineWithData player={props?.player}/>
         <Marker position={props?.player?.position} icon={props?.player?.icon}
-                draggable eventHandlers={eventHandlers}
+                draggable={draggable}
+                riseOnHover={false}
+                eventHandlers={eventHandlers}
                 ref={markerRef}>
-            <Popup position={[71.505, 9]}>I am {props?.player?.name}!</Popup>
-        </Marker></>);
+            <PlayerMoveRoute player={props?.player}/>
+            <Popup position={popupPosition} className="custom-popup">
+                {popupCaption()}</Popup>
+        </Marker>);
 }
