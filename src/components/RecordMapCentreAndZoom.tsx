@@ -22,6 +22,19 @@ export function RecordMapCentreAndZoom() {
                 setZoom(zoom);
                 setMapCentre([map.getCenter().lat, map.getCenter().lng]);
             });
+            map.on("zoomstart", () => {
+                const zoom = map.getZoom();
+                log.info(`zoomstart:map zoom is: ${zoom}`);
+            });
+            map.on("zoomlevelschange", () => {
+                const zoom = map.getZoom();
+                log.info(`zoomlevelschange:map zoom is: ${zoom}`);
+            });
+            // zoomlevelschange?: LeafletEventHandlerFn | undefined;
+            // unload?: LeafletEventHandlerFn | undefined;
+            // viewreset?: LeafletEventHandlerFn | undefined;
+            // load?: LeafletEventHandlerFn | undefined;
+            // zoomstart?: LeafletEventHandlerFn | undefined;
         } else {
             log.info("map not yet initialised");
         }

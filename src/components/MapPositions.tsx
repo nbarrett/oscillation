@@ -1,5 +1,5 @@
 import { Player } from "../models/player-models";
-import { SetterOrUpdater, useRecoilState, useRecoilValue } from "recoil";
+import { useRecoilValue } from "recoil";
 import { LatLngTuple } from "leaflet";
 import { Stack } from "@mui/material";
 import { formatLatLong, toLatLngFromLatLngTuple } from "../mappings/route-mappings";

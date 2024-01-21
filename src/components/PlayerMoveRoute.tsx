@@ -9,6 +9,7 @@ import { createSerializableRouteDirectionsRequest, toApiTuple } from "../mapping
 import { Player } from "../models/player-models";
 import { currentPlayerState } from "../atoms/game-atoms";
 import { useGameState } from "../hooks/use-game-state";
+import { colours } from "../models/game-models";
 
 export function PlayerMoveRoute(props: { player: Player }) {
 
@@ -35,8 +36,8 @@ export function PlayerMoveRoute(props: { player: Player }) {
 
     return (
         <Polyline
-            color={'red'}
-            opacity={0.7}
+            color={colours.osMapsPurple}
+            opacity={0.8}
             weight={10}
             positions={positions}/>);
 }

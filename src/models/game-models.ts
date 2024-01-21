@@ -2,6 +2,14 @@ import { defaultZoom } from "./route-models";
 import { Player } from "./player-models";
 import { LatLngTuple } from "leaflet";
 
+export const colours = {
+    blueCar: 'rgb(34 93 173)',
+    greyCar: 'rgb(204 205 207)',
+    redCar: 'rgb(238 25 29)',
+    osMapsPurple: '#453c90',
+    osMapsPink: '#d40058'
+};
+
 export interface DiceRollerProps {
     onRoll: (result: number) => void;
 }

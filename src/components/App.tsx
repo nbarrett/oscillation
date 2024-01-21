@@ -19,6 +19,7 @@ import { DiceRoller } from "./DiceRoller";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 
 export default function App() {
+
     const theme = createTheme({
         components: {
             MuiButton: {
@@ -30,6 +31,7 @@ export default function App() {
             },
         },
     });
+
     return (
         <RecoilRoot>
             <ThemeProvider theme={theme}>

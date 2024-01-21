@@ -1,6 +1,6 @@
 import { LatLngTuple } from "leaflet";
 
-export const defaultZoom = 17;
+export const defaultZoom = 7;
 
 export enum Profile {
     DRIVING_CAR = "driving-car",

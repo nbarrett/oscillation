@@ -8,7 +8,6 @@ import { useRecoilState } from "recoil";
 import { log } from "../util/logging-config";
 import { mappingProviderState } from "../atoms/os-maps-atoms";
 import { asTitle } from "../util/strings";
-import { MapLayer } from "../models/os-maps-models";
 
 export default function MappingProviderSelector() {
 
@@ -17,7 +16,7 @@ export default function MappingProviderSelector() {
     useEffect(() => {
         if (!mappingProvider) {
             log.info("MappingProviderSelector:mappingProvider:initialised to:", mappingProvider);
-            setMappingProvider(MappingProvider.OS_MAPS_ZXY);
+            setMappingProvider(MappingProvider.OS_MAPS_WMTS);
         }
     }, []);
 
