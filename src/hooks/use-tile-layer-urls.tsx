@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import { log } from "../util/logging-config";
 import { useRecoilValue } from "recoil";
 import { accessTokenState, mapLayerState, mappingProviderState } from "../atoms/os-maps-atoms";
@@ -12,8 +12,6 @@ export function useTileLayerUrls() {
     const accessTokenResponse: AccessTokenResponse = useRecoilValue<AccessTokenResponse>(accessTokenState);
     const mapLayerAttributes: MapLayerAttributes = MapLayers[mapLayer];
     const key = encodeURI(accessTokenResponse?.access_token);
-    const tileMatrixSet = mapLayerAttributes?.tileMatrixSet;
-    const layer = encodeURI(mapLayerAttributes?.layerName);
     const urlOSMapsZXY = osMapsZXYUrl();
     const urlOSMapsWMTS = osMapsWMTSUrl();
     const urlOpenStreetMapsZXY = openStreetMapsUrl();
@@ -30,32 +28,33 @@ export function useTileLayerUrls() {
         }
     }
 
-
     useEffect(() => {
-        log.info("mappingProvider:", mappingProvider, "urlOSMapsZXY:", urlOSMapsZXY, "urlOSMapsWMTS:", urlOSMapsWMTS, "urlOpenStreetMapsZXY:", urlOpenStreetMapsZXY, "tileUrl:", url);
+        log.debug("mappingProvider:", mappingProvider, "urlOSMapsZXY:", urlOSMapsZXY, "urlOSMapsWMTS:", urlOSMapsWMTS, "urlOpenStreetMapsZXY:", urlOpenStreetMapsZXY, "tileUrl:", url);
     }, [urlOSMapsZXY, urlOSMapsWMTS, urlOpenStreetMapsZXY, url, mappingProvider]);
 
     useEffect(() => {
-        log.info("accessTokenResponse:", accessTokenResponse);
+        log.debug("accessTokenResponse:", accessTokenResponse);
     }, [accessTokenResponse]);
 
     useEffect(() => {
-        log.info("for mapLayerAttributes:", mapLayerAttributes, "tileUrl:", url, "tileMatrixSet:", tileMatrixSet, "layer:", layer);
+        log.info("for mapLayerAttributes:", mapLayerAttributes, "tileUrl:", url);
     }, [url]);
 
 
     function osMapsZXYUrl() {
-        return `https://api.os.uk/maps/raster/v1/zxy/${mapLayerAttributes?.layerName}/{z}/{x}/{y}.png?key=${key}`;
+        return `https://api.os.uk/maps/raster/v1/zxy/${mapLayerAttributes?.layerParameters?.layer}/{z}/{x}/{y}.png?key=${key}`;
     }
 
     function osMapsWMTSUrl() {
-        return `https://api.os.uk/maps/raster/v1/wmts?key=${key}&service=WMTS&request=GetTile&version=1.0.0&style=default&layer=${mapLayerAttributes?.layerName}&tileMatrixSet=${tileMatrixSet}&tileMatrix={z}&tileRow={y}&tileCol={x}`;
+        const namValuePars = mapLayerAttributes ? Object.entries(mapLayerAttributes?.layerParameters)
+            .map((pair: [string, any]) => `${pair[0]}=${pair[1]}`).join("&") : "";
+        return `https://api.os.uk/maps/raster/v1/wmts?key=${key}&${namValuePars}`;
     }
 
     function openStreetMapsUrl() {
         return "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
     }
 
-    return {url, tileMatrixSet, layer};
+    return {url};
 }
 

@@ -1,14 +1,15 @@
 import { atom, atomFamily, RecoilState } from "recoil";
-import { StoredValue } from "../util/ui-stored-values";
+import { initialValueFor, saveValueFor, StoredValue } from "../util/ui-stored-values";
 import { log } from "../util/logging-config";
 import { removeToJSONFrom } from "../mappings/atom-mappings";
 import { queryDirections } from "../data-services/route-data-services";
 import {
-  DirectionsResponse,
-  Profile,
-  RouteDirectionsRequest,
-  SerializableRouteDirectionsRequest
+    DirectionsResponse,
+    Profile,
+    RouteDirectionsRequest,
+    SerializableRouteDirectionsRequest
 } from "../models/route-models";
+import { enumForKey } from "../util/enums";
 
 export const routeDirectionsState: (routeDirectionsRequest: SerializableRouteDirectionsRequest) => RecoilState<DirectionsResponse> = atomFamily({
   key: StoredValue.ROUTE_DIRECTIONS,
@@ -31,7 +32,15 @@ export const routeDirectionsState: (routeDirectionsRequest: SerializableRouteDir
 
 export const profileState: RecoilState<Profile> = atom({
   key: StoredValue.DRIVING_PROFILE,
-  default: null,
+  default: enumForKey(Profile, initialValueFor(StoredValue.DRIVING_PROFILE, Profile.DRIVING_CAR)),
+  effects: [
+    ({onSet}) => {
+      onSet(mapZoom => {
+        log.info(StoredValue.DRIVING_PROFILE, "set to:", mapZoom);
+        saveValueFor(StoredValue.DRIVING_PROFILE, mapZoom);
+      });
+    },
+  ],
 });
 
 

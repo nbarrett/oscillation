@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Grid, Stack } from "@mui/material";
 import CasinoIcon from '@mui/icons-material/Casino';
-import { GameTurnState } from '../models/game-models';
+import { colours, GameTurnState } from '../models/game-models';
 import { Player } from "../models/player-models";
 import { useRecoilValue } from "recoil";
 import { log } from "../util/logging-config";
@@ -44,6 +44,7 @@ export function DiceRoller() {
     }
 
 
+
     return (
         <Grid pt={2} container alignItems={"center"} spacing={2} mb={2}>
             <Grid item xs={12} xl={6}>
@@ -54,10 +55,10 @@ export function DiceRoller() {
                             disabled={isRolling || gameState.gameData.gameTurnState !== GameTurnState.ROLL_DICE}
                             sx={{
                                 '&': {
-                                    backgroundColor: '#453c90',
+                                    backgroundColor: colours.osMapsPurple,
                                 },
                                 '&:hover': {
-                                    backgroundColor: '#d40058',
+                                    backgroundColor: colours.osMapsPink,
                                 },
                             }}>{isRolling ? `${playerName} Rolling...` : `${playerName} Roll Dice`}</Button>
                     <Button fullWidth variant="contained"
@@ -66,10 +67,10 @@ export function DiceRoller() {
                             disabled={gameState.gameData.gameTurnState !== GameTurnState.DICE_ROLLED}
                             sx={{
                                 '&': {
-                                    backgroundColor: '#453c90',
+                                    backgroundColor: colours.osMapsPurple,
                                 },
                                 '&:hover': {
-                                    backgroundColor: '#d40058',
+                                    backgroundColor: colours.osMapsPink,
                                 },
                             }}>{`${playerName} Turn Complete`}</Button>
                 </Stack>

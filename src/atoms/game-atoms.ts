@@ -1,9 +1,10 @@
 import { atom, GetCallback, GetRecoilValue, RecoilState, RecoilValueReadOnly, selector, selectorFamily } from "recoil";
-import { StoredValue } from "../util/ui-stored-values";
+import { initialValueFor, saveValueFor, StoredValue } from "../util/ui-stored-values";
 import { GAME_DEFAULTS, GameData } from "../models/game-models";
 import { Player } from "../models/player-models";
 import { defaultZoom } from "../models/route-models";
 import { LatLngTuple } from "leaflet";
+import { log } from "../util/logging-config";
 
 
 export const gameState: RecoilState<GameData> = atom({
@@ -43,5 +44,13 @@ export const mapClickPositionState: RecoilState<LatLngTuple> = atom({
 
 export const mapZoomState: RecoilState<number> = atom({
     key: StoredValue.MAP_ZOOM,
-    default: defaultZoom,
+    default: +initialValueFor(StoredValue.MAP_ZOOM, defaultZoom),
+    effects: [
+        ({onSet}) => {
+            onSet(mapZoom => {
+                log.info(StoredValue.MAP_ZOOM, "set to:", mapZoom);
+                saveValueFor(StoredValue.MAP_ZOOM, mapZoom);
+            });
+        },
+    ],
 });
