@@ -145,4 +145,3 @@ export interface CellAddress {
 export interface UniqueValues {
     [fieldName: string]: any[]
 }
-

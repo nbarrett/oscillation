@@ -1,22 +1,44 @@
-import { GameData, GameTurnState } from '../models/game-models';
-import { useRecoilState, useRecoilValue } from "recoil";
-import { currentPlayerState, gameState } from "../atoms/game-atoms";
+import first from "lodash-es/first";
+import last from "lodash-es/last";
+
+import { blueCarIcon, GameData, GameTurnState, redCarIcon, whiteCarIcon } from '../models/game-models';
+import { SetterOrUpdater, useRecoilState, useRecoilValue, useSetRecoilState } from "recoil";
+import { currentPlayerState, gameState, playerZoomRequestState } from "../atoms/game-atoms";
 import { Player } from "../models/player-models";
 import { useEffect } from "react";
 import { log } from "../util/logging-config";
-import { LatLngTuple } from "leaflet";
+import { Icon, LatLngTuple } from "leaflet";
+import { startingPositionState } from "../atoms/route-atoms";
 
 export function useGameState() {
 
     const [gameData, setGameData] = useRecoilState<GameData>(gameState);
     const currentPlayer: Player = useRecoilValue<Player>(currentPlayerState);
+    const startingPosition = useRecoilValue(startingPositionState);
+    const setPlayerZoomRequest: SetterOrUpdater<string> = useSetRecoilState<string>(playerZoomRequestState);
 
     useEffect(() => {
-        log.info("gameData:", gameData);
+        log.debug("gameData:", gameData);
     }, [gameData]);
 
-    function initialisePlayers(players: Player[]) {
-        setGameData(existing => ({...existing, players}));
+
+    function startingPositionFor(index: number): LatLngTuple {
+        return [first(startingPosition?.location) + 0.00014023745552549371 * index, last(startingPosition?.location) + -0.0002467632293701172 * index];
+    }
+
+    function generatePlayers(icons: Icon[]): Player[] {
+        return icons.map((icon, index) => ({name: `Player ${index + 1}`, icon, position: startingPositionFor(index)}));
+    }
+
+    function initialisePlayers() {
+        if (startingPosition) {
+            const players = generatePlayers([whiteCarIcon, blueCarIcon, redCarIcon]);
+            log.debug("initialising players to:", players);
+            setGameData(existing => ({...existing, players}));
+            setPlayerZoomRequest(players[0].name);
+        } else {
+            log.info("cant initialise players as startingPosition not set");
+        }
     }
 
     function setCurrentPlayer(currentPlayerName: string) {
@@ -25,7 +47,7 @@ export function useGameState() {
 
     function setPlayerData(field: keyof Player, value: any) {
         if (currentPlayer) {
-            log.info("setPlayerData:setting", currentPlayer.name, "field:", field, "to value:", value);
+            log.debug("setPlayerData:setting", currentPlayer.name, "field:", field, "to value:", value);
             setGameData(existing => ({
                 ...existing, players: existing.players.map(player => player?.name === gameData?.currentPlayerName ? ({
                     ...player, [field]: value

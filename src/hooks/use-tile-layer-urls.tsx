@@ -37,18 +37,18 @@ export function useTileLayerUrls() {
     }, [accessTokenResponse]);
 
     useEffect(() => {
-        log.info("for mapLayerAttributes:", mapLayerAttributes, "tileUrl:", url);
+        log.info("for mapLayerAttributes:", mapLayerAttributes, "key:", key, "tileUrl:", url);
     }, [url]);
 
 
     function osMapsZXYUrl() {
-        return `https://api.os.uk/maps/raster/v1/zxy/${mapLayerAttributes?.layerParameters?.layer}/{z}/{x}/{y}.png?key=${key}`;
+        return key ? `https://api.os.uk/maps/raster/v1/zxy/${mapLayerAttributes?.layerParameters?.layer}/{z}/{x}/{y}.png?key=${key}` : null;
     }
 
     function osMapsWMTSUrl() {
-        const namValuePars = mapLayerAttributes ? Object.entries(mapLayerAttributes?.layerParameters)
+        const nameValuePars = mapLayerAttributes ? Object.entries(mapLayerAttributes?.layerParameters)
             .map((pair: [string, any]) => `${pair[0]}=${pair[1]}`).join("&") : "";
-        return `https://api.os.uk/maps/raster/v1/wmts?key=${key}&${namValuePars}`;
+        return key ? `https://api.os.uk/maps/raster/v1/wmts?key=${key}&${nameValuePars}` : null;
     }
 
     function openStreetMapsUrl() {

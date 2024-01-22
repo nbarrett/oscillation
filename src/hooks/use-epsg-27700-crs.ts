@@ -6,7 +6,7 @@ import { log } from "../util/logging-config";
 import { useRecoilValue } from "recoil";
 import { mapZoomState } from "../atoms/game-atoms";
 import { MapOptions } from "../models/os-maps-models";
-import { startingPosition } from "../components/MapWithCars";
+import { startingPositionLondon } from "../models/game-models";
 
 export function useCustomCRSFor27700Projection() {
 
@@ -26,7 +26,7 @@ export function useCustomCRSFor27700Projection() {
         crs,
         minZoom: 0,
         maxZoom: 8,
-        center: startingPosition,
+        center: startingPositionLondon,
         zoom: zoom,
         maxBounds: [
             transformCoords([-238375.0, 0.0]),

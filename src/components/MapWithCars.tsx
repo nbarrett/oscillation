@@ -1,11 +1,7 @@
-import blueCar from "../images/blue-car.png";
-import redCar from "../images/red-car.png";
-import whiteCar from "../images/white-car.png";
-import markerIconImage from "leaflet/dist/images/marker-icon.png";
 import React, { useEffect, useState } from "react";
 import "leaflet/dist/leaflet.css";
 import "./App.css";
-import L, { Icon, LatLngTuple } from "leaflet";
+import L from "leaflet";
 import { MapContainer, TileLayer } from "react-leaflet";
 import { log } from "../util/logging-config";
 import { Player } from "../models/player-models";
@@ -28,39 +24,14 @@ import { mapZoomState, playerZoomRequestState, selectablePlayerState } from "../
 import { useGameState } from "../hooks/use-game-state";
 import { useCustomCRSFor27700Projection } from "../hooks/use-epsg-27700-crs";
 import { MappingProvider } from "../models/route-models";
-
-export const startingPosition: LatLngTuple = [51.505, -0.09];
-
-const whiteCarIcon: Icon<{ iconSize: [number, number]; iconUrl: any }> = new Icon({
-    iconUrl: whiteCar,
-    iconSize: [172, 62]
-});
-const blueCarIcon = new Icon({
-    iconUrl: blueCar,
-    iconSize: [172, 62]
-});
-const redCarIcon = new Icon({
-    iconUrl: redCar,
-    iconSize: [172, 62]
-});
-
-const markerIcon = new Icon({
-    iconUrl: markerIconImage,
-    iconSize: [72, 52]
-});
-
-
-function startingPositionFor(index: number): LatLngTuple {
-    return [startingPosition[0] + 0.00014023745552549371 * index, startingPosition[1] + -0.0002467632293701172 * index];
-}
-
-function generatePlayers(icons: Icon[]): Player[] {
-    return icons.map((icon, index) => ({name: `Player ${index + 1}`, icon, position: startingPositionFor(index)}));
-}
+import { MapSquare, MapTiler } from "./MapSquare";
+import { startingPositionState } from "../atoms/route-atoms";
+import useNamedLocationsData from "../hooks/use-named-locations";
 
 
 export function MapWithCars() {
 
+    const startingPosition = useRecoilValue(startingPositionState);
     const gameState = useGameState();
     const playerZoomRequest: string = useRecoilValue<string>(playerZoomRequestState);
     const mapLayer: MapLayer = useRecoilValue<MapLayer>(mapLayerState);
@@ -75,50 +46,50 @@ export function MapWithCars() {
     const useCustomTileLayer: boolean = mappingProvider !== MappingProvider.OPEN_STREET_MAPS && mapLayerAttributes?.layerParameters?.tileMatrixSet === ProjectionValue.ESPG_27700;
     const customCRS = useCustomCRSFor27700Projection();
     const crs = useCustomTileLayer ? customCRS.crs : L.CRS.EPSG3857;
+    const canRender = mapLayerAttributes && startingPosition;
+    const namedLocationsData = useNamedLocationsData();
 
     useEffect(() => {
-        const players = generatePlayers([whiteCarIcon, blueCarIcon, redCarIcon]);
-        log.info("initialising players to:", players);
-        gameState.initialisePlayers(players);
-    }, []);
+        gameState.initialisePlayers();
+    }, [startingPosition]);
 
     useEffect(() => {
         if (playerZoom) {
-            log.info("zooming to players to:", playerZoom.name, "position:", playerZoom.position);
+            log.debug("zooming to players to:", playerZoom.name, "position:", playerZoom.position);
             map?.flyTo(playerZoom.position);
         }
     }, [playerZoom]);
 
     useEffect(() => {
-        log.info("zoom:", zoom, "mapLayerAttributes:", mapLayerAttributes, "useCustomTileLayer:", useCustomTileLayer);
+        log.debug("zoom:", zoom, "mapLayerAttributes:", mapLayerAttributes, "useCustomTileLayer:", useCustomTileLayer);
         if (useCustomTileLayer) {
             if (zoom < mapLayerAttributes?.minZoom) {
             const newZoom = mapLayerAttributes.minZoom + Math.floor(mapLayerAttributes.maxZoom - mapLayerAttributes.minZoom / 2);
-                log.info("zoom:", zoom, "below minZoom:", mapLayerAttributes.minZoom);
+                log.debug("zoom:", zoom, "below minZoom:", mapLayerAttributes.minZoom);
                 setZoom(mapLayerAttributes.minZoom);
             } else if (zoom > mapLayerAttributes?.maxZoom) {
-                log.info("zoom:", zoom, "above mxnZoom:", mapLayerAttributes.maxZoom);
+                log.debug("zoom:", zoom, "above mxnZoom:", mapLayerAttributes.maxZoom);
                 setZoom(mapLayerAttributes.maxZoom);
         }
         } else {
-            log.info("zoom:", zoom, "not validated and intercepted");
+            log.debug("zoom:", zoom, "not validated and intercepted");
         }
     }, [useCustomTileLayer, mapLayerAttributes, zoom]);
 
     useEffect(() => {
-        log.info("for mapLayerAttributes:", mapLayerAttributes, "tileUrl:", mapTileUrls?.url, "useCustomTileLayer:", useCustomTileLayer);
+        log.debug("for mapLayerAttributes:", mapLayerAttributes, "tileUrl:", mapTileUrls?.url, "useCustomTileLayer:", useCustomTileLayer);
     }, [mapTileUrls?.url, useCustomTileLayer]);
 
     useEffect(() => {
-        log.info("crs:", crs, "useCustomTileLayer:", useCustomTileLayer);
+        log.debug("crs:", crs, "useCustomTileLayer:", useCustomTileLayer);
     }, [crs, useCustomTileLayer]);
 
-    return mapLayerAttributes ?
+    return canRender ?
         <div style={{height: '80vh', width: '100%'}}>
-            <MapContainer crs={crs} whenReady={() => log.info("map ready")}
+            <MapContainer crs={crs} whenReady={() => log.debug("map ready")}
                           minZoom={useCustomTileLayer ? mapLayerAttributes?.minZoom : 0}
                           maxZoom={useCustomTileLayer ? mapLayerAttributes?.maxZoom : 18}
-                          zoom={zoom} center={startingPosition} scrollWheelZoom={true}
+                          zoom={zoom} center={startingPosition?.location} scrollWheelZoom={true}
                           ref={(map: L.Map) => setMap(map)} style={{height: '100%'}}>
                 {accessTokenResponse?.access_token ?
                     <TileLayer url={mapTileUrls?.url}
@@ -129,6 +100,8 @@ export function MapWithCars() {
                     <Legend map={map as L.Map}/>
                     <RecordMapCentreAndZoom/>
                     <RecordMapClick/>
+                <MapSquare/>
+                <MapTiler/>
                 </MapContainer>
         </div>
         : null;

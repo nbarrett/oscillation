@@ -1,6 +1,11 @@
 import { defaultZoom } from "./route-models";
 import { Player } from "./player-models";
-import { LatLngTuple } from "leaflet";
+import { Icon, LatLngTuple } from "leaflet";
+import blueCar from "../images/blue-car.png";
+import whiteCar from "../images/white-car.png";
+import markerIconImage from "leaflet/dist/images/marker-icon.png";
+import redCar from "../images/red-car.png";
+import { NamedLocation } from "../shared/NamedLocation";
 
 export const colours = {
     blueCar: 'rgb(34 93 173)',
@@ -40,3 +45,33 @@ export const GAME_DEFAULTS: GameData = {
     mapZoom: defaultZoom,
     diceResult: null
 };
+
+export const startingPositionLondon: LatLngTuple = [51.505, -0.09];
+
+export const startingPositionChallock: LatLngTuple = [51.21861, 0.88011];
+
+export const referenceStartingPoints: NamedLocation[] = [
+    Object.assign(new NamedLocation(), {name: "London", location: startingPositionLondon}),
+    Object.assign(new NamedLocation(), {name: "Challock", location: startingPositionChallock}),
+    Object.assign(new NamedLocation(), {name: "Cambridge", location: [52.17487, 0.12830]})
+];
+
+export const whiteCarIcon: Icon<{ iconSize: [number, number]; iconUrl: any }> = new Icon({
+    iconUrl: whiteCar,
+    iconSize: [172, 62]
+});
+
+export const blueCarIcon = new Icon({
+    iconUrl: blueCar,
+    iconSize: [172, 62]
+});
+
+export const redCarIcon = new Icon({
+    iconUrl: redCar,
+    iconSize: [172, 62]
+});
+
+export const markerIcon = new Icon({
+    iconUrl: markerIconImage,
+    iconSize: [72, 52]
+});
