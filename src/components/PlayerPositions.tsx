@@ -49,9 +49,9 @@ export function PlayerPositions() {
 
     return <Grid container direction={"row"} spacing={1}>
         {players.map(player => <Grid item xs key={player.name}>
-            <Link onClick={() => setPlayerZoomRequest(player.name)} sx={{cursor: "pointer"}}
-                  key={player.name}>{player.name}</Link>
-            <Box>lat-long: {formatLatLong(new LatLng(player.position[0], player.position[1]))}</Box>
+            <Link onClick={() => setPlayerZoomRequest(player?.name)} sx={{cursor: "pointer"}}
+                  key={player.name}>{player?.name}</Link>
+            <Box>lat-long: {formatLatLong(player?.position)}</Box>
         </Grid>)}
     </Grid>;
 }

@@ -1,0 +1,26 @@
+[
+  {
+    "id": "ml5fbe4le6nbdqo9ah4a7jdt",
+    "name": "London",
+    "location": [
+      51.505,
+      -0.09
+    ]
+  },
+  {
+    "id": "qobbh0n9g36su2ap3o7h7hvb",
+    "name": "Challock",
+    "location": [
+      51.21861,
+      0.88011
+    ]
+  },
+  {
+    "id": "o8uqkki9e4wqbfiy2m8lh38q",
+    "name": "Cambridge",
+    "location": [
+      52.17487,
+      0.1283
+    ]
+  }
+]

@@ -31,7 +31,6 @@ export default function ProfileSelector() {
     return (
         <TextField fullWidth sx={{minWidth: 220}} select size={"small"}
                    label={"Driving Profile"}
-                   id="demo-simple-select"
                    value={profile||""}
                    onChange={handleChange}>
             {enumKeyValues(Profile).map((value, index) =>

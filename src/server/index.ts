@@ -2,8 +2,15 @@ import express, { Request, Response } from "express";
 import request from "request";
 import { Profile } from "../models/route-models";
 import { AccessTokenResponse } from "../models/os-maps-models";
+import bodyParser from "body-parser";
+import cors from 'cors';
+import { api } from "./api";
 
 export const app = express();
+app.use(cors());
+app.use(bodyParser.json());
+app.use(api);
+
 const port = process.env["PORT"] || 3002;
 const viteMode = process.env["VITE"];
 const key = process.env["OS_MAPS_API_KEY"];

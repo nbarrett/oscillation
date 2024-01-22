@@ -17,6 +17,7 @@ import { DiceRoller } from "./DiceRoller";
 
 
 import { createTheme, ThemeProvider } from "@mui/material/styles";
+import StartingPositionSelector from "./StartingPositionSelector";
 
 export default function App() {
 
@@ -57,6 +58,9 @@ export default function App() {
                         </Grid>
                         <Grid item xs>
                             <MapLayerSelector/>
+                        </Grid>
+                        <Grid item xs>
+                            <StartingPositionSelector/>
                         </Grid>
                     </Grid>
                     <Grid container alignItems={"center"} spacing={2}>

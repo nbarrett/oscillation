@@ -5,6 +5,8 @@ export enum StoredValue {
   ACCESS_TOKEN = "access-token",
   CURRENT_PLAYER = "current-player",
   DRIVING_PROFILE = "driving-profile",
+  STARTING_POSITION = "starting-position",
+  NAMED_LOCATIONS = "named-locations",
   GAME = "game",
   MAPPING_PROVIDER = "mapping-provider",
   CUSTOM_TILE_SELECTION = "custom-tile-selection",
@@ -24,6 +26,16 @@ export function initialValueFor(parameter: string, defaultValue?: any): string {
   const value = localStorageValue || defaultValue;
   log.debug("initial value for:", parameter, "localStorage:", localStorageValue, "default:", defaultValue, "is:", value);
   return value;
+}
+
+export function initialObjectValueFor<T>(parameter: string, defaultValue?: T): T {
+  try {
+    const text = initialValueFor(parameter, defaultValue);
+    return text ? JSON.parse(text) : defaultValue;
+  } catch (e) {
+    log.error("initialObjectValueFor:failed to parse value for:", parameter, "error:", e);
+    return defaultValue;
+  }
 }
 
 export function initialBooleanValueFor(parameter: string, defaultValue?: any): boolean {
