@@ -1,20 +1,5 @@
-import { HasAuditTimestamps } from "./common-models";
 import * as L from "leaflet";
-import { LatLngTuple } from "leaflet";
-
-export interface UserData extends HasAuditTimestamps {
-    avatarUrl?: string;
-    firstName?: string;
-    lastName?: string;
-    userName?: string;
-    mobile?: string;
-    phone?: string;
-}
-
-export interface UserRoles extends HasAuditTimestamps {
-    systemAccess?: boolean;
-    accountSettings?: boolean;
-}
+import { LatLng, LatLngTuple, Point } from "leaflet";
 
 export interface AccessTokenResponse {
     access_token: string;
@@ -22,6 +7,32 @@ export interface AccessTokenResponse {
     issued_at: string;
     token_type: string;
 }
+export interface GridReferenceData {
+    eastings: string,
+    northings: string
+    column: number;
+    row: number;
+    gridCode: string
+    gridReference: string
+}
+
+export interface GridReferenceTransform {
+    cornerPoint?: Point;
+    cornerGridReference: string;
+    cornerLatLng?: LatLng;
+    cornerEastingNumber: number;
+    cornerNorthingNumber: number;
+}
+
+export const gridReferenceCodes: string[][] = [
+    ["SV", "SQ", "SL", "SF", "SA", "NV", "NQ", "NL", "NF", "NA", "HV", "HQ", "HL"],
+    ["SW", "SR", "SM", "SG", "SB", "NW", "NR", "NM", "NG", "NB", "HW", "HR", "HM"],
+    ["SX", "SS", "SN", "SH", "SC", "NX", "NS", "NN", "NH", "NC", "HX", "HS", "HN"],
+    ["SY", "ST", "SO", "SJ", "SD", "NY", "NT", "NO", "NJ", "ND", "HY", "HT", "HO"],
+    ["SZ", "SU", "SP", "SK", "SE", "NZ", "NU", "NP", "NK", "NE", "HZ", "HU", "HP"],
+    ["TV", "TQ", "TL", "TF", "TA", "OV", "OQ", "OL", "OF", "OA", "JV", "JQ", "JL"],
+    ["TW", "TR", "TM", "TG", "TB", "OW", "OR", "OM", "OG", "OB", "JW", "JR", "JM"]
+];
 
 export enum MapLayer {
     LEISURE_27700 = "LEISURE_27700",

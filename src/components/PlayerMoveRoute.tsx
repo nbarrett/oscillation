@@ -28,7 +28,7 @@ export function PlayerMoveRoute(props: { player: Player }) {
 
     useEffect(() => {
         if (receivedPositions.length > 0) {
-            log.info("PlayerMoveRoute:positions received for player:", props.player.name, "->", receivedPositions);
+            log.debug("PlayerMoveRoute:positions received for player:", props.player.name, "->", receivedPositions);
             setPositions(receivedPositions);
             gameState.playerRouteReceived();
         }

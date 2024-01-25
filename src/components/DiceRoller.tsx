@@ -9,6 +9,7 @@ import { useGameState } from "../hooks/use-game-state";
 import Typography from "@mui/material/Typography";
 import TrendingFlatIcon from '@mui/icons-material/TrendingFlat';
 import { currentPlayerState } from "../atoms/game-atoms";
+import { GridSelectionButton } from "./GridSelectionButton";
 
 export function DiceRoller() {
 
@@ -21,7 +22,7 @@ export function DiceRoller() {
     const gameState = useGameState();
 
     useEffect(() => {
-        log.info("isRolling:", isRolling, "total changed to:", total);
+        log.debug("isRolling:", isRolling, "total changed to:", total);
         if (total && !isRolling) {
             gameState.handleDiceRoll(total);
         }
@@ -89,6 +90,7 @@ export function DiceRoller() {
                         <TrendingFlatIcon/><Typography variant="h6">
                         {playerName} threw {total}
                     </Typography></> : null}
+                    <GridSelectionButton/>
                 </Stack>
             </Grid>
         </Grid>);

@@ -25,7 +25,7 @@ export function PlayerCar(props: { player: Player }) {
             dragstart() {
                 if (active) {
                     const position = positionFrom(markerRef);
-                    log.info("drag start for:", props?.player?.name, "position:", position);
+                    log.debug("drag start for:", props?.player?.name, "position:", position);
                     gameState.setPlayerData("position", position);
                 } else {
                     log.warn("drag start not possible for:", props?.player?.name, "as", activeLabel);
@@ -34,7 +34,7 @@ export function PlayerCar(props: { player: Player }) {
             dragend: function () {
                 if (active) {
                     const position = positionFrom(markerRef);
-                    log.info("drag end for:", props?.player?.name, "position:", position);
+                    log.debug("drag end for:", props?.player?.name, "position:", position);
                     gameState.setPlayerData("nextPosition", position);
                 } else {
                     log.warn("drag start not possible for:", props?.player?.name, "as", activeLabel);
@@ -42,11 +42,11 @@ export function PlayerCar(props: { player: Player }) {
 
             },
             mouseover: function (data) {
-                log.info(activeLabel, "mouseover for:", props?.player?.name, "data:", data);
+                log.debug(activeLabel, "mouseover for:", props?.player?.name, "data:", data);
                 markerRef.current.openPopup();
             },
             mouseout: function (data) {
-                log.info(activeLabel, "mouseout for:", props?.player?.name, "data:", data);
+                log.debug(activeLabel, "mouseout for:", props?.player?.name, "data:", data);
             },
         }),
         [props.player, active],
@@ -57,10 +57,10 @@ export function PlayerCar(props: { player: Player }) {
 
     useEffect(() => {
         if (active && markerRef) {
-            log.info("opening popup for ", props?.player?.name, "ref:", markerRef.current, "gameTurnState:", gameState.gameData.gameTurnState);
+            log.debug("opening popup for ", props?.player?.name, "ref:", markerRef.current, "gameTurnState:", gameState.gameData.gameTurnState);
             markerRef.current.openPopup();
         } else {
-            log.info("not opening popup for ", props?.player?.name, "ref:", markerRef.current, "gameTurnState:", gameState.gameData.gameTurnState);
+            log.debug("not opening popup for ", props?.player?.name, "ref:", markerRef.current, "gameTurnState:", gameState.gameData.gameTurnState);
         }
     }, [active, markerRef, gameState.gameData.gameTurnState]);
 

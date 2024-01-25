@@ -24,10 +24,9 @@ import { mapZoomState, playerZoomRequestState, selectablePlayerState } from "../
 import { useGameState } from "../hooks/use-game-state";
 import { useCustomCRSFor27700Projection } from "../hooks/use-epsg-27700-crs";
 import { MappingProvider } from "../models/route-models";
-import { MapSquare, MapTiler } from "./MapSquare";
+import { SelectGridSquares } from "./SelectGridSquares";
 import { startingPositionState } from "../atoms/route-atoms";
-import useNamedLocationsData from "../hooks/use-named-locations";
-
+import { MapFeatures } from "./MapFeatures";
 
 export function MapWithCars() {
 
@@ -47,7 +46,6 @@ export function MapWithCars() {
     const customCRS = useCustomCRSFor27700Projection();
     const crs = useCustomTileLayer ? customCRS.crs : L.CRS.EPSG3857;
     const canRender = mapLayerAttributes && startingPosition;
-    const namedLocationsData = useNamedLocationsData();
 
     useEffect(() => {
         gameState.initialisePlayers();
@@ -100,8 +98,8 @@ export function MapWithCars() {
                     <Legend map={map as L.Map}/>
                     <RecordMapCentreAndZoom/>
                     <RecordMapClick/>
-                <MapSquare/>
-                <MapTiler/>
+                <SelectGridSquares/>
+                <MapFeatures/>;
                 </MapContainer>
         </div>
         : null;

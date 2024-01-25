@@ -15,13 +15,13 @@ export default function ProfileSelector() {
 
     useEffect(() => {
         if (!profile) {
-            log.info("ProfileSelector:profile:initialised to:", profile);
+            log.debug("ProfileSelector:profile:initialised to:", profile);
             setProfile(Profile.DRIVING_CAR);
         }
     }, []);
 
     useEffect(() => {
-        log.info("ProfileSelector:profile:", profile);
+        log.debug("ProfileSelector:profile:", profile);
     }, [profile]);
 
     function handleChange(event) {

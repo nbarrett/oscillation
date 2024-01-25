@@ -5,6 +5,7 @@ import { Player } from "../models/player-models";
 import { defaultZoom } from "../models/route-models";
 import { LatLngTuple } from "leaflet";
 import { log } from "../util/logging-config";
+import { SelectedGrid } from "../components/SelectGridSquares";
 
 
 export const gameState: RecoilState<GameData> = atom({
@@ -32,6 +33,11 @@ export const playerZoomRequestState: RecoilState<string> = atom({
     default: null,
 });
 
+export const gridClearRequestState: RecoilState<number> = atom({
+    key: StoredValue.GRID_CLEAR_REQUEST,
+    default: 0,
+});
+
 export const mapCentreState: RecoilState<LatLngTuple> = atom({
     key: StoredValue.MAP_CENTRE_POSITION,
     default: null,
@@ -42,13 +48,18 @@ export const mapClickPositionState: RecoilState<LatLngTuple> = atom({
     default: null,
 });
 
+export const selectedGridSquaresState: RecoilState<SelectedGrid[]> = atom({
+    key: StoredValue.SELECTED_GRID_SQUARES,
+    default: [],
+});
+
 export const mapZoomState: RecoilState<number> = atom({
     key: StoredValue.MAP_ZOOM,
     default: +initialValueFor(StoredValue.MAP_ZOOM, defaultZoom),
     effects: [
         ({onSet}) => {
             onSet(mapZoom => {
-                log.info(StoredValue.MAP_ZOOM, "set to:", mapZoom);
+                log.debug(StoredValue.MAP_ZOOM, "set to:", mapZoom);
                 saveValueFor(StoredValue.MAP_ZOOM, mapZoom);
             });
         },

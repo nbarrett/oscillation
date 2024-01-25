@@ -59,6 +59,16 @@ export function stringifyObject(inputValue, defaultValue?: any, omitEmptyFields?
   }
 }
 
+export function generateUniqueName(): string {
+  const adjectives = ['Brave', 'Clever', 'Bold', 'Happy', 'Tired', 'Sad', 'Angry', 'Excited', 'Calm', 'Energetic'];
+  const nouns = ['Lion', 'Elephant', 'Cat', 'Dog', 'Bird', 'Fish', 'Turtle', 'Rabbit', 'Horse', 'Monkey'];
+
+  const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+  const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
+  const randomNumber = Math.floor(Math.random() * 10000);  // generates a random number between 0 and 9999
+
+  return `${randomAdjective}${randomNoun}${randomNumber}`;
+}
 export function asMoney(numberString: number | undefined, decimalPlaces: number, currencySymbol: string): string {
   log.debug("asMoney:numberString:", numberString, typeof numberString);
   return numberString ? (currencySymbol + " " + asNumber(numberString).toFixed(2)) : "-";
