@@ -16,13 +16,13 @@ export default function MapLayerSelector() {
 
     useEffect(() => {
         if (!mapLayer) {
-            log.info("ProfileSelector:mapLayer:initialised to:", mapLayer);
+            log.debug("ProfileSelector:mapLayer:initialised to:", mapLayer);
             setMapLayer(MapLayer.LEISURE_27700);
         }
     }, []);
 
     useEffect(() => {
-        log.info("ProfileSelector:mapLayer:", mapLayer);
+        log.debug("ProfileSelector:mapLayer:", mapLayer);
     }, [mapLayer]);
 
     function handleChange(event) {

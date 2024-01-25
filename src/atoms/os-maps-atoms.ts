@@ -11,9 +11,9 @@ export const accessTokenState: RecoilState<AccessTokenResponse> = atom({
     default: null,
     effects: [
         ({setSelf}) => {
-            log.info("refreshAccessToken:querying");
+            log.debug("refreshAccessToken:querying");
             refreshAccessTokenRaw().then(refreshToken => {
-                log.info("refreshAccessToken:returned:", refreshToken);
+                log.debug("refreshAccessToken:returned:", refreshToken);
                 setSelf(refreshToken);
             }).catch(log.error);
         },
@@ -26,7 +26,7 @@ export const mapLayerState: RecoilState<MapLayer> = atom({
     effects: [
         ({onSet}) => {
             onSet(mapLayer => {
-                log.info(StoredValue.MAP_LAYER, "set to:", mapLayer);
+                log.debug(StoredValue.MAP_LAYER, "set to:", mapLayer);
                 saveValueFor(StoredValue.MAP_LAYER, mapLayer);
             });
         },
@@ -35,7 +35,7 @@ export const mapLayerState: RecoilState<MapLayer> = atom({
 
 export const mappingProviderState: RecoilState<MappingProvider> = atom({
     key: StoredValue.MAPPING_PROVIDER,
-    default: enumForKey(MappingProvider, initialValueFor(StoredValue.MAPPING_PROVIDER)),
+    default: enumForKey(MappingProvider, initialValueFor(StoredValue.MAPPING_PROVIDER, MappingProvider.OS_MAPS_WMTS)),
     effects: [
         ({onSet}) => {
             onSet(mappingProvider => {

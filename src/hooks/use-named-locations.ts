@@ -13,13 +13,13 @@ export default function useNamedLocations() {
     const startingPointsRepo = remult.repo(NamedLocation);
 
     useEffect(() => {
-        log.info("useNamedLocations:namedLocation:", namedLocation, "namedLocations:", namedLocations);
+        log.debug("useNamedLocations:namedLocation:", namedLocation, "namedLocations:", namedLocations);
         if (!namedLocation && namedLocations?.length > 0) {
             const firstNamedLocation = namedLocations[0];
-            log.info("useNamedLocations:namedLocation:initialised to:", firstNamedLocation);
+            log.debug("useNamedLocations:namedLocation:initialised to:", firstNamedLocation);
             setNamedLocation(firstNamedLocation);
         } else if (namedLocations?.length == 0) {
-            log.info("useNamedLocations:namedLocation:migration required");
+            log.debug("useNamedLocations:namedLocation:migration required");
         }
     }, [namedLocations, namedLocation]);
 
@@ -30,14 +30,14 @@ export default function useNamedLocations() {
 
     async function prePopulateDataStore() {
         for (const point of referenceStartingPoints) {
-            log.info("prePopulateDataStore:point:", point);
+            log.debug("prePopulateDataStore:point:", point);
             const existingPoint = await startingPointsRepo.findFirst({name: point.name});
             if (!existingPoint) {
                 const newData = {name: point.name, location: point.location};
-                log.info("prePopulateDataStore:point:inserting:", newData);
+                log.debug("prePopulateDataStore:point:inserting:", newData);
                 await startingPointsRepo.save(newData);
             } else {
-                log.info("prePopulateDataStore:found:", existingPoint, "for:", point);
+                log.debug("prePopulateDataStore:found:", existingPoint, "for:", point);
             }
         }
     }

@@ -3,7 +3,7 @@ import last from "lodash-es/last";
 
 import { blueCarIcon, GameData, GameTurnState, redCarIcon, whiteCarIcon } from '../models/game-models';
 import { SetterOrUpdater, useRecoilState, useRecoilValue, useSetRecoilState } from "recoil";
-import { currentPlayerState, gameState, playerZoomRequestState } from "../atoms/game-atoms";
+import { currentPlayerState, gameState, gridClearRequestState, playerZoomRequestState } from "../atoms/game-atoms";
 import { Player } from "../models/player-models";
 import { useEffect } from "react";
 import { log } from "../util/logging-config";
@@ -16,6 +16,12 @@ export function useGameState() {
     const currentPlayer: Player = useRecoilValue<Player>(currentPlayerState);
     const startingPosition = useRecoilValue(startingPositionState);
     const setPlayerZoomRequest: SetterOrUpdater<string> = useSetRecoilState<string>(playerZoomRequestState);
+    const setGridClearRequest: SetterOrUpdater<number> = useSetRecoilState<number>(gridClearRequestState);
+
+
+    function clearSelections() {
+        setGridClearRequest(existing => existing + 1);
+    }
 
     useEffect(() => {
         log.debug("gameData:", gameData);
@@ -37,7 +43,7 @@ export function useGameState() {
             setGameData(existing => ({...existing, players}));
             setPlayerZoomRequest(players[0].name);
         } else {
-            log.info("cant initialise players as startingPosition not set");
+            log.debug("cant initialise players as startingPosition not set");
         }
     }
 
@@ -64,6 +70,9 @@ export function useGameState() {
 
     function handleGameTurnStateChange(gameTurnState: GameTurnState) {
         setGameData(existing => ({...existing, gameTurnState}));
+        if (gameTurnState === GameTurnState.END_TURN) {
+            clearSelections();
+        }
     }
 
     function playerRouteReceived() {
@@ -73,6 +82,7 @@ export function useGameState() {
     }
 
     return {
+        startingPosition,
         gameData,
         handleDiceRoll,
         handleGameTurnStateChange,

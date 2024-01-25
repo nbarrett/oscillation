@@ -1,17 +1,17 @@
 import { useEffect } from "react";
 import { log } from "../util/logging-config";
-import { useRecoilValue } from "recoil";
-import { accessTokenState, mapLayerState, mappingProviderState } from "../atoms/os-maps-atoms";
-import { AccessTokenResponse, MapLayer, MapLayerAttributes, MapLayers } from "../models/os-maps-models";
+import { MapLayerAttributes } from "../models/os-maps-models";
 import { MappingProvider } from "../models/route-models";
+import { useApiKey } from "./use-api-key";
+import { useMapLayers } from "./use-map-layers";
 
 export function useTileLayerUrls() {
 
-    const mapLayer: MapLayer = useRecoilValue<MapLayer>(mapLayerState);
-    const mappingProvider: MappingProvider = useRecoilValue<MappingProvider>(mappingProviderState);
-    const accessTokenResponse: AccessTokenResponse = useRecoilValue<AccessTokenResponse>(accessTokenState);
-    const mapLayerAttributes: MapLayerAttributes = MapLayers[mapLayer];
-    const key = encodeURI(accessTokenResponse?.access_token);
+    const apiKey = useApiKey();
+    const mapLayers = useMapLayers();
+    const mappingProvider: MappingProvider = mapLayers.mappingProvider;
+    const mapLayerAttributes: MapLayerAttributes = mapLayers.mapLayerAttributes;
+    const key = apiKey.key;
     const urlOSMapsZXY = osMapsZXYUrl();
     const urlOSMapsWMTS = osMapsWMTSUrl();
     const urlOpenStreetMapsZXY = openStreetMapsUrl();
@@ -32,12 +32,9 @@ export function useTileLayerUrls() {
         log.debug("mappingProvider:", mappingProvider, "urlOSMapsZXY:", urlOSMapsZXY, "urlOSMapsWMTS:", urlOSMapsWMTS, "urlOpenStreetMapsZXY:", urlOpenStreetMapsZXY, "tileUrl:", url);
     }, [urlOSMapsZXY, urlOSMapsWMTS, urlOpenStreetMapsZXY, url, mappingProvider]);
 
-    useEffect(() => {
-        log.debug("accessTokenResponse:", accessTokenResponse);
-    }, [accessTokenResponse]);
 
     useEffect(() => {
-        log.info("for mapLayerAttributes:", mapLayerAttributes, "key:", key, "tileUrl:", url);
+        log.debug("for mapLayerAttributes:", mapLayerAttributes, "key:", key, "tileUrl:", url);
     }, [url]);
 
 

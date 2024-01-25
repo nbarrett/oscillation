@@ -22,14 +22,14 @@ export function toApiTuple(position: LatLngTuple | number[]): LatLngTuple {
 
 function validLatLong(latlngTuple: LatLng | LatLngTuple): boolean {
     const valid = !!(latlngTuple && !isNaN(first(latlngTuple)) && !isNaN(last(latlngTuple)));
-    log.info("validLatLong:latlngTuple:", latlngTuple, "!isNaN first:", !isNaN(first(latlngTuple)), "!isNaN last:", !isNaN(last(latlngTuple)), "valid:", valid);
+    log.debug("validLatLong:latlngTuple:", latlngTuple, "!isNaN first:", !isNaN(first(latlngTuple)), "!isNaN last:", !isNaN(last(latlngTuple)), "valid:", valid);
     if (!valid) new Error("blah");
     return valid;
 }
 
 export function toLatLngFromLatLngTuple(latlngTuple: LatLngTuple): LatLng {
     const valid = validLatLong(latlngTuple);
-    log.info("toLatLngFromLatLngTuple:latlngTuple:", latlngTuple, "valid:", valid);
+    log.debug("toLatLngFromLatLngTuple:latlngTuple:", latlngTuple, "valid:", valid);
     return valid ? new LatLng(first(latlngTuple), last(latlngTuple)) : null;
 }
 

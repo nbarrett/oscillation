@@ -14,14 +14,7 @@ export default function MappingProviderSelector() {
     const [mappingProvider, setMappingProvider] = useRecoilState<MappingProvider>(mappingProviderState);
 
     useEffect(() => {
-        if (!mappingProvider) {
-            log.info("MappingProviderSelector:mappingProvider:initialised to:", mappingProvider);
-            setMappingProvider(MappingProvider.OS_MAPS_WMTS);
-        }
-    }, []);
-
-    useEffect(() => {
-        log.info("ProfileSelector:mappingProvider:", mappingProvider);
+        log.debug("MappingProviderSelector:mappingProvider:", mappingProvider);
     }, [mappingProvider]);
 
     function handleChange(event) {
