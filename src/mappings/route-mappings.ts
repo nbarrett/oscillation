@@ -21,8 +21,8 @@ export function toApiTuple(position: LatLngTuple | number[]): LatLngTuple {
 }
 
 function validLatLong(latlngTuple: LatLng | LatLngTuple): boolean {
-    const valid = !!(latlngTuple && !isNaN(first(latlngTuple)) && !isNaN(last(latlngTuple)));
-    log.debug("validLatLong:latlngTuple:", latlngTuple, "!isNaN first:", !isNaN(first(latlngTuple)), "!isNaN last:", !isNaN(last(latlngTuple)), "valid:", valid);
+    const valid = !!(latlngTuple && !isNaN(latlngTuple[0])) && !isNaN(latlngTuple[1]);
+    log.debug("validLatLong:latlngTuple:", latlngTuple, "!isNaN first:", !isNaN(latlngTuple[0]), "!isNaN last:", !isNaN(latlngTuple[1]), "valid:", valid);
     if (!valid) new Error("blah");
     return valid;
 }
