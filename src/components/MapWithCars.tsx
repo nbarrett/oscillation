@@ -99,7 +99,7 @@ export function MapWithCars() {
                     <RecordMapCentreAndZoom/>
                     <RecordMapClick/>
                 <SelectGridSquares/>
-                <MapFeatures/>;
+                <MapFeatures/>
                 </MapContainer>
         </div>
         : null;

@@ -6,6 +6,7 @@ import { defaultZoom } from "../models/route-models";
 import { LatLngTuple } from "leaflet";
 import { log } from "../util/logging-config";
 import { SelectedGrid } from "../components/SelectGridSquares";
+import { MapClickPosition } from "../models/os-maps-models";
 
 
 export const gameState: RecoilState<GameData> = atom({
@@ -43,7 +44,7 @@ export const mapCentreState: RecoilState<LatLngTuple> = atom({
     default: null,
 });
 
-export const mapClickPositionState: RecoilState<LatLngTuple> = atom({
+export const mapClickPositionState: RecoilState<MapClickPosition> = atom({
     key: StoredValue.MAP_CLICK_POSITION,
     default: null,
 });

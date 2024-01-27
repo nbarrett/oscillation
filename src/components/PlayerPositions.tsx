@@ -8,6 +8,7 @@ import { GameTurnState } from "../models/game-models";
 import { log } from "../util/logging-config";
 import { useGameState } from "../hooks/use-game-state";
 import { currentPlayerState, playerZoomRequestState } from "../atoms/game-atoms";
+import { GridReferences } from "./GridReferences";
 
 export function PlayerPositions() {
 
@@ -52,5 +53,6 @@ export function PlayerPositions() {
                   key={player.name}>{player?.name}</Link>
             <Box>lat-long: {formatLatLong(player?.position)}</Box>
         </Grid>)}
+        <GridReferences/>
     </Grid>;
 }

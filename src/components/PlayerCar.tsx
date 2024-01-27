@@ -20,6 +20,7 @@ export function PlayerCar(props: { player: Player }) {
     const active = props.player.name === gameState?.gameData?.currentPlayerName;
     const activeLabel = active ? "active" : "not active";
     const draggable = active && gameState.gameData.gameTurnState === GameTurnState.DICE_ROLLED;
+    const hide = (!active && gameState.gameData.gameTurnState === GameTurnState.DICE_ROLLED);
     const eventHandlers = useMemo(
         () => ({
             dragstart() {
@@ -43,7 +44,7 @@ export function PlayerCar(props: { player: Player }) {
             },
             mouseover: function (data) {
                 log.debug(activeLabel, "mouseover for:", props?.player?.name, "data:", data);
-                markerRef.current.openPopup();
+                markerRef && markerRef?.current?.openPopup();
             },
             mouseout: function (data) {
                 log.debug(activeLabel, "mouseout for:", props?.player?.name, "data:", data);
@@ -53,12 +54,16 @@ export function PlayerCar(props: { player: Player }) {
     );
 
     useEffect(() => {
+        log.info(props?.player?.name, "hide:", hide, draggable ? "draggable" : "not draggable", "gameTurnState:", gameState.gameData.gameTurnState);
+    }, [hide, props.player?.name, gameState.gameData.gameTurnState, draggable]);
+
+    useEffect(() => {
     }, [markerRef]);
 
     useEffect(() => {
         if (active && markerRef) {
             log.debug("opening popup for ", props?.player?.name, "ref:", markerRef.current, "gameTurnState:", gameState.gameData.gameTurnState);
-            markerRef.current.openPopup();
+            markerRef?.current?.openPopup();
         } else {
             log.debug("not opening popup for ", props?.player?.name, "ref:", markerRef.current, "gameTurnState:", gameState.gameData.gameTurnState);
         }
@@ -77,7 +82,7 @@ export function PlayerCar(props: { player: Player }) {
     }
 
     return (
-        <Marker position={props?.player?.position} icon={props?.player?.icon}
+        hide ? null : <Marker position={props?.player?.position} icon={props?.player?.icon}
                 draggable={draggable}
                 riseOnHover={false}
                 eventHandlers={eventHandlers}
