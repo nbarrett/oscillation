@@ -7,6 +7,13 @@ export interface AccessTokenResponse {
     issued_at: string;
     token_type: string;
 }
+
+export interface MapClickPosition {
+    latLng: LatLng;
+    gridReferenceData: GridReferenceData;
+    gridSquareCorners: GridSquareCorners;
+}
+
 export interface GridReferenceData {
     eastings: string,
     northings: string
@@ -22,6 +29,13 @@ export interface GridReferenceTransform {
     cornerLatLng?: LatLng;
     cornerEastingNumber: number;
     cornerNorthingNumber: number;
+}
+
+export interface GridSquareCorners {
+    topLeft: string;
+    topRight: string;
+    bottomLeft: string;
+    bottomRight: string;
 }
 
 export const gridReferenceCodes: string[][] = [

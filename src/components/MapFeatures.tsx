@@ -1,7 +1,7 @@
 import "leaflet/dist/leaflet.css";
 import "proj4leaflet";
 import * as L from "leaflet";
-import { LatLngTuple, LayerGroup } from "leaflet";
+import { LayerGroup } from "leaflet";
 import { SetterOrUpdater, useRecoilState, useRecoilValue } from "recoil";
 import { mapClickPositionState, mapZoomState } from "../atoms/game-atoms";
 import { useApiKey } from "../hooks/use-api-key";
@@ -16,6 +16,7 @@ import {
     geoJsonFeaturesState,
     layerGroupState
 } from "../atoms/os-features-atoms";
+import { MapClickPosition } from "../models/os-maps-models";
 
 
 export function MapFeatures() {
@@ -29,7 +30,7 @@ export function MapFeatures() {
     const apiKey = useApiKey();
     const mapLayers = useMapLayers();
     const map = useMap();
-    const mapClickPosition: LatLngTuple = useRecoilValue<LatLngTuple>(mapClickPositionState);
+    const mapClickPosition: MapClickPosition = useRecoilValue<MapClickPosition>(mapClickPositionState);
 
     useEffect(() => {
         // setLayerGroup(L.layerGroup().addTo(map));

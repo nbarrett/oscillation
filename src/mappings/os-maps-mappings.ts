@@ -1,9 +1,14 @@
 import L, { LatLng, Point } from "leaflet";
 import { log } from "../util/logging-config";
-import { gridReferenceCodes, GridReferenceData, GridReferenceTransform } from "../models/os-maps-models";
+import {
+    gridReferenceCodes,
+    GridReferenceData,
+    GridReferenceTransform,
+    GridSquareCorners
+} from "../models/os-maps-models";
 import isNaN from "lodash-es/isNaN";
 
-export function gridReferenceDataFrom(eastings: string, northings: string): GridReferenceData {
+export function gridReferenceDataFromEastingsAndNothings(eastings: string, northings: string): GridReferenceData {
     const row = +eastings.substring(0, 1);
     const column = +northings.substring(0, 1);
     const gridCode = gridReferenceCodes[row][column];
@@ -12,15 +17,13 @@ export function gridReferenceDataFrom(eastings: string, northings: string): Grid
     return {eastings, northings, row, column, gridCode, gridReference};
 }
 
-export function calculateGridReference(map: L.Map, latlng: LatLng): LatLng[] {
+export function gridReferenceDataFromLatLong(map: L.Map, latlng: LatLng): GridReferenceData {
     const osCoordinates: Point = map.options.crs.project(latlng);
-    const easting: number = Math.round(osCoordinates.x);
-    const northing: number = Math.round(osCoordinates.y);
-    const gridReferenceData: GridReferenceData = gridReferenceDataFrom(easting.toString(), northing.toString());
-    const gridReference = gridReferenceData.gridReference;
-    const gridReferenceSquare: LatLng[] = calculateGridReferenceSquare(map, gridReferenceData);
-    log.info("latlng:", latlng, "osCoordinates:", osCoordinates, "gridReferenceData:", gridReferenceData, "easting:", easting, "northing:", northing, "Clicked Grid Square:", gridReference, "calculateGridReferenceSquare:", gridReferenceSquare, gridReference);
-    return gridReferenceSquare;
+    const eastings: number = Math.round(osCoordinates.x);
+    const northings: number = Math.round(osCoordinates.y);
+    const gridReferenceData: GridReferenceData = gridReferenceDataFromEastingsAndNothings(eastings.toString(), northings.toString());
+    log.info("latlng:", latlng, "osCoordinates:", osCoordinates, "eastings:", eastings, "northings:", northings, "gridReferenceData:", gridReferenceData);
+    return gridReferenceData;
 }
 
 function eastingsFromGridReference(gridReference: string) {
@@ -48,7 +51,7 @@ function transformGridReference(cornerGridReference: string, gridReferenceData: 
     }
 }
 
-export function calculateGridReferenceSquare(map: L.Map, gridReferenceData: GridReferenceData): LatLng[] {
+export function calculateGridSquareCorners(gridReferenceData: GridReferenceData): GridSquareCorners {
     const gridReference = gridReferenceData.gridReference;
     const eastings = eastingsFromGridReference(gridReference);
     const northings = northingsFromFromGridReference(gridReference);
@@ -57,14 +60,16 @@ export function calculateGridReferenceSquare(map: L.Map, gridReferenceData: Grid
     const eastingCeil = eastingFloor + 100;
     const northingCeil = northingFloor + 100;
 
-    const cornerGridReferences = [
-        `${(gridReferenceData.gridCode)} ${eastingFloor.toString().padStart(4, '0')} ${northingCeil.toString().padStart(4, '0')}`,  // top left
-        `${(gridReferenceData.gridCode)} ${eastingCeil.toString().padStart(4, '0')} ${northingCeil.toString().padStart(4, '0')}`,   // top right
-        `${(gridReferenceData.gridCode)} ${eastingCeil.toString().padStart(4, '0')} ${northingFloor.toString().padStart(4, '0')}`,  // bottom right
-        `${(gridReferenceData.gridCode)} ${eastingFloor.toString().padStart(4, '0')} ${northingFloor.toString().padStart(4, '0')}`  // bottom left
-    ];
+    return {
+        topLeft: `${(gridReferenceData.gridCode)} ${eastingFloor.toString().padStart(4, '0')} ${northingCeil.toString().padStart(4, '0')}`,
+        topRight: `${(gridReferenceData.gridCode)} ${eastingCeil.toString().padStart(4, '0')} ${northingCeil.toString().padStart(4, '0')}`,
+        bottomRight: `${(gridReferenceData.gridCode)} ${eastingCeil.toString().padStart(4, '0')} ${northingFloor.toString().padStart(4, '0')}`,
+        bottomLeft: `${(gridReferenceData.gridCode)} ${eastingFloor.toString().padStart(4, '0')} ${northingFloor.toString().padStart(4, '0')}`
+    };
+}
 
-    const gridSquareCornerLatLongs: GridReferenceTransform[] = cornerGridReferences.map(cornerGridReference => transformGridReference(cornerGridReference, gridReferenceData, map));
+export function calculateGridReferenceSquare(map: L.Map, gridReferenceData: GridReferenceData, cornerGridReferences: GridSquareCorners): LatLng[] {
+    const gridSquareCornerLatLongs: GridReferenceTransform[] = Object.entries(cornerGridReferences).map((cornerGridReference: [string, string]) => transformGridReference(cornerGridReference[1], gridReferenceData, map));
     const gridSquareLatLongs: LatLng[] = gridSquareCornerLatLongs.map(item => item.cornerLatLng).filter(item => !isNaN(item));
     log.info("given gridReferenceData:", gridReferenceData.gridReference, "cornerGridReferences:", cornerGridReferences, "gridSquareCornerLatLongs:", gridSquareCornerLatLongs, "gridSquareLatLongs:", gridSquareLatLongs);
     return gridSquareLatLongs;

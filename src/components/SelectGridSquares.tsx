@@ -3,15 +3,15 @@ import "leaflet/dist/leaflet.css";
 import "proj4leaflet";
 import { log } from "../util/logging-config";
 import { useEffect } from "react";
-import L, { LatLng, LatLngTuple } from "leaflet";
+import L, { LatLng } from "leaflet";
 import { SetterOrUpdater, useRecoilState, useRecoilValue } from "recoil";
 import { gridClearRequestState, mapClickPositionState, selectedGridSquaresState } from "../atoms/game-atoms";
-import { toLatLngFromLatLngTuple } from "../mappings/route-mappings";
-import { calculateGridReference } from "../mappings/os-maps-mappings";
+import { calculateGridReferenceSquare } from "../mappings/os-maps-mappings";
 import { colours } from "../models/game-models";
 import isEqual from "lodash/isEqual";
 import cloneDeep from "lodash/cloneDeep";
 import { useGameState } from "../hooks/use-game-state";
+import { MapClickPosition } from "../models/os-maps-models";
 
 export interface SelectedGrid {
     gridSquareLatLongs: LatLng[];
@@ -19,7 +19,7 @@ export interface SelectedGrid {
 
 export function SelectGridSquares() {
     const gameState = useGameState();
-    const mapClickPosition: LatLngTuple = useRecoilValue<LatLngTuple>(mapClickPositionState);
+    const mapClickPosition: MapClickPosition = useRecoilValue<MapClickPosition>(mapClickPositionState);
     const [selectedGridSquares, setSelectedGridSquares]: [SelectedGrid[], SetterOrUpdater<SelectedGrid[]>] = useRecoilState<SelectedGrid[]>(selectedGridSquaresState);
     const gridClearRequest: number = useRecoilValue<number>(gridClearRequestState);
     const map: L.Map = useMap();
@@ -35,7 +35,7 @@ export function SelectGridSquares() {
 
     useEffect(() => {
         if (mapClickPosition) {
-            const gridSquareLatLongs: LatLng[] = calculateGridReference(map, toLatLngFromLatLngTuple(mapClickPosition));
+            const gridSquareLatLongs: LatLng[] = calculateGridReferenceSquare(map, mapClickPosition.gridReferenceData, mapClickPosition.gridSquareCorners);
             const existingItem = selectedGridSquares.find(item => isEqual(item.gridSquareLatLongs[0], gridSquareLatLongs[0]));
             if (gameState.gameData.diceResult > selectedGridSquares.length || existingItem) {
                 if (existingItem) {
@@ -63,7 +63,7 @@ export function SelectGridSquares() {
                     log.info("created gridSquare:", gridSquare);
                     const newItem: SelectedGrid = {gridSquareLatLongs};
                     log.info("created newItem:", newItem);
-                    log.info("adding gridSquare,to map:");
+                    log.info("adding gridSquare to map:", gridSquare);
                     gridSquare.addTo(map);
                     setSelectedGridSquares(existingSelections => cloneDeep(existingSelections).concat(newItem));
                 }
