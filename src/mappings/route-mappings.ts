@@ -21,9 +21,18 @@ export function toApiTuple(position: LatLngTuple | number[]): LatLngTuple {
 }
 
 function validLatLong(latlngTuple: LatLng | LatLngTuple): boolean {
-    const valid = !!(latlngTuple && !isNaN(latlngTuple[0])) && !isNaN(latlngTuple[1]);
-    log.debug("validLatLong:latlngTuple:", latlngTuple, "!isNaN first:", !isNaN(latlngTuple[0]), "!isNaN last:", !isNaN(latlngTuple[1]), "valid:", valid);
-    if (!valid) new Error("blah");
+    let lat: number, lng: number;
+    if (!latlngTuple) {
+        log.debug("validLatLong:latlngTuple:", latlngTuple, "valid:", false);
+        return false;
+    } else if (isLatLng(latlngTuple)) {
+        lat = latlngTuple?.lat;
+        lng = latlngTuple?.lng;
+    } else {
+        [lng, lat] = latlngTuple;
+    }
+    const valid = !!(lat && lng && !isNaN(lat) && !isNaN(lng));
+    log.debug("validLatLong:usedLatLong:", latlngTuple, "!isNaN lat:", !isNaN(lat), "!isNaN lng:", !isNaN(lng), "valid:", valid);
     return valid;
 }
 
@@ -35,8 +44,13 @@ export function toLatLngFromLatLngTuple(latlngTuple: LatLngTuple): LatLng {
 
 export function formatLatLong(latLong: LatLng | LatLngTuple): string {
     if (validLatLong(latLong)) {
-        const usedLatLong = isLatLng(latLong) ? latLong : toLatLngFromLatLngTuple(latLong);
-        const {lat, lng} = usedLatLong;
+        let lat: number, lng: number;
+        if (isLatLng(latLong)) {
+            lat = latLong.lat;
+            lng = latLong.lng;
+        } else {
+            [lng, lat] = latLong;
+        }
         return `lat: ${lat.toFixed(5)}, long: ${lng.toFixed(5)}`;
     } else {
         return "";
@@ -44,5 +58,5 @@ export function formatLatLong(latLong: LatLng | LatLngTuple): string {
 }
 
 export function isLatLng(document: any): document is LatLng {
-    return (document as LatLng).distanceTo !== undefined;
+    return (document as LatLng)?.distanceTo !== undefined;
 }
