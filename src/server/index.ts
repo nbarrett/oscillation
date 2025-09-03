@@ -112,7 +112,7 @@ if (viteMode) {
     const frontendFiles = process.cwd() + "/dist";
     app.use(express.static(frontendFiles));
     app.get("/*", (_, res) => {
-        res.send(frontendFiles + "/index.html");
+        res.sendFile(frontendFiles + "/index.html");
     });
 
     app.listen(port, () => console.log("Server started on port ", port));

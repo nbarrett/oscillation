@@ -61,10 +61,10 @@ export function calculateGridSquareCorners(gridReferenceData: GridReferenceData)
     const northingCeil = northingFloor + 100;
 
     return {
-        topLeft: `${(gridReferenceData.gridCode)} ${eastingFloor.toString().padStart(4, '0')} ${northingCeil.toString().padStart(4, '0')}`,
-        topRight: `${(gridReferenceData.gridCode)} ${eastingCeil.toString().padStart(4, '0')} ${northingCeil.toString().padStart(4, '0')}`,
-        bottomRight: `${(gridReferenceData.gridCode)} ${eastingCeil.toString().padStart(4, '0')} ${northingFloor.toString().padStart(4, '0')}`,
-        bottomLeft: `${(gridReferenceData.gridCode)} ${eastingFloor.toString().padStart(4, '0')} ${northingFloor.toString().padStart(4, '0')}`
+        northWest: `${(gridReferenceData.gridCode)} ${eastingFloor.toString().padStart(4, '0')} ${northingCeil.toString().padStart(4, '0')}`,
+        northEast: `${(gridReferenceData.gridCode)} ${eastingCeil.toString().padStart(4, '0')} ${northingCeil.toString().padStart(4, '0')}`,
+        southEast: `${(gridReferenceData.gridCode)} ${eastingCeil.toString().padStart(4, '0')} ${northingFloor.toString().padStart(4, '0')}`,
+        southWest: `${(gridReferenceData.gridCode)} ${eastingFloor.toString().padStart(4, '0')} ${northingFloor.toString().padStart(4, '0')}`
     };
 }
 

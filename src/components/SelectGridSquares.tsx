@@ -11,11 +11,7 @@ import { colours } from "../models/game-models";
 import isEqual from "lodash/isEqual";
 import cloneDeep from "lodash/cloneDeep";
 import { useGameState } from "../hooks/use-game-state";
-import { MapClickPosition } from "../models/os-maps-models";
-
-export interface SelectedGrid {
-    gridSquareLatLongs: LatLng[];
-}
+import { MapClickPosition, SelectedGrid } from "../models/os-maps-models";
 
 export function SelectGridSquares() {
     const gameState = useGameState();

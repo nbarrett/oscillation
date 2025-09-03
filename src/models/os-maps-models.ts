@@ -8,6 +8,10 @@ export interface AccessTokenResponse {
     token_type: string;
 }
 
+export interface SelectedGrid {
+    gridSquareLatLongs: LatLng[];
+}
+
 export interface MapClickPosition {
     latLng: LatLng;
     gridReferenceData: GridReferenceData;
@@ -32,10 +36,10 @@ export interface GridReferenceTransform {
 }
 
 export interface GridSquareCorners {
-    topLeft: string;
-    topRight: string;
-    bottomLeft: string;
-    bottomRight: string;
+    northWest: string;
+    northEast: string;
+    southWest: string;
+    southEast: string;
 }
 
 export const gridReferenceCodes: string[][] = [

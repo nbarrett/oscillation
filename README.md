@@ -16,7 +16,7 @@ Only one prototype was ever made and it has been played by family members and fr
 Over Christmas period of 2023, I decided to create a digital version of the game as a tribute to my father and to see if I could overcome the limitations that Waddingtons had identified.
 
 ## Game Demo
-There's a demo of the game so far running at https://oscillation-production.up.railway.app. Note that the game is still in development and is not yet complete, so please don't expect all features in the instructions to be found! 
+There's a demo of the game so far running at https://oscillation.fly.dev/. Note that the game is still in development and is not yet complete, so please don't expect all features in the instructions to be found! 
 
 ## Pictures of the prototype game being played
 ### Guy and Lynds play in 2020
@@ -148,3 +148,22 @@ Install it and run:
 npm install
 npm run dev
 ```
+
+## Deploy to Fly.io
+
+Prerequisites:
+- Install `flyctl` from https://fly.io/docs/hands-on/install-flyctl/
+- Authenticate: `flyctl auth login`
+
+First-time setup:
+- Create (or rename) your Fly app: `flyctl apps create oscillation` (or choose a unique name)
+- Set required secrets:
+  - `flyctl secrets set OS_MAPS_API_KEY=...`
+  - `flyctl secrets set OS_MAPS_API_SECRET=...`
+
+Deploy:
+- `flyctl deploy` (uses the provided Dockerfile and fly.toml)
+
+Notes:
+- The server listens on `PORT` (default 8080). Fly maps public HTTP to this port as configured in `fly.toml`.
+- For subsequent updates, run `flyctl deploy` again.

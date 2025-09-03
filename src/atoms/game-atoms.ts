@@ -5,8 +5,7 @@ import { Player } from "../models/player-models";
 import { defaultZoom } from "../models/route-models";
 import { LatLngTuple } from "leaflet";
 import { log } from "../util/logging-config";
-import { SelectedGrid } from "../components/SelectGridSquares";
-import { MapClickPosition } from "../models/os-maps-models";
+import { MapClickPosition, SelectedGrid } from "../models/os-maps-models";
 
 
 export const gameState: RecoilState<GameData> = atom({

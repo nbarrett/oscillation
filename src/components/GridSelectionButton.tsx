@@ -3,8 +3,8 @@ import { Button } from "@mui/material";
 import { colours } from '../models/game-models';
 import { SetterOrUpdater, useRecoilState, useSetRecoilState } from "recoil";
 import { gridClearRequestState, selectedGridSquaresState } from "../atoms/game-atoms";
-import { SelectedGrid } from "./SelectGridSquares";
 import { pluraliseWithCount } from "../util/strings";
+import { SelectedGrid } from "../models/os-maps-models";
 
 export function GridSelectionButton() {
 

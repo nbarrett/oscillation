@@ -26,7 +26,6 @@ import { useCustomCRSFor27700Projection } from "../hooks/use-epsg-27700-crs";
 import { MappingProvider } from "../models/route-models";
 import { SelectGridSquares } from "./SelectGridSquares";
 import { startingPositionState } from "../atoms/route-atoms";
-import { MapFeatures } from "./MapFeatures";
 
 export function MapWithCars() {
 
@@ -99,7 +98,7 @@ export function MapWithCars() {
                     <RecordMapCentreAndZoom/>
                     <RecordMapClick/>
                 <SelectGridSquares/>
-                <MapFeatures/>
+                {/*<FeatureDetails/>*/}
                 </MapContainer>
         </div>
         : null;
