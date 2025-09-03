@@ -1,0 +1,17 @@
+# fly.toml generated for deployment
+# You can rename the app below with `flyctl apps create -n <name>` or `flyctl launch`.
+
+app = "oscillation"
+primary_region = "iad"
+
+[env]
+  PORT = "8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
