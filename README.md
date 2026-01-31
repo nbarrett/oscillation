@@ -33,20 +33,19 @@ There's a demo of the game so far running at https://oscillation.fly.dev/. Note 
 ![img.png](images-story/game-with-friends-2021.png)
 ### The younger family play! Christmas 2023
 ![family-game-2023](images-story/family-game-2023.png)
-## OSCILLATION 200 Tooling Preferences
-The game is to be coded with the following libraries and frameworks:
-* The application is to be developed as a web application
-* React is to be used as the front end framework
-* Material UI is to be used as the UI framework
-* React-leaflet is to be used for the mapping component
-* OS Maps is to be used as the mapping provider and data source, not OpenStreetMap
-* Vite is to be used as the build tool
-* Node.js is to be used as the server side runtime
-* express is to be used as the server side framework
-* remult is to be used as the ORM layer
-* TypeScript is to be used as the programming language for both the front end and back end
-* The game should support multiple players and changes that take place on one player's screen should be reflected on
-  all other players' screens in real time.
+## Technology Stack (T3 Stack)
+
+The game is built with the [T3 Stack](https://create.t3.gg/):
+
+* **Next.js 15** - React framework with App Router
+* **tRPC** - End-to-end typesafe APIs
+* **Prisma** - Type-safe ORM with MongoDB
+* **Zustand** - Lightweight state management
+* **Material UI** - Component library
+* **React-Leaflet** - Mapping component
+* **OS Maps API** - Mapping provider and data source
+* **TypeScript** - Full-stack type safety
+* **Fly.io** - Deployment platform (London & Johannesburg regions)
  
 
 ## Oscillation Game instructions
@@ -140,30 +139,62 @@ The game is to be coded with the following libraries and frameworks:
 9. Winning the game
    * The gets back to the Finishing Point with five different tokens is the Winner
 
-## The game so far
+## Development
 
-Install it and run:
+### Prerequisites
+- Node.js 20+
+- pnpm 9+
+- MongoDB (or use MongoDB Atlas)
+
+### Setup
 
 ```bash
-npm install
-npm run dev
+# Install dependencies
+pnpm install
+
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your MongoDB connection string and OS Maps API keys
+
+# Generate Prisma client
+pnpm run db:generate
+
+# Run development server
+pnpm run dev
 ```
 
-## Deploy to Fly.io
+### Environment Variables
 
-Prerequisites:
-- Install `flyctl` from https://fly.io/docs/hands-on/install-flyctl/
-- Authenticate: `flyctl auth login`
+Required environment variables:
+- `DATABASE_URL` - MongoDB connection string
+- `OS_MAPS_API_KEY` - OS Maps API key
+- `OS_MAPS_API_SECRET` - OS Maps API secret
 
-First-time setup:
-- Create (or rename) your Fly app: `flyctl apps create oscillation` (or choose a unique name)
-- Set required secrets:
-  - `flyctl secrets set OS_MAPS_API_KEY=...`
-  - `flyctl secrets set OS_MAPS_API_SECRET=...`
+## Deployment
 
-Deploy:
-- `flyctl deploy` (uses the provided Dockerfile and fly.toml)
+The app deploys automatically to Fly.io on push to main. The deployment includes:
+- Validation (lint, type check, build)
+- Docker-based deployment
+- Health check verification
 
-Notes:
-- The server listens on `PORT` (default 8080). Fly maps public HTTP to this port as configured in `fly.toml`.
-- For subsequent updates, run `flyctl deploy` again.
+Machines are deployed in:
+- **lhr** - London, UK
+- **jnb** - Johannesburg, South Africa
+
+### Manual deployment
+
+```bash
+# Install Fly CLI
+curl -L https://fly.io/install.sh | sh
+
+# Login
+fly auth login
+
+# Set secrets (first time only)
+fly secrets set DATABASE_URL=...
+fly secrets set OS_MAPS_API_KEY=...
+fly secrets set OS_MAPS_API_SECRET=...
+
+# Deploy
+fly deploy
+```
