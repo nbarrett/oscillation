@@ -1,15 +1,16 @@
-import Typography from "@mui/material/Typography";
-import Link from "@mui/material/Link";
-import * as React from "react";
+'use client';
 
-export function Copyright() {
-    return (
-        <Typography variant="body2" color="text.secondary" align="right">
-            {'Copyright © '}
-            <Link color="inherit" href="https://Oscillation.com/">
-                Kerry Barrett
-            </Link>{' '}
-            1989-{new Date().getFullYear()}
-        </Typography>
-    );
+import Typography from '@mui/material/Typography';
+import Link from '@mui/material/Link';
+
+export default function Copyright() {
+  return (
+    <Typography variant="body2" color="text.secondary" align="right">
+      {'Copyright © '}
+      <Link color="inherit" href="https://github.com/nbarrett/oscillation">
+        Kerry Barrett
+      </Link>{' '}
+      1989-{new Date().getFullYear()}
+    </Typography>
+  );
 }

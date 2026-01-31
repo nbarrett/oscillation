@@ -1,20 +1,17 @@
-import { Player } from "../models/player-models";
-import { useRecoilValue } from "recoil";
-import { LatLngTuple } from "leaflet";
-import { Stack } from "@mui/material";
-import { formatLatLong, toLatLngFromLatLngTuple } from "../mappings/route-mappings";
-import React from "react";
-import { currentPlayerState, mapCentreState, mapClickPositionState, mapZoomState } from "../atoms/game-atoms";
-import { MapClickPosition } from "../models/os-maps-models";
+'use client';
 
-export function MapPositions() {
-    const zoom: number = useRecoilValue<number>(mapZoomState);
-    const mapClickPosition: MapClickPosition = useRecoilValue<MapClickPosition>(mapClickPositionState);
-    const mapCentrePosition: LatLngTuple = useRecoilValue<LatLngTuple>(mapCentreState);
+import { Stack } from '@mui/material';
+import { useGameStore } from '@/stores/game-store';
+import { formatLatLong } from '@/lib/utils';
 
-    return <Stack direction={"row"} textAlign={"center"} alignItems={"center"} spacing={1}>
-        <div>Zoom Level: {zoom || "none"}</div>
-        <div>Map click position:{formatLatLong(mapClickPosition?.latLng)}</div>
-        <div>Map centre position:{formatLatLong(toLatLngFromLatLngTuple(mapCentrePosition))}</div>
-    </Stack>;
+export default function MapPositions() {
+  const { mapZoom, mapClickPosition, mapCentre } = useGameStore();
+
+  return (
+    <Stack direction="row" textAlign="center" alignItems="center" spacing={1}>
+      <div>Zoom Level: {mapZoom || 'none'}</div>
+      <div>Map click position: {mapClickPosition?.latLng ? formatLatLong(mapClickPosition.latLng) : ''}</div>
+      <div>Map centre position: {mapCentre ? formatLatLong(mapCentre) : ''}</div>
+    </Stack>
+  );
 }

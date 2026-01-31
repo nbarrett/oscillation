@@ -1,43 +1,68 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import { Polyline } from 'react-leaflet';
-import { LatLngTuple } from "leaflet";
-import { useEffect, useState } from "react";
-import { DirectionsResponse, Profile, SerializableRouteDirectionsRequest } from "../models/route-models";
-import { profileState, routeDirectionsState } from "../atoms/route-atoms";
-import { useRecoilValue } from "recoil";
-import { log } from '../util/logging-config';
-import { createSerializableRouteDirectionsRequest, toApiTuple } from "../mappings/route-mappings";
-import { Player } from "../models/player-models";
-import { currentPlayerState } from "../atoms/game-atoms";
-import { useGameState } from "../hooks/use-game-state";
-import { colours } from "../models/game-models";
+import { trpc } from '@/lib/trpc/client';
+import { useGameStore, useCurrentPlayer, Player } from '@/stores/game-store';
+import { useRouteStore, Profile } from '@/stores/route-store';
+import { colours, log } from '@/lib/utils';
+import type { LatLngTuple } from 'leaflet';
 
-export function PlayerMoveRoute(props: { player: Player }) {
+interface PlayerMoveRouteProps {
+  player: Player;
+}
 
-    const currentPlayer: Player = useRecoilValue<Player>(currentPlayerState);
-    const gameState = useGameState();
-    const active = props.player?.name === currentPlayer?.name;
-    const profile = useRecoilValue<Profile>(profileState);
-    const routeDirectionsRequest: SerializableRouteDirectionsRequest = active ? createSerializableRouteDirectionsRequest({
-        profile,
-        start: toApiTuple(props.player?.position),
-        end: toApiTuple(props.player?.nextPosition)
-    }) : null;
-    const directionsResponse: DirectionsResponse = useRecoilValue<DirectionsResponse>(routeDirectionsState(routeDirectionsRequest));
-    const [positions, setPositions]: [LatLngTuple[], (positions: LatLngTuple[]) => void] = useState<LatLngTuple[]>([]);
-    const receivedPositions: LatLngTuple[] = directionsResponse?.features[0]?.geometry?.coordinates?.map((tuple: number[]) => toApiTuple(tuple)) || [];
+function toApiCoordinateFormat(position: LatLngTuple | undefined): [number, number] | null {
+  if (!position || position.length < 2) return null;
+  return [position[1], position[0]];
+}
 
-    useEffect(() => {
-        if (receivedPositions.length > 0) {
-            log.debug("PlayerMoveRoute:positions received for player:", props.player.name, "->", receivedPositions);
-            setPositions(receivedPositions);
-            gameState.playerRouteReceived();
-        }
-    }, [receivedPositions]);
+export default function PlayerMoveRoute({ player }: PlayerMoveRouteProps) {
+  const currentPlayer = useCurrentPlayer();
+  const { playerRouteReceived } = useGameStore();
+  const { profile } = useRouteStore();
+  const [positions, setPositions] = useState<LatLngTuple[]>([]);
 
-    return (
-        <Polyline
-            color={colours.osMapsPurple}
-            opacity={0.8}
-            weight={10}
-            positions={positions}/>);
+  const active = player.name === currentPlayer?.name;
+  const hasNextPosition = !!player.nextPosition;
+
+  const startPosition = active && hasNextPosition ? toApiCoordinateFormat(player.position) : null;
+  const endPosition = active && hasNextPosition ? toApiCoordinateFormat(player.nextPosition) : null;
+
+  const { data: directionsResponse } = trpc.directions.getDirections.useQuery(
+    {
+      profile: profile as Profile,
+      start: startPosition!,
+      end: endPosition!,
+    },
+    {
+      enabled: !!(startPosition && endPosition),
+    }
+  );
+
+  function toLeafletCoordinateFormat(coords: number[][]): LatLngTuple[] {
+    return coords.map((tuple: number[]) => [tuple[1], tuple[0]] as LatLngTuple);
+  }
+
+  useEffect(() => {
+    if (directionsResponse?.features?.[0]?.geometry?.coordinates) {
+      const coords = directionsResponse.features[0].geometry.coordinates;
+      const receivedPositions = toLeafletCoordinateFormat(coords);
+
+      if (receivedPositions.length > 0) {
+        log.debug('PlayerMoveRoute: positions received for player:', player.name);
+        setPositions(receivedPositions);
+        playerRouteReceived();
+      }
+    }
+  }, [directionsResponse, player.name, playerRouteReceived]);
+
+  return (
+    <Polyline
+      color={colours.osMapsPurple}
+      opacity={0.8}
+      weight={10}
+      positions={positions}
+    />
+  );
 }

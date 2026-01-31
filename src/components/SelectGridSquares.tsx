@@ -1,117 +1,140 @@
-import { useMap } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
-import "proj4leaflet";
-import { log } from "../util/logging-config";
-import { useEffect } from "react";
-import L, { LatLng } from "leaflet";
-import { SetterOrUpdater, useRecoilState, useRecoilValue } from "recoil";
-import { gridClearRequestState, mapClickPositionState, selectedGridSquaresState } from "../atoms/game-atoms";
-import { calculateGridReferenceSquare } from "../mappings/os-maps-mappings";
-import { colours } from "../models/game-models";
-import isEqual from "lodash/isEqual";
-import cloneDeep from "lodash/cloneDeep";
-import { useGameState } from "../hooks/use-game-state";
-import { MapClickPosition, SelectedGrid } from "../models/os-maps-models";
+'use client';
 
-export function SelectGridSquares() {
-    const gameState = useGameState();
-    const mapClickPosition: MapClickPosition = useRecoilValue<MapClickPosition>(mapClickPositionState);
-    const [selectedGridSquares, setSelectedGridSquares]: [SelectedGrid[], SetterOrUpdater<SelectedGrid[]>] = useRecoilState<SelectedGrid[]>(selectedGridSquaresState);
-    const gridClearRequest: number = useRecoilValue<number>(gridClearRequestState);
-    const map: L.Map = useMap();
+import { useEffect } from 'react';
+import { useMap } from 'react-leaflet';
+import L from 'leaflet';
+import { isEqual } from "es-toolkit/compat";
+import { useGameStore, GridReferenceData, GridSquareCorners, SelectedGrid } from '@/stores/game-store';
+import { colours, log } from '@/lib/utils';
 
-    class IdentifiedPolygon extends L.Polygon {
-        firstLatLong: LatLng;
+class IdentifiedPolygon extends L.Polygon {
+  firstLatLong: L.LatLng;
 
-        constructor(gridSquareLatLongs: LatLng[], options?: L.PolylineOptions) {
-            super(gridSquareLatLongs, options);
-            this.firstLatLong = gridSquareLatLongs[0];
+  constructor(gridSquareLatLongs: L.LatLng[], options?: L.PolylineOptions) {
+    super(gridSquareLatLongs, options);
+    this.firstLatLong = gridSquareLatLongs[0];
+  }
+}
+
+function isIdentifiedPolygon(layer: L.Layer): layer is IdentifiedPolygon {
+  return (layer as IdentifiedPolygon).firstLatLong !== undefined;
+}
+
+function transformGridReference(
+  cornerGridReference: string,
+  gridReferenceData: GridReferenceData,
+  map: L.Map
+): { cornerLatLng: L.LatLng | null } {
+  try {
+    const parts = cornerGridReference.split(' ');
+    const cornerEasting = parseInt(`${gridReferenceData.row}${parts[1]}`.padEnd(gridReferenceData.eastings.length, '0'), 10);
+    const cornerNorthing = parseInt(`${gridReferenceData.column}${parts[2]}`.padEnd(gridReferenceData.northings.length, '0'), 10);
+
+    const cornerPoint = new L.Point(cornerEasting, cornerNorthing);
+    const cornerLatLng = map.options.crs!.unproject(cornerPoint);
+    return { cornerLatLng };
+  } catch (e) {
+    log.error('failed to transform grid reference:', e);
+    return { cornerLatLng: null };
+  }
+}
+
+function calculateGridReferenceSquare(
+  map: L.Map,
+  gridReferenceData: GridReferenceData,
+  gridSquareCorners: GridSquareCorners
+): L.LatLng[] {
+  const corners = Object.values(gridSquareCorners);
+  return corners
+    .map((corner) => transformGridReference(corner, gridReferenceData, map).cornerLatLng)
+    .filter((latLng): latLng is L.LatLng => latLng !== null);
+}
+
+export default function SelectGridSquares() {
+  const map = useMap();
+  const {
+    mapClickPosition,
+    selectedGridSquares,
+    diceResult,
+    gridClearRequest,
+    setSelectedGridSquares,
+    addSelectedGridSquare,
+    removeSelectedGridSquare,
+  } = useGameStore();
+
+  function findExistingGridSquareIndex(gridSquareLatLongs: L.LatLng[]): number {
+    return selectedGridSquares.findIndex(
+      (item) => item.gridSquareLatLongs.length > 0 &&
+        isEqual(item.gridSquareLatLongs[0], { lat: gridSquareLatLongs[0].lat, lng: gridSquareLatLongs[0].lng })
+    );
+  }
+
+  function deselectGridSquare(gridSquareLatLongs: L.LatLng[], existingIndex: number) {
+    map.eachLayer((layer) => {
+      if (isIdentifiedPolygon(layer)) {
+        const firstLL = gridSquareLatLongs[0];
+        if (isEqual({ lat: layer.firstLatLong.lat, lng: layer.firstLatLong.lng }, { lat: firstLL.lat, lng: firstLL.lng })) {
+          log.info("removing polygon for deselection");
+          layer.remove();
         }
+      }
+    });
+    removeSelectedGridSquare(existingIndex);
+  }
+
+  function selectGridSquare(gridSquareLatLongs: L.LatLng[]) {
+    const gridSquare = new IdentifiedPolygon(gridSquareLatLongs, {
+      interactive: true,
+      color: colours.osMapsPurple,
+      weight: 1,
+    });
+
+    gridSquare.addTo(map);
+    addSelectedGridSquare({
+      gridSquareLatLongs: gridSquareLatLongs.map((ll) => ({ lat: ll.lat, lng: ll.lng })),
+    });
+    log.info("added grid square polygon");
+  }
+
+  function canSelectMoreGridSquares(): boolean {
+    return !!(diceResult && diceResult > selectedGridSquares.length);
+  }
+
+  useEffect(() => {
+    if (!mapClickPosition || !map) return;
+
+    const gridSquareLatLongs = calculateGridReferenceSquare(
+      map,
+      mapClickPosition.gridReferenceData,
+      mapClickPosition.gridSquareCorners
+    );
+
+    if (gridSquareLatLongs.length === 0) return;
+
+    const existingIndex = findExistingGridSquareIndex(gridSquareLatLongs);
+
+    if (existingIndex !== -1) {
+      deselectGridSquare(gridSquareLatLongs, existingIndex);
+    } else if (canSelectMoreGridSquares()) {
+      selectGridSquare(gridSquareLatLongs);
     }
+  }, [mapClickPosition]);
 
-    useEffect(() => {
-        if (mapClickPosition) {
-            const gridSquareLatLongs: LatLng[] = calculateGridReferenceSquare(map, mapClickPosition.gridReferenceData, mapClickPosition.gridSquareCorners);
-            const existingItem = selectedGridSquares.find(item => isEqual(item.gridSquareLatLongs[0], gridSquareLatLongs[0]));
-            if (gameState.gameData.diceResult > selectedGridSquares.length || existingItem) {
-                if (existingItem) {
-                    log.info("attempting to find layer with matching lat/long:", existingItem.gridSquareLatLongs);
-                    map.eachLayer((layer) => {
-                        if (isIdentifiedPolygon(layer)) {
-                            if (isEqual(layer.firstLatLong, existingItem.gridSquareLatLongs[0])) {
-                                log.info("found matching lat/long", layer.getLatLngs(), "removing polygon");
-                                layer.remove();
-                                setSelectedGridSquares(existingSelections => existingSelections.filter(existingSelection => !isEqual(existingSelection.gridSquareLatLongs, existingItem.gridSquareLatLongs)));
-                            } else {
-                                log.debug("layer lat/long", layer.getLatLngs(), "don't match", existingItem.gridSquareLatLongs);
-                            }
-                        } else {
-                            log.debug("layer not a polygon", layer);
-                        }
-                    });
-                } else {
-                    log.info("could not find existing grid square with gridSquareLatLongs:", gridSquareLatLongs);
-                    const gridSquare: IdentifiedPolygon = new IdentifiedPolygon(gridSquareLatLongs, {
-                        interactive: true,
-                        color: colours.osMapsPurple,
-                        weight: 1
-                    });
-                    log.info("created gridSquare:", gridSquare);
-                    const newItem: SelectedGrid = {gridSquareLatLongs};
-                    log.info("created newItem:", newItem);
-                    log.info("adding gridSquare to map:", gridSquare);
-                    gridSquare.addTo(map);
-                    setSelectedGridSquares(existingSelections => cloneDeep(existingSelections).concat(newItem));
-                }
-            }
+  function clearAllPolygons() {
+    log.info("clearing all grid selections");
+    map.eachLayer((layer) => {
+      if (layer instanceof L.Polygon) {
+        layer.remove();
+      }
+    });
+    setSelectedGridSquares([]);
+  }
 
-        } else {
-            log.debug("map not yet initialised");
-        }
-
-    }, [mapClickPosition]);
-
-    useEffect(() => {
-        const polygons: L.Polygon[] = [];
-        map.eachLayer((layer) => {
-            if (isIdentifiedPolygon(layer)) {
-                log.debug("found IdentifiedPolygon", layer);
-                polygons.push(layer);
-            } else {
-                log.debug("layer not an IdentifiedPolygon:", layer);
-            }
-        });
-
-        log.info("selectedGridSquares:", selectedGridSquares, "polygons:", polygons);
-
-
-    }, [selectedGridSquares]);
-
-    useEffect(() => {
-        log.info("gridClearRequest:", gridClearRequest);
-        if (gridClearRequest > 0) {
-            clearSelections();
-        }
-
-    }, [gridClearRequest]);
-
-
-    function isIdentifiedPolygon(document: any): document is IdentifiedPolygon {
-        return (document as IdentifiedPolygon).firstLatLong !== undefined;
+  useEffect(() => {
+    if (gridClearRequest > 0) {
+      clearAllPolygons();
     }
+  }, [gridClearRequest, map, setSelectedGridSquares]);
 
-    function clearSelections() {
-        log.info("request to clear grid");
-        map.eachLayer((layer) => {
-            if (layer instanceof L.Polygon) {
-                log.info("removing polygon", layer);
-                layer.remove();
-            } else {
-                log.info("layer not a polygon:", layer);
-            }
-        });
-        setSelectedGridSquares([]);
-    }
-
-    return null;
+  return null;
 }

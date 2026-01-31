@@ -1,27 +1,39 @@
-FROM node:20-alpine AS build
+FROM node:20-alpine AS deps
 WORKDIR /app
 
-# Install dependencies (cache layer)
-COPY package.json package-lock.json* .npmrc* ./
+COPY package.json package-lock.json* ./
+COPY prisma ./prisma
+
 RUN npm ci --no-audit --no-fund
 
-# Copy source and build
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/node_modules/.prisma ./node_modules/.prisma
 COPY . .
+
+ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-# Copy only what we need to run
-COPY --from=build /app/package.json ./package.json
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
-
 ENV NODE_ENV=production
-# Fly will set PORT. Default to 8080 for local runs.
+ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=8080
+ENV HOSTNAME="0.0.0.0"
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+
+USER nextjs
 
 EXPOSE 8080
 
-CMD ["npm", "run", "start"]
-
+CMD ["node", "server.js"]
