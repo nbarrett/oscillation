@@ -59,7 +59,7 @@ jobs:
       - name: Deploy to Fly.io
         run: |
           for i in 1 2 3; do
-            flyctl deploy --remote-only && break
+            flyctl deploy --remote-only --no-cache && break
             echo "Deploy attempt $i failed, retrying in 10s..."
             sleep 10
           done
