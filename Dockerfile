@@ -7,6 +7,7 @@ COPY package.json pnpm-lock.yaml ./
 COPY prisma ./prisma
 
 RUN pnpm install --frozen-lockfile
+RUN pnpm run db:generate
 
 FROM node:20-alpine AS builder
 WORKDIR /app
@@ -14,6 +15,7 @@ WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/node_modules/.prisma ./node_modules/.prisma
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
