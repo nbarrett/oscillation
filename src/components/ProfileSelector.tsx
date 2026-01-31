@@ -1,40 +1,46 @@
-import * as React from 'react';
+'use client';
+
 import { useEffect } from 'react';
 import MenuItem from '@mui/material/MenuItem';
-import { enumKeyValues } from "../util/enums";
-import { Profile } from "../models/route-models";
-import { asTitle } from "../util/strings";
-import { TextField } from "@mui/material";
-import { useRecoilState } from "recoil";
-import { profileState } from "../atoms/route-atoms";
-import { log } from "../util/logging-config";
+import { TextField } from '@mui/material';
+import { useRouteStore, Profile } from '@/stores/route-store';
+import { asTitle, log } from '@/lib/utils';
+
+const profileOptions = Object.values(Profile);
 
 export default function ProfileSelector() {
+  const { profile, setProfile } = useRouteStore();
 
-    const [profile, setProfile] = useRecoilState<Profile>(profileState);
-
-    useEffect(() => {
-        if (!profile) {
-            log.debug("ProfileSelector:profile:initialised to:", profile);
-            setProfile(Profile.DRIVING_CAR);
-        }
-    }, []);
-
-    useEffect(() => {
-        log.debug("ProfileSelector:profile:", profile);
-    }, [profile]);
-
-    function handleChange(event) {
-        setProfile(event.target.value);
+  useEffect(() => {
+    if (!profile) {
+      log.debug('ProfileSelector:profile:initialised to:', Profile.DRIVING_CAR);
+      setProfile(Profile.DRIVING_CAR);
     }
+  }, [profile, setProfile]);
 
-    return (
-        <TextField fullWidth sx={{minWidth: 220}} select size={"small"}
-                   label={"Driving Profile"}
-                   value={profile||""}
-                   onChange={handleChange}>
-            {enumKeyValues(Profile).map((value, index) =>
-                <MenuItem key={value.key} value={value.value}>{asTitle(value.value)}</MenuItem>)}
-        </TextField>
-    );
+  useEffect(() => {
+    log.debug('ProfileSelector:profile:', profile);
+  }, [profile]);
+
+  function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
+    setProfile(event.target.value as Profile);
+  }
+
+  return (
+    <TextField
+      fullWidth
+      sx={{ minWidth: 220 }}
+      select
+      size="small"
+      label="Driving Profile"
+      value={profile || ''}
+      onChange={handleChange}
+    >
+      {profileOptions.map((value) => (
+        <MenuItem key={value} value={value}>
+          {asTitle(value)}
+        </MenuItem>
+      ))}
+    </TextField>
+  );
 }

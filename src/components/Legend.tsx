@@ -1,25 +1,37 @@
-import L from "leaflet";
-import { useEffect } from "react";
-import { log } from "../util/logging-config";
+'use client';
 
-export function Legend(props: { map: L.Map }) {
+import { useEffect } from 'react';
+import L from 'leaflet';
+import { log } from '@/lib/utils';
 
-    const legend = new L.Control({position: "bottomleft"});
+interface LegendProps {
+  map: L.Map | null;
+}
 
-    useEffect(() => {
-        if (props.map) {
-            log.debug("legend:onAdd", legend);
-            legend.onAdd = () => {
-                const div = L.DomUtil.create("div", "description");
-                L.DomEvent.disableClickPropagation(div);
-                const text = "<b>Map Instructions</b><div>We can put information in here to help players understand how to use the map or play the game.</div>";
-                div.innerHTML = text;
-                return div;
-            };
-            legend.addTo(props.map);
-        }
+export default function Legend({ map }: LegendProps) {
+  useEffect(() => {
+    if (!map) return;
 
-    }, [props.map]);
+    const legend = new L.Control({ position: 'bottomleft' });
 
-    return null;
+    legend.onAdd = () => {
+      const div = L.DomUtil.create('div', 'description');
+      L.DomEvent.disableClickPropagation(div);
+      div.innerHTML = `
+        <b>Map Instructions</b>
+        <div>Roll the dice, then drag your car to move across the grid squares.</div>
+      `;
+      div.style.cssText = 'background: white; padding: 10px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);';
+      return div;
+    };
+
+    legend.addTo(map);
+    log.debug('legend:added to map');
+
+    return () => {
+      legend.remove();
+    };
+  }, [map]);
+
+  return null;
 }

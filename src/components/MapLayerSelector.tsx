@@ -1,44 +1,50 @@
-import * as React from 'react';
+'use client';
+
 import { useEffect } from 'react';
 import MenuItem from '@mui/material/MenuItem';
-import { enumValues } from "../util/enums";
-import { MappingProvider } from "../models/route-models";
-import { TextField } from "@mui/material";
-import { useRecoilState, useRecoilValue } from "recoil";
-import { log } from "../util/logging-config";
-import { mapLayerState, mappingProviderState } from "../atoms/os-maps-atoms";
-import { MapLayer, MapLayerAttributes, MapLayers } from "../models/os-maps-models";
+import { TextField } from '@mui/material';
+import { useMapStore, MapLayer, MapLayers, MappingProvider } from '@/stores/map-store';
+import { log } from '@/lib/utils';
+
+const mapLayerOptions = Object.values(MapLayer);
 
 export default function MapLayerSelector() {
+  const { mapLayer, mappingProvider, setMapLayer } = useMapStore();
 
-    const [mapLayer, setMapLayer] = useRecoilState<MapLayer>(mapLayerState);
-    const mappingProvider: MappingProvider = useRecoilValue<MappingProvider>(mappingProviderState);
-
-    useEffect(() => {
-        if (!mapLayer) {
-            log.debug("ProfileSelector:mapLayer:initialised to:", mapLayer);
-            setMapLayer(MapLayer.LEISURE_27700);
-        }
-    }, []);
-
-    useEffect(() => {
-        log.debug("ProfileSelector:mapLayer:", mapLayer);
-    }, [mapLayer]);
-
-    function handleChange(event) {
-        setMapLayer(event.target.value);
+  useEffect(() => {
+    if (!mapLayer) {
+      log.debug('MapLayerSelector:mapLayer:initialised to:', MapLayer.OUTDOOR_3857);
+      setMapLayer(MapLayer.OUTDOOR_3857);
     }
+  }, [mapLayer, setMapLayer]);
 
-    return (
-            <TextField fullWidth disabled={mappingProvider === MappingProvider.OPEN_STREET_MAPS}
-                       sx={{minWidth: 220}} select size={"small"}
-                       label={"Map Layer"}
-                       value={mapLayer || ""}
-                       onChange={handleChange}>
-                {enumValues(MapLayer).map((value, index) => {
-                    const attribute: MapLayerAttributes = MapLayers[value];
-                    return <MenuItem key={attribute.name} value={attribute.name}>{attribute.displayName}</MenuItem>;
-                })}
-            </TextField>
-    );
+  useEffect(() => {
+    log.debug('MapLayerSelector:mapLayer:', mapLayer);
+  }, [mapLayer]);
+
+  function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
+    setMapLayer(event.target.value as MapLayer);
+  }
+
+  return (
+    <TextField
+      fullWidth
+      disabled={mappingProvider === MappingProvider.OPEN_STREET_MAPS}
+      sx={{ minWidth: 220 }}
+      select
+      size="small"
+      label="Map Layer"
+      value={mapLayer || ''}
+      onChange={handleChange}
+    >
+      {mapLayerOptions.map((value) => {
+        const attribute = MapLayers[value];
+        return (
+          <MenuItem key={attribute.name} value={attribute.name}>
+            {attribute.displayName}
+          </MenuItem>
+        );
+      })}
+    </TextField>
+  );
 }

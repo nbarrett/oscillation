@@ -1,105 +1,128 @@
-import React, { useEffect, useState } from "react";
-import "leaflet/dist/leaflet.css";
-import "./App.css";
-import L from "leaflet";
-import { MapContainer, TileLayer } from "react-leaflet";
-import { log } from "../util/logging-config";
-import { Player } from "../models/player-models";
-import { SetterOrUpdater, useRecoilState, useRecoilValue } from "recoil";
-import { accessTokenState, mapLayerState, mappingProviderState } from "../atoms/os-maps-atoms";
-import {
-    AccessTokenResponse,
-    MapLayer,
-    MapLayerAttributes,
-    MapLayers,
-    ProjectionValue
-} from "../models/os-maps-models";
-import { Legend } from "./Legend";
-import "proj4leaflet";
-import { RecordMapCentreAndZoom } from "./RecordMapCentreAndZoom";
-import { RecordMapClick } from "./RecordMapClick";
-import { PlayerCar } from "./PlayerCar";
-import { useTileLayerUrls } from "../hooks/use-tile-layer-urls";
-import { mapZoomState, playerZoomRequestState, selectablePlayerState } from "../atoms/game-atoms";
-import { useGameState } from "../hooks/use-game-state";
-import { useCustomCRSFor27700Projection } from "../hooks/use-epsg-27700-crs";
-import { MappingProvider } from "../models/route-models";
-import { SelectGridSquares } from "./SelectGridSquares";
-import { startingPositionState } from "../atoms/route-atoms";
+'use client';
 
-export function MapWithCars() {
+import { useEffect, useState, useCallback } from 'react';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+import { MapContainer, TileLayer } from 'react-leaflet';
+import { useGameStore, usePlayer, Player } from '@/stores/game-store';
+import { useMapStore, MapLayer, MapLayers, MappingProvider, ProjectionValue } from '@/stores/map-store';
+import { useRouteStore } from '@/stores/route-store';
+import { log } from '@/lib/utils';
+import 'proj4leaflet';
+import PlayerCar from './PlayerCar';
+import Legend from './Legend';
+import RecordMapCentreAndZoom from './RecordMapCentreAndZoom';
+import RecordMapClick from './RecordMapClick';
+import SelectGridSquares from './SelectGridSquares';
 
-    const startingPosition = useRecoilValue(startingPositionState);
-    const gameState = useGameState();
-    const playerZoomRequest: string = useRecoilValue<string>(playerZoomRequestState);
-    const mapLayer: MapLayer = useRecoilValue<MapLayer>(mapLayerState);
-    const playerZoom: Player = useRecoilValue<Player>(selectablePlayerState(playerZoomRequest));
-    const players: Player[] = gameState.gameData.players;
-    const [zoom, setZoom]: [number, SetterOrUpdater<number>] = useRecoilState<number>(mapZoomState);
-    const accessTokenResponse: AccessTokenResponse = useRecoilValue<AccessTokenResponse>(accessTokenState);
-    const mappingProvider: MappingProvider = useRecoilValue<MappingProvider>(mappingProviderState);
-    const mapLayerAttributes: MapLayerAttributes = MapLayers[mapLayer];
-    const [map, setMap] = useState<L.Map>();
-    const mapTileUrls = useTileLayerUrls();
-    const useCustomTileLayer: boolean = mappingProvider !== MappingProvider.OPEN_STREET_MAPS && mapLayerAttributes?.layerParameters?.tileMatrixSet === ProjectionValue.ESPG_27700;
-    const customCRS = useCustomCRSFor27700Projection();
-    const crs = useCustomTileLayer ? customCRS.crs : L.CRS.EPSG3857;
-    const canRender = mapLayerAttributes && startingPosition;
+const customCRS = new L.Proj.CRS(
+  'EPSG:27700',
+  '+proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy +towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 +units=m +no_defs',
+  {
+    resolutions: [896.0, 448.0, 224.0, 112.0, 56.0, 28.0, 14.0, 7.0, 3.5, 1.75],
+    origin: [-238375.0, 1376256.0],
+  }
+);
 
-    useEffect(() => {
-        gameState.initialisePlayers();
-    }, [startingPosition]);
+export default function MapWithCars() {
+  const { players, mapZoom, setMapZoom, playerZoomRequest, initialisePlayers } = useGameStore();
+  const { accessToken, mapLayer, mappingProvider } = useMapStore();
+  const { startingPosition } = useRouteStore();
 
-    useEffect(() => {
-        if (playerZoom) {
-            log.debug("zooming to players to:", playerZoom.name, "position:", playerZoom.position);
-            map?.flyTo(playerZoom.position);
-        }
-    }, [playerZoom]);
+  const [map, setMap] = useState<L.Map | null>(null);
 
-    useEffect(() => {
-        log.debug("zoom:", zoom, "mapLayerAttributes:", mapLayerAttributes, "useCustomTileLayer:", useCustomTileLayer);
-        if (useCustomTileLayer) {
-            if (zoom < mapLayerAttributes?.minZoom) {
-            const newZoom = mapLayerAttributes.minZoom + Math.floor(mapLayerAttributes.maxZoom - mapLayerAttributes.minZoom / 2);
-                log.debug("zoom:", zoom, "below minZoom:", mapLayerAttributes.minZoom);
-                setZoom(mapLayerAttributes.minZoom);
-            } else if (zoom > mapLayerAttributes?.maxZoom) {
-                log.debug("zoom:", zoom, "above mxnZoom:", mapLayerAttributes.maxZoom);
-                setZoom(mapLayerAttributes.maxZoom);
-        }
-        } else {
-            log.debug("zoom:", zoom, "not validated and intercepted");
-        }
-    }, [useCustomTileLayer, mapLayerAttributes, zoom]);
+  const mapLayerAttributes = MapLayers[mapLayer];
+  const useCustomTileLayer =
+    mappingProvider !== MappingProvider.OPEN_STREET_MAPS &&
+    mapLayerAttributes?.layerParameters?.tileMatrixSet === ProjectionValue.ESPG_27700;
+  const crs = useCustomTileLayer ? customCRS : L.CRS.EPSG3857;
 
-    useEffect(() => {
-        log.debug("for mapLayerAttributes:", mapLayerAttributes, "tileUrl:", mapTileUrls?.url, "useCustomTileLayer:", useCustomTileLayer);
-    }, [mapTileUrls?.url, useCustomTileLayer]);
+  const canRender = mapLayerAttributes && startingPosition;
 
-    useEffect(() => {
-        log.debug("crs:", crs, "useCustomTileLayer:", useCustomTileLayer);
-    }, [crs, useCustomTileLayer]);
+  const playerToZoom = players.find((p) => p.name === playerZoomRequest);
 
-    return canRender ?
-        <div style={{height: '80vh', width: '100%'}}>
-            <MapContainer crs={crs} whenReady={() => log.debug("map ready")}
-                          minZoom={useCustomTileLayer ? mapLayerAttributes?.minZoom : 0}
-                          maxZoom={useCustomTileLayer ? mapLayerAttributes?.maxZoom : 18}
-                          zoom={zoom} center={startingPosition?.location} scrollWheelZoom={true}
-                          ref={(map: L.Map) => setMap(map)} style={{height: '100%'}}>
-                {accessTokenResponse?.access_token ?
-                    <TileLayer url={mapTileUrls?.url}
-                               attribution={'© <a href="https://www.ordnancesurvey.co.uk/">Ordnance Survey Crown copyright and database rights 2022 OS 100018976</a> <a href="https://www.ordnancesurvey.co.uk/">Ordnance Survey</a>'}
-                    />
-                    : <div>waiting for access token</div>}
-                    {players.map((player: Player, key: number) => <PlayerCar key={key} player={player}/>)}
-                    <Legend map={map as L.Map}/>
-                    <RecordMapCentreAndZoom/>
-                    <RecordMapClick/>
-                <SelectGridSquares/>
-                {/*<FeatureDetails/>*/}
-                </MapContainer>
-        </div>
-        : null;
+  useEffect(() => {
+    if (startingPosition && players.length === 0) {
+      initialisePlayers([startingPosition.lat, startingPosition.lng]);
+    }
+  }, [startingPosition, players.length, initialisePlayers]);
+
+  useEffect(() => {
+    if (playerToZoom && map) {
+      log.debug('zooming to player:', playerToZoom.name, 'position:', playerToZoom.position);
+      map.flyTo(playerToZoom.position);
+    }
+  }, [playerToZoom, map]);
+
+  useEffect(() => {
+    log.debug('zoom:', mapZoom, 'mapLayerAttributes:', mapLayerAttributes, 'useCustomTileLayer:', useCustomTileLayer);
+    if (useCustomTileLayer) {
+      if (mapZoom < mapLayerAttributes?.minZoom) {
+        log.debug('zoom:', mapZoom, 'below minZoom:', mapLayerAttributes.minZoom);
+        setMapZoom(mapLayerAttributes.minZoom);
+      } else if (mapZoom > mapLayerAttributes?.maxZoom) {
+        log.debug('zoom:', mapZoom, 'above maxZoom:', mapLayerAttributes.maxZoom);
+        setMapZoom(mapLayerAttributes.maxZoom);
+      }
+    }
+  }, [useCustomTileLayer, mapLayerAttributes, mapZoom, setMapZoom]);
+
+  const buildTileUrl = useCallback(() => {
+    const key = accessToken?.access_token;
+    if (!key) return null;
+
+    switch (mappingProvider) {
+      case MappingProvider.OPEN_STREET_MAPS:
+        return 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+      case MappingProvider.OS_MAPS_ZXY:
+        return `https://api.os.uk/maps/raster/v1/zxy/${mapLayerAttributes?.layerParameters?.layer}/{z}/{x}/{y}.png?key=${key}`;
+      case MappingProvider.OS_MAPS_WMTS:
+        const params = mapLayerAttributes
+          ? Object.entries(mapLayerAttributes.layerParameters)
+              .map(([k, v]) => `${k}=${v}`)
+              .join('&')
+          : '';
+        return `https://api.os.uk/maps/raster/v1/wmts?key=${key}&${params}`;
+      default:
+        return null;
+    }
+  }, [accessToken, mappingProvider, mapLayerAttributes]);
+
+  const tileUrl = buildTileUrl();
+
+  if (!canRender) {
+    return null;
+  }
+
+  return (
+    <div style={{ height: '80vh', width: '100%' }}>
+      <MapContainer
+        crs={crs}
+        whenReady={() => log.debug('map ready')}
+        minZoom={useCustomTileLayer ? mapLayerAttributes?.minZoom : 0}
+        maxZoom={useCustomTileLayer ? mapLayerAttributes?.maxZoom : 18}
+        zoom={mapZoom}
+        center={[startingPosition.lat, startingPosition.lng]}
+        scrollWheelZoom={true}
+        ref={(mapRef) => setMap(mapRef)}
+        style={{ height: '100%' }}
+      >
+        {tileUrl ? (
+          <TileLayer
+            url={tileUrl}
+            attribution='© <a href="https://www.ordnancesurvey.co.uk/">Ordnance Survey Crown copyright and database rights 2024 OS 100018976</a>'
+          />
+        ) : (
+          <div>waiting for access token</div>
+        )}
+        {players.map((player, key) => (
+          <PlayerCar key={key} player={player} />
+        ))}
+        <Legend map={map} />
+        <RecordMapCentreAndZoom />
+        <RecordMapClick />
+        <SelectGridSquares />
+      </MapContainer>
+    </div>
+  );
 }

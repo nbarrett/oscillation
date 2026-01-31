@@ -1,57 +1,104 @@
-import * as React from "react";
-import { useEffect } from "react";
-import MenuItem from "@mui/material/MenuItem";
-import { asTitle } from "../util/strings";
-import { Button, TextField } from "@mui/material";
-import { formatLatLong } from "../mappings/route-mappings";
-import Typography from "@mui/material/Typography";
-import Stack from '@mui/material/Stack';
-import { NamedLocation } from "../shared/NamedLocation";
-import useNamedLocationsData from "../hooks/use-named-locations";
-import { colours } from "../models/game-models";
-import { log } from "../util/logging-config";
-import isNull from "lodash-es/isNull";
+'use client';
+
+import { useEffect } from 'react';
+import MenuItem from '@mui/material/MenuItem';
+import { Button, TextField, Typography, Stack } from '@mui/material';
+import { trpc } from '@/lib/trpc/client';
+import { useRouteStore, NamedLocation } from '@/stores/route-store';
+import { useGameStore } from '@/stores/game-store';
+import { formatLatLong, asTitle, colours, log } from '@/lib/utils';
+
+const referenceStartingPoints = [
+  { name: 'London', lat: 51.505, lng: -0.09 },
+  { name: 'Challock', lat: 51.21861, lng: 0.88011 },
+  { name: 'Cambridge', lat: 52.17487, lng: 0.12830 },
+];
 
 export default function StartingPositionSelector() {
+  const { startingPosition, setStartingPosition, setNamedLocations, namedLocations } = useRouteStore();
+  const { initialisePlayers } = useGameStore();
 
-    const namedLocationsData = useNamedLocationsData();
-    const namedLocations: NamedLocation[] = namedLocationsData?.namedLocations;
-    const namedLocation: NamedLocation = namedLocationsData?.namedLocation;
+  const { data: locations, refetch } = trpc.locations.getAll.useQuery();
+  const createLocation = trpc.locations.create.useMutation({
+    onSuccess: () => refetch(),
+  });
 
-    useEffect(() => {
-        log.debug("StartingPositionSelector:namedLocations:", namedLocations);
-    }, [namedLocations]);
-
-    function handleChange(event) {
-        const namedLocation = namedLocations.find((value: NamedLocation) => value.name === event.target.value);
-        namedLocationsData.setNamedLocation(namedLocation);
+  useEffect(() => {
+    if (locations) {
+      setNamedLocations(locations);
+      log.debug('StartingPositionSelector:locations:', locations);
     }
+  }, [locations, setNamedLocations]);
 
-    return isNull(namedLocations) ?
-        <Button fullWidth variant="contained"
-                color="primary"
-                onClick={() => namedLocationsData.prePopulateDataStore()}
-                sx={{
-                    '&': {
-                        backgroundColor: colours.osMapsPurple,
-                    },
-                    '&:hover': {
-                        backgroundColor: colours.osMapsPink,
-                    },
-                }}>Populate Starting Points</Button> :
-        <TextField fullWidth sx={{minWidth: 220}} select size={"small"}
-                   label={"Game Starting Point"}
-                   value={namedLocation?.name || ""}
-                   onChange={handleChange}>
-            {namedLocations?.map((value: NamedLocation, index) => (
-                <MenuItem key={value?.name} value={value?.name}>
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                        <div>{asTitle(value?.name)}</div>
-                        <Typography variant="body2" color="text.secondary">
-                            {formatLatLong(value?.location)}
-                        </Typography>
-                    </Stack>
-                </MenuItem>
-            ))}
-        </TextField>;
+  useEffect(() => {
+    if (namedLocations.length > 0 && !startingPosition) {
+      const firstLocation = namedLocations[0];
+      log.debug('StartingPositionSelector:initialised to:', firstLocation);
+      setStartingPosition(firstLocation);
+    }
+  }, [namedLocations, startingPosition, setStartingPosition]);
+
+  useEffect(() => {
+    if (startingPosition) {
+      initialisePlayers([startingPosition.lat, startingPosition.lng]);
+    }
+  }, [startingPosition, initialisePlayers]);
+
+  async function prePopulateDataStore() {
+    for (const point of referenceStartingPoints) {
+      log.debug('prePopulateDataStore:point:', point);
+      const existing = namedLocations.find((loc) => loc.name === point.name);
+      if (!existing) {
+        await createLocation.mutateAsync(point);
+      }
+    }
+  }
+
+  function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const selected = namedLocations.find((loc) => loc.name === event.target.value);
+    if (selected) {
+      setStartingPosition(selected);
+    }
+  }
+
+  if (!locations || locations.length === 0) {
+    return (
+      <Button
+        fullWidth
+        variant="contained"
+        color="primary"
+        onClick={prePopulateDataStore}
+        disabled={createLocation.isPending}
+        sx={{
+          '&': { backgroundColor: colours.osMapsPurple },
+          '&:hover': { backgroundColor: colours.osMapsPink },
+        }}
+      >
+        {createLocation.isPending ? 'Populating...' : 'Populate Starting Points'}
+      </Button>
+    );
+  }
+
+  return (
+    <TextField
+      fullWidth
+      sx={{ minWidth: 220 }}
+      select
+      size="small"
+      label="Game Starting Point"
+      value={startingPosition?.name || ''}
+      onChange={handleChange}
+    >
+      {namedLocations.map((location) => (
+        <MenuItem key={location.name} value={location.name}>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <div>{asTitle(location.name)}</div>
+            <Typography variant="body2" color="text.secondary">
+              {formatLatLong([location.lat, location.lng])}
+            </Typography>
+          </Stack>
+        </MenuItem>
+      ))}
+    </TextField>
+  );
 }

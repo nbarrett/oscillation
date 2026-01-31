@@ -1,31 +1,27 @@
-import React from 'react';
-import { Button } from "@mui/material";
-import { colours } from '../models/game-models';
-import { SetterOrUpdater, useRecoilState, useSetRecoilState } from "recoil";
-import { gridClearRequestState, selectedGridSquaresState } from "../atoms/game-atoms";
-import { pluraliseWithCount } from "../util/strings";
-import { SelectedGrid } from "../models/os-maps-models";
+'use client';
 
-export function GridSelectionButton() {
+import { Button } from '@mui/material';
+import { useGameStore, GameTurnState } from '@/stores/game-store';
+import { colours, pluraliseWithCount } from '@/lib/utils';
 
-    const setGridClearRequest: SetterOrUpdater<number> = useSetRecoilState<number>(gridClearRequestState);
+export default function GridSelectionButton() {
+  const { selectedGridSquares, gameTurnState, clearGridSelections } = useGameStore();
 
-    const [selectedGridSquares, setSelectedGridSquares]: [SelectedGrid[], SetterOrUpdater<SelectedGrid[]>] = useRecoilState<SelectedGrid[]>(selectedGridSquaresState);
+  if (gameTurnState !== GameTurnState.DICE_ROLLED || selectedGridSquares.length === 0) {
+    return null;
+  }
 
-    function clearSelections() {
-        setGridClearRequest(existing => existing + 1);
-    }
-
-    return selectedGridSquares.length > 0 ? <Button variant="contained"
-                                                    color="primary"
-                                                    onClick={clearSelections}
-                                                    disabled={false}
-                                                    sx={{
-                                                        '&': {
-                                                            backgroundColor: colours.osMapsPurple,
-                                                        },
-                                                        '&:hover': {
-                                                            backgroundColor: colours.osMapsPink,
-                                                        },
-                                                    }}>Clear {pluraliseWithCount(selectedGridSquares.length, "Move")}</Button> : null;
+  return (
+    <Button
+      variant="contained"
+      color="primary"
+      onClick={clearGridSelections}
+      sx={{
+        '&': { backgroundColor: colours.osMapsPurple },
+        '&:hover': { backgroundColor: colours.osMapsPink },
+      }}
+    >
+      Clear {pluraliseWithCount(selectedGridSquares.length, 'Move')}
+    </Button>
+  );
 }

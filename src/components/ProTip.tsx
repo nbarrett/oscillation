@@ -1,4 +1,5 @@
-import * as React from 'react';
+'use client';
+
 import Link from '@mui/material/Link';
 import SvgIcon, { SvgIconProps } from '@mui/material/SvgIcon';
 import Typography from '@mui/material/Typography';
@@ -16,7 +17,9 @@ export default function ProTip() {
     <Typography sx={{ mt: 1, mb: 3 }} color="text.secondary">
       <LightBulbIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
       {'Pro tip: See game instructions in '}
-      <Link href="https://github.com/nbarrett/oscillation?tab=readme-ov-file#oscillation-game-instructions">in the documentation</Link>
+      <Link href="https://github.com/nbarrett/oscillation?tab=readme-ov-file#oscillation-game-instructions">
+        the documentation
+      </Link>
     </Typography>
   );
 }

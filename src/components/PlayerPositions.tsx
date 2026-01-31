@@ -1,58 +1,69 @@
-import { SetterOrUpdater, useRecoilValue, useSetRecoilState } from "recoil";
-import { Player } from "../models/player-models";
-import React, { useEffect } from "react";
-import { Box, Grid } from "@mui/material";
-import Link from "@mui/material/Link";
-import { formatLatLong } from "../mappings/route-mappings";
-import { GameTurnState } from "../models/game-models";
-import { log } from "../util/logging-config";
-import { useGameState } from "../hooks/use-game-state";
-import { currentPlayerState, playerZoomRequestState } from "../atoms/game-atoms";
-import { GridReferences } from "./GridReferences";
+'use client';
 
-export function PlayerPositions() {
+import { useEffect } from 'react';
+import { Box, Grid, Link } from '@mui/material';
+import { useGameStore, useCurrentPlayer, GameTurnState } from '@/stores/game-store';
+import { formatLatLong, log } from '@/lib/utils';
+import GridReferences from './GridReferences';
 
-    const setPlayerZoomRequest: SetterOrUpdater<string> = useSetRecoilState<string>(playerZoomRequestState);
-    const currentPlayer: Player = useRecoilValue<Player>(currentPlayerState);
-    const gameState = useGameState();
-    const players = gameState.gameData.players;
+export default function PlayerPositions() {
+  const {
+    players,
+    gameTurnState,
+    setCurrentPlayer,
+    setPlayerZoomRequest,
+    setGameTurnState,
+  } = useGameStore();
+  const currentPlayer = useCurrentPlayer();
 
-    useEffect(() => {
-        if (players?.length > 0 && !currentPlayer) {
-            log.debug("initialising current player to :", players[0]);
-            gameState.setCurrentPlayer(players[0].name);
-        }
-    }, [currentPlayer, players]);
-
-    useEffect(() => {
-        log.debug("gameTurnState received:", gameState.gameData.gameTurnState);
-        if (gameState.gameData?.gameTurnState === GameTurnState.END_TURN) {
-            selectNextPlayer();
-        }
-    }, [gameState.gameData]);
-
-    function selectNextPlayer() {
-        const currentPlayerIndex = players.findIndex(player => player.name === currentPlayer.name);
-        const newIndex: number = currentPlayerIndex < players.length - 1 ? currentPlayerIndex + 1 : 0;
-        log.debug("gameTurnState received:", gameState.gameData.gameTurnState, 'currentPlayerIndex:', currentPlayerIndex, "newIndex:", newIndex);
-        const newPlayer: Player = players[newIndex];
-        if (newPlayer) {
-            log.debug("setting current player to:", newPlayer);
-            gameState.setCurrentPlayer(newPlayer.name);
-            setPlayerZoomRequest(newPlayer.name)
-            gameState.handleGameTurnStateChange(GameTurnState.ROLL_DICE);
-        } else {
-            log.error("unable to find next player");
-        }
+  useEffect(() => {
+    if (players.length > 0 && !currentPlayer) {
+      log.debug('initialising current player to:', players[0]);
+      setCurrentPlayer(players[0].name);
     }
+  }, [currentPlayer, players, setCurrentPlayer]);
 
+  useEffect(() => {
+    log.debug('gameTurnState received:', gameTurnState);
+    if (gameTurnState === GameTurnState.END_TURN) {
+      selectNextPlayer();
+    }
+  }, [gameTurnState]);
 
-    return <Grid container direction={"row"} spacing={1}>
-        {players.map(player => <Grid item xs key={player.name}>
-            <Link onClick={() => setPlayerZoomRequest(player?.name)} sx={{cursor: "pointer"}}
-                  key={player.name}>{player?.name}</Link>
-            <Box>lat-long: {formatLatLong(player?.position)}</Box>
-        </Grid>)}
-        <GridReferences/>
-    </Grid>;
+  function selectNextPlayer() {
+    if (!currentPlayer) return;
+
+    const currentPlayerIndex = players.findIndex(
+      (player) => player.name === currentPlayer.name
+    );
+    const newIndex =
+      currentPlayerIndex < players.length - 1 ? currentPlayerIndex + 1 : 0;
+    const newPlayer = players[newIndex];
+
+    if (newPlayer) {
+      log.debug('setting current player to:', newPlayer);
+      setCurrentPlayer(newPlayer.name);
+      setPlayerZoomRequest(newPlayer.name);
+      setGameTurnState(GameTurnState.ROLL_DICE);
+    } else {
+      log.error('unable to find next player');
+    }
+  }
+
+  return (
+    <Grid container direction="row" spacing={1}>
+      {players.map((player) => (
+        <Grid item xs key={player.name}>
+          <Link
+            onClick={() => setPlayerZoomRequest(player.name)}
+            sx={{ cursor: 'pointer' }}
+          >
+            {player.name}
+          </Link>
+          <Box>lat-long: {formatLatLong(player.position)}</Box>
+        </Grid>
+      ))}
+      <GridReferences />
+    </Grid>
+  );
 }

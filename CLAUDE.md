@@ -6,10 +6,9 @@
 
 Before doing ANYTHING, read [AGENTS.md](AGENTS.md) for:
 - Critical rules you MUST NEVER violate
-- Enforced ESLint patterns
 - Project overview and structure
 - Code style requirements
 - Development workflows
-- Testing guidelines
+- T3 Stack patterns (tRPC, Zustand, Drizzle)
 
 **Do not proceed without reading [AGENTS.md](AGENTS.md) first.**

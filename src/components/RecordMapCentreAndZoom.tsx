@@ -1,44 +1,34 @@
-import { useMap } from "react-leaflet";
-import { useEffect } from "react";
-import { log } from "../util/logging-config";
-import { formatLatLong } from "../mappings/route-mappings";
-import { useRecoilState, useSetRecoilState } from "recoil";
-import { LatLngTuple } from "leaflet";
-import { mapCentreState, mapZoomState } from "../atoms/game-atoms";
+'use client';
 
-export function RecordMapCentreAndZoom() {
+import { useEffect } from 'react';
+import { useMap } from 'react-leaflet';
+import { useGameStore } from '@/stores/game-store';
+import { log, formatLatLong } from '@/lib/utils';
 
-    const map = useMap();
+export default function RecordMapCentreAndZoom() {
+  const map = useMap();
+  const { setMapZoom, setMapCentre } = useGameStore();
 
-    const setZoom = useSetRecoilState<number>(mapZoomState);
-    const [mapCentre, setMapCentre] = useRecoilState<LatLngTuple>(mapCentreState);
+  useEffect(() => {
+    if (!map) {
+      log.debug('map not yet initialised');
+      return;
+    }
 
+    const handleMoveEnd = () => {
+      const zoom = map.getZoom();
+      const center = map.getCenter();
+      log.debug(`map centre is ${formatLatLong({ lat: center.lat, lng: center.lng })} setting zoom to: ${zoom}`);
+      setMapZoom(zoom);
+      setMapCentre([center.lat, center.lng]);
+    };
 
-    useEffect(() => {
-        if (map) {
-            map.on("dragend zoomend", () => {
-                const zoom = map.getZoom();
-                log.debug(`map centre is ${formatLatLong(map.getCenter())} setting zoom to: ${zoom}`);
-                setZoom(zoom);
-                setMapCentre([map.getCenter().lat, map.getCenter().lng]);
-            });
-            map.on("zoomstart", () => {
-                const zoom = map.getZoom();
-                log.debug(`zoomstart:map zoom is: ${zoom}`);
-            });
-            map.on("zoomlevelschange", () => {
-                const zoom = map.getZoom();
-                log.debug(`zoomlevelschange:map zoom is: ${zoom}`);
-            });
-            // zoomlevelschange?: LeafletEventHandlerFn | undefined;
-            // unload?: LeafletEventHandlerFn | undefined;
-            // viewreset?: LeafletEventHandlerFn | undefined;
-            // load?: LeafletEventHandlerFn | undefined;
-            // zoomstart?: LeafletEventHandlerFn | undefined;
-        } else {
-            log.debug("map not yet initialised");
-        }
-    }, [map]);
-    return null;
+    map.on('dragend zoomend', handleMoveEnd);
+
+    return () => {
+      map.off('dragend zoomend', handleMoveEnd);
+    };
+  }, [map, setMapZoom, setMapCentre]);
+
+  return null;
 }
-
