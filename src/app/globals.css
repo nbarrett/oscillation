@@ -1,11 +1,63 @@
-/* Global styles */
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 246 41% 40%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 246 41% 40%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 246 41% 50%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 246 41% 50%;
+  }
 }
 
-/* Dice spin animation */
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
 @keyframes spin {
   from {
     transform: rotate(0deg);
@@ -15,20 +67,112 @@
   }
 }
 
-/* Leaflet fixes for Next.js */
 .leaflet-container {
   width: 100%;
   height: 100%;
+  border-radius: var(--radius);
 }
 
-/* Custom popup styles */
 .custom-popup .leaflet-popup-content-wrapper {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.2);
+  @apply bg-popover text-popover-foreground rounded-lg shadow-lg;
 }
 
 .custom-popup .leaflet-popup-content {
-  margin: 12px 16px;
-  font-size: 14px;
+  @apply m-3 text-sm;
+}
+
+.dice-scene {
+  width: 50px;
+  height: 50px;
+  perspective: 200px;
+}
+
+.dice-cube {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.dice-face {
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  background: linear-gradient(145deg, #ffffff, #e6e6e6);
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.05);
+}
+
+.dice-face-1 { transform: rotateY(0deg) translateZ(25px); }
+.dice-face-2 { transform: rotateY(-90deg) translateZ(25px); }
+.dice-face-3 { transform: rotateX(90deg) translateZ(25px); }
+.dice-face-4 { transform: rotateX(-90deg) translateZ(25px); }
+.dice-face-5 { transform: rotateY(90deg) translateZ(25px); }
+.dice-face-6 { transform: rotateY(180deg) translateZ(25px); }
+
+@keyframes dice-roll {
+  0% {
+    transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg);
+  }
+  25% {
+    transform: rotateX(180deg) rotateY(90deg) rotateZ(45deg);
+  }
+  50% {
+    transform: rotateX(360deg) rotateY(180deg) rotateZ(90deg);
+  }
+  75% {
+    transform: rotateX(540deg) rotateY(270deg) rotateZ(135deg);
+  }
+  100% {
+    transform: rotateX(720deg) rotateY(360deg) rotateZ(180deg);
+  }
+}
+
+.dice-rolling {
+  animation: dice-roll 1.2s ease-in-out infinite;
+}
+
+@keyframes dice-settle {
+  0% {
+    transform: scale(1.05);
+  }
+  50% {
+    transform: scale(0.97);
+  }
+  75% {
+    transform: scale(1.01);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-dice-settle {
+  animation: dice-settle 0.3s ease-out forwards;
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 5px hsl(var(--primary) / 0.5), 0 0 10px hsl(var(--primary) / 0.3);
+  }
+  50% {
+    box-shadow: 0 0 10px hsl(var(--primary) / 0.7), 0 0 20px hsl(var(--primary) / 0.5);
+  }
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+.player-card-active {
+  @apply ring-2 ring-primary ring-offset-2 ring-offset-background;
+}
+
+.player-card-hover {
+  @apply transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5;
 }

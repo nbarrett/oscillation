@@ -1,105 +1,99 @@
-'use client';
+"use client"
 
-import { useEffect, useState } from 'react';
-import { Button, Grid, Stack, Typography } from '@mui/material';
-import CasinoIcon from '@mui/icons-material/Casino';
-import TrendingFlatIcon from '@mui/icons-material/TrendingFlat';
-import { GameTurnState, useCurrentPlayer, useGameStore } from '@/stores/game-store';
-import { colours } from '@/lib/utils';
-import GridSelectionButton from './GridSelectionButton';
+import { useEffect, useState } from "react"
+import { Dices, CheckCircle2 } from "lucide-react"
+import { GameTurnState, useCurrentPlayer, useGameStore } from "@/stores/game-store"
+import { Button } from "@/components/ui/button"
+import { DiceDisplay } from "@/components/ui/dice"
+import GridSelectionButton from "./GridSelectionButton"
+import { cn } from "@/lib/cn"
 
 export default function DiceRoller() {
-  const player = useCurrentPlayer();
+  const player = useCurrentPlayer()
   const {
     gameTurnState,
-    diceResult,
     handleDiceRoll,
     handleEndTurn,
-  } = useGameStore();
+  } = useGameStore()
 
-  const [isRolling, setRolling] = useState(false);
-  const [dice1Value, setDice1Value] = useState(0);
-  const [dice2Value, setDice2Value] = useState(0);
-  const total = dice1Value + dice2Value;
-  const playerName = player?.name || '';
+  const [isRolling, setRolling] = useState(false)
+  const [hasSettled, setHasSettled] = useState(false)
+  const [hasRolled, setHasRolled] = useState(false)
+  const [dice1Value, setDice1Value] = useState(1)
+  const [dice2Value, setDice2Value] = useState(1)
+  const total = dice1Value + dice2Value
+  const playerName = player?.name || ""
 
   useEffect(() => {
-    if (total && !isRolling) {
-      handleDiceRoll(total);
+    if (hasSettled && !isRolling) {
+      handleDiceRoll(total)
+      setHasSettled(false)
     }
-  }, [total, isRolling, handleDiceRoll]);
+  }, [hasSettled, isRolling, total, handleDiceRoll])
 
   function rollDice() {
     if (!isRolling) {
-      setRolling(true);
-
-      const rollInterval = setInterval(() => {
-        setDice1Value(Math.floor(Math.random() * 6) + 1);
-        setDice2Value(Math.floor(Math.random() * 6) + 1);
-      }, 100);
+      setRolling(true)
+      setHasSettled(false)
+      setHasRolled(true)
 
       setTimeout(() => {
-        clearInterval(rollInterval);
-        setRolling(false);
-      }, 800);
+        setDice1Value(Math.floor(Math.random() * 6) + 1)
+        setDice2Value(Math.floor(Math.random() * 6) + 1)
+        setRolling(false)
+        setHasSettled(true)
+      }, 2000)
     }
   }
 
+  const showResult = !isRolling && gameTurnState === GameTurnState.DICE_ROLLED
+
   return (
-      <Grid pt={2} container alignItems="center" spacing={2} mb={2}>
-        <Grid item xs={12} xl={6}>
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <Button
-                fullWidth
-                variant="contained"
-                color="primary"
-                onClick={rollDice}
-                disabled={isRolling || gameTurnState !== GameTurnState.ROLL_DICE}
-                sx={{
-                  '&': {backgroundColor: colours.osMapsPurple},
-                  '&:hover': {backgroundColor: colours.osMapsPink},
-                }}
-            >
-              {isRolling ? `${playerName} Rolling...` : `${playerName} Roll Dice`}
-            </Button>
-            <Button
-                fullWidth
-                variant="contained"
-                color="primary"
-                onClick={handleEndTurn}
-                disabled={gameTurnState !== GameTurnState.DICE_ROLLED}
-                sx={{
-                  '&': {backgroundColor: colours.osMapsPurple},
-                  '&:hover': {backgroundColor: colours.osMapsPink},
-                }}
-            >
-              {`${playerName} Turn Complete`}
-            </Button>
-          </Stack>
-        </Grid>
-        <Grid item xs={12} xl={6}>
-          <Stack direction="row" alignItems="center" textAlign="center" spacing={1}>
-            <CasinoIcon
-                color="error"
-                sx={{animation: isRolling ? 'spin 2s infinite linear' : 'none'}}
+    <div className="flex flex-col sm:flex-row items-center gap-4">
+      {hasRolled && (
+        <div className="flex items-center gap-3">
+          <div className={cn(!isRolling && showResult && "animate-dice-settle")}>
+            <DiceDisplay
+              dice1={dice1Value}
+              dice2={dice2Value}
+              isRolling={isRolling}
             />
-            {dice1Value ? <Typography variant="h6">{dice1Value}</Typography> : null}
-            <CasinoIcon
-                color="error"
-                sx={{animation: isRolling ? 'spin 2s infinite linear' : 'none'}}
-            />
-            {dice1Value ? <Typography variant="h6">{dice2Value}</Typography> : null}
-            {!isRolling && gameTurnState === GameTurnState.DICE_ROLLED && dice1Value ? (
-                <>
-                  <TrendingFlatIcon/>
-                  <Typography variant="h6">
-                    {playerName} threw {total}
-                  </Typography>
-                </>
-            ) : null}
-            <GridSelectionButton/>
-          </Stack>
-        </Grid>
-      </Grid>
-  );
+          </div>
+
+          {showResult && (
+            <div className="text-lg font-bold text-primary whitespace-nowrap">
+              You rolled {total}!
+            </div>
+          )}
+        </div>
+      )}
+
+      {showResult && (
+        <p className="text-sm text-muted-foreground sm:hidden">
+          {playerName} rolled {total}
+        </p>
+      )}
+
+      <div className="flex flex-1 items-center gap-2 w-full sm:w-auto">
+        <Button
+          className="flex-1 sm:flex-none gap-2"
+          onClick={rollDice}
+          disabled={isRolling || gameTurnState !== GameTurnState.ROLL_DICE}
+        >
+          <Dices className="h-4 w-4" />
+          {isRolling ? "Rolling..." : "Roll Dice"}
+        </Button>
+        <Button
+          className="flex-1 sm:flex-none gap-2"
+          variant="secondary"
+          onClick={handleEndTurn}
+          disabled={gameTurnState !== GameTurnState.DICE_ROLLED}
+        >
+          <CheckCircle2 className="h-4 w-4" />
+          End Turn
+        </Button>
+        <GridSelectionButton />
+      </div>
+    </div>
+  )
 }

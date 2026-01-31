@@ -17,6 +17,12 @@ export enum MappingProvider {
   OS_MAPS_WMTS = 'OS_MAPS_WMTS',
 }
 
+export const MAPPING_PROVIDER_LABELS: Record<MappingProvider, string> = {
+  [MappingProvider.OPEN_STREET_MAPS]: "OpenStreetMap (Free)",
+  [MappingProvider.OS_MAPS_ZXY]: "OS Maps",
+  [MappingProvider.OS_MAPS_WMTS]: "OS Maps (Recommended)",
+}
+
 export enum ProjectionValue {
   ESPG_27700 = 'EPSG:27700',
   ESPG_3857 = 'EPSG:3857',
@@ -57,7 +63,7 @@ export interface MapLayerAttributes {
 export const MapLayers: Record<MapLayer, MapLayerAttributes> = {
   LEISURE_27700: {
     name: MapLayer.LEISURE_27700,
-    displayName: "Leisure 27700",
+    displayName: "Explorer (Grandad's Favourite)",
     style: "Leisure",
     minZoom: 0,
     maxZoom: 9,
@@ -79,7 +85,7 @@ export const MapLayers: Record<MapLayer, MapLayerAttributes> = {
   },
   LIGHT_27700: {
     name: MapLayer.LIGHT_27700,
-    displayName: "Light 27700",
+    displayName: "Light (Simple)",
     style: "Light",
     minZoom: 0,
     maxZoom: 9,
@@ -101,7 +107,7 @@ export const MapLayers: Record<MapLayer, MapLayerAttributes> = {
   },
   LIGHT_3857: {
     name: MapLayer.LIGHT_3857,
-    displayName: 'Light 3857',
+    displayName: "Light (Simple - Web)",
     style: 'Light',
     minZoom: 7,
     maxZoom: 20,
@@ -123,7 +129,7 @@ export const MapLayers: Record<MapLayer, MapLayerAttributes> = {
   },
   OUTDOOR_27700: {
     name: MapLayer.OUTDOOR_27700,
-    displayName: "Outdoor 27700",
+    displayName: "Outdoor (Paths & Trails)",
     style: "Outdoor",
     minZoom: 0,
     maxZoom: 9,
@@ -145,7 +151,7 @@ export const MapLayers: Record<MapLayer, MapLayerAttributes> = {
   },
   OUTDOOR_3857: {
     name: MapLayer.OUTDOOR_3857,
-    displayName: 'Outdoor 3857',
+    displayName: "Outdoor (Paths - Web)",
     style: 'Outdoor',
     minZoom: 7,
     maxZoom: 20,
@@ -167,7 +173,7 @@ export const MapLayers: Record<MapLayer, MapLayerAttributes> = {
   },
   ROAD_27700: {
     name: MapLayer.ROAD_27700,
-    displayName: "Road 27700",
+    displayName: "Road (Driving)",
     style: "Road",
     minZoom: 0,
     maxZoom: 9,
@@ -189,7 +195,7 @@ export const MapLayers: Record<MapLayer, MapLayerAttributes> = {
   },
   ROAD_3857: {
     name: MapLayer.ROAD_3857,
-    displayName: 'Road 3857',
+    displayName: "Road (Driving - Web)",
     style: 'Road',
     minZoom: 7,
     maxZoom: 20,

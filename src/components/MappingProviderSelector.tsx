@@ -1,39 +1,44 @@
-'use client';
+"use client"
 
-import { useEffect } from 'react';
-import MenuItem from '@mui/material/MenuItem';
-import { TextField } from '@mui/material';
-import { useMapStore, MappingProvider } from '@/stores/map-store';
-import { asTitle, log } from '@/lib/utils';
+import { useEffect } from "react"
+import { useMapStore, MappingProvider, MAPPING_PROVIDER_LABELS } from "@/stores/map-store"
+import { log } from "@/lib/utils"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
-const providerOptions = Object.values(MappingProvider);
+const providerOptions = Object.values(MappingProvider)
 
 export default function MappingProviderSelector() {
-  const { mappingProvider, setMappingProvider } = useMapStore();
+  const { mappingProvider, setMappingProvider } = useMapStore()
 
   useEffect(() => {
-    log.debug('MappingProviderSelector:mappingProvider:', mappingProvider);
-  }, [mappingProvider]);
-
-  function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
-    setMappingProvider(event.target.value as MappingProvider);
-  }
+    log.debug("MappingProviderSelector:mappingProvider:", mappingProvider)
+  }, [mappingProvider])
 
   return (
-    <TextField
-      fullWidth
-      sx={{ minWidth: 220 }}
-      select
-      size="small"
-      label="Mapping Provider"
-      value={mappingProvider || ''}
-      onChange={handleChange}
-    >
-      {providerOptions.map((value) => (
-        <MenuItem key={value} value={value}>
-          {asTitle(value)}
-        </MenuItem>
-      ))}
-    </TextField>
-  );
+    <div className="space-y-2">
+      <Label>Map Source</Label>
+      <Select
+        value={mappingProvider || ""}
+        onValueChange={(value) => setMappingProvider(value as MappingProvider)}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Select source" />
+        </SelectTrigger>
+        <SelectContent>
+          {providerOptions.map((value) => (
+            <SelectItem key={value} value={value}>
+              {MAPPING_PROVIDER_LABELS[value]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )
 }
