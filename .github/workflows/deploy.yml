@@ -59,15 +59,25 @@ jobs:
       - name: Deploy to Fly.io
         run: |
           for i in 1 2 3; do
-            flyctl deploy --remote-only --no-cache && break
+            if flyctl deploy --remote-only --no-cache; then
+              echo "Deploy succeeded"
+              exit 0
+            fi
             echo "Deploy attempt $i failed, retrying in 10s..."
             sleep 10
           done
+          echo "All deploy attempts failed"
+          exit 1
 
       - name: Verify deployment
         run: |
           sleep 10
-          curl -sf https://oscillation.fly.dev/ || echo "Health check warning - app may still be starting"
+          # Fail if health check fails
+          curl -sf https://oscillation.fly.dev/ | grep -q "_next" || {
+            echo "Health check failed - Next.js app not responding correctly"
+            exit 1
+          }
+          echo "Health check passed - Next.js app is responding"
 
       - name: Get logs on failure
         if: failure()
