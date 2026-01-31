@@ -7,7 +7,6 @@ COPY package.json pnpm-lock.yaml ./
 COPY prisma ./prisma
 
 RUN pnpm install --frozen-lockfile
-RUN pnpm run db:generate
 
 FROM node:20-alpine AS builder
 WORKDIR /app
@@ -15,8 +14,10 @@ WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/node_modules/.prisma ./node_modules/.prisma
 COPY . .
+
+# Generate Prisma client in builder stage (pnpm stores it differently)
+RUN pnpm run db:generate
 
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm run build
@@ -35,7 +36,6 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 
 USER nextjs
 
