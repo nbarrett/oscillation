@@ -2,7 +2,7 @@
 # You can rename the app below with `flyctl apps create -n <name>` or `flyctl launch`.
 
 app = "oscillation"
-primary_region = "iad"
+primary_region = "lhr"
 
 [env]
   PORT = "8080"
