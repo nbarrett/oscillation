@@ -10,7 +10,7 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "postinstall": "prisma generate && npm run setup:hooks",
+    "postinstall": "prisma generate",
     "setup:hooks": "git config core.hooksPath .githooks && chmod +x .githooks/*"
   },
   "dependencies": {
