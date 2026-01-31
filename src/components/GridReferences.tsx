@@ -1,34 +1,33 @@
-'use client';
+"use client"
 
-import { useEffect } from 'react';
-import { Grid } from '@mui/material';
-import { useGameStore } from '@/stores/game-store';
-import { asTitle, log } from '@/lib/utils';
+import { useEffect } from "react"
+import { useGameStore } from "@/stores/game-store"
+import { asTitle, log } from "@/lib/utils"
 
 export default function GridReferences() {
-  const mapClickPosition = useGameStore((state) => state.mapClickPosition);
-  const gridReferenceData = mapClickPosition?.gridReferenceData;
-  const gridSquareCorners = mapClickPosition?.gridSquareCorners;
-  const cornerPairs = gridSquareCorners ? Object.entries(gridSquareCorners) : null;
+  const mapClickPosition = useGameStore((state) => state.mapClickPosition)
+  const gridReferenceData = mapClickPosition?.gridReferenceData
+  const gridSquareCorners = mapClickPosition?.gridSquareCorners
+  const cornerPairs = gridSquareCorners ? Object.entries(gridSquareCorners) : null
 
   useEffect(() => {
-    log.info('gridReferenceData:', gridReferenceData, 'cornerPairs:', cornerPairs);
-  }, [cornerPairs, gridReferenceData]);
+    log.info("gridReferenceData:", gridReferenceData, "cornerPairs:", cornerPairs)
+  }, [cornerPairs, gridReferenceData])
 
-  if (!cornerPairs) return null;
+  if (!cornerPairs) return null
 
   return (
     <>
-      <Grid item xs>
-        <div>Grid Reference</div>
-        <div>{gridReferenceData?.gridReference}</div>
-      </Grid>
+      <div className="space-y-1">
+        <p className="text-xs text-muted-foreground">Grid Reference</p>
+        <p className="font-medium">{gridReferenceData?.gridReference}</p>
+      </div>
       {cornerPairs.map((cornerPair) => (
-        <Grid item xs key={cornerPair[0]}>
-          <div>{asTitle(cornerPair[0])}</div>
-          <div>{cornerPair[1]}</div>
-        </Grid>
+        <div key={cornerPair[0]} className="space-y-1">
+          <p className="text-xs text-muted-foreground">{asTitle(cornerPair[0])}</p>
+          <p className="font-medium">{cornerPair[1]}</p>
+        </div>
       ))}
     </>
-  );
+  )
 }

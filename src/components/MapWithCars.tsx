@@ -116,7 +116,7 @@ export default function MapWithCars() {
   }
 
   return (
-    <div style={{ height: "80vh", width: "100%" }}>
+    <div className="h-full w-full">
       <MapContainer
         key={mapKey}
         crs={crs}

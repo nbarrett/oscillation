@@ -1,108 +1,86 @@
-"use client";
+"use client"
 
-import { useEffect } from "react";
-import MenuItem from "@mui/material/MenuItem";
-import { Button, TextField, Typography, Stack } from "@mui/material";
-import { trpc } from "@/lib/trpc/client";
-import { useRouteStore, NamedLocation } from "@/stores/route-store";
-import { useGameStore } from "@/stores/game-store";
-import { formatLatLong, asTitle, colours, log } from "@/lib/utils";
-import AddStartingPointDialog from "./AddStartingPointDialog";
-
-const referenceStartingPoints = [
-  { name: "London", lat: 51.505, lng: -0.09 },
-  { name: "Challock", lat: 51.21861, lng: 0.88011 },
-  { name: "Cambridge", lat: 52.17487, lng: 0.1283 },
-];
+import { useEffect } from "react"
+import { trpc } from "@/lib/trpc/client"
+import { useRouteStore } from "@/stores/route-store"
+import { useGameStore } from "@/stores/game-store"
+import { asTitle, log } from "@/lib/utils"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import AddStartingPointDialog from "./AddStartingPointDialog"
 
 export default function StartingPositionSelector() {
-  const { startingPosition, setStartingPosition, setNamedLocations, namedLocations } = useRouteStore();
-  const { initialisePlayers } = useGameStore();
+  const { startingPosition, setStartingPosition, setNamedLocations, namedLocations } = useRouteStore()
+  const { initialisePlayers } = useGameStore()
 
-  const { data: locations, refetch } = trpc.locations.getAll.useQuery();
-  const createLocation = trpc.locations.create.useMutation({
-    onSuccess: () => refetch(),
-  });
+  const { data: locations, refetch } = trpc.locations.getAll.useQuery()
 
   useEffect(() => {
     if (locations) {
-      setNamedLocations(locations);
-      log.debug("StartingPositionSelector:locations:", locations);
+      setNamedLocations(locations)
+      log.debug("StartingPositionSelector:locations:", locations)
     }
-  }, [locations, setNamedLocations]);
+  }, [locations, setNamedLocations])
 
   useEffect(() => {
     if (namedLocations.length > 0 && !startingPosition) {
-      const firstLocation = namedLocations[0];
-      log.debug("StartingPositionSelector:initialised to:", firstLocation);
-      setStartingPosition(firstLocation);
+      const firstLocation = namedLocations[0]
+      log.debug("StartingPositionSelector:initialised to:", firstLocation)
+      setStartingPosition(firstLocation)
     }
-  }, [namedLocations, startingPosition, setStartingPosition]);
+  }, [namedLocations, startingPosition, setStartingPosition])
 
   useEffect(() => {
     if (startingPosition) {
-      initialisePlayers([startingPosition.lat, startingPosition.lng]);
+      initialisePlayers([startingPosition.lat, startingPosition.lng])
     }
-  }, [startingPosition, initialisePlayers]);
+  }, [startingPosition, initialisePlayers])
 
-  async function prePopulateDataStore() {
-    for (const point of referenceStartingPoints) {
-      log.debug("prePopulateDataStore:point:", point);
-      const existing = namedLocations.find((loc) => loc.name === point.name);
-      if (!existing) {
-        await createLocation.mutateAsync(point);
-      }
-    }
-  }
-
-  function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const selected = namedLocations.find((loc) => loc.name === event.target.value);
+  function handleChange(value: string) {
+    const selected = namedLocations.find((loc) => loc.name === value)
     if (selected) {
-      setStartingPosition(selected);
+      setStartingPosition(selected)
     }
   }
 
   if (!locations || locations.length === 0) {
     return (
-      <Button
-        fullWidth
-        variant="contained"
-        color="primary"
-        onClick={prePopulateDataStore}
-        disabled={createLocation.isPending}
-        sx={{
-          "&": { backgroundColor: colours.osMapsPurple },
-          "&:hover": { backgroundColor: colours.osMapsPink },
-        }}
-      >
-        {createLocation.isPending ? "Populating..." : "Populate Starting Points"}
-      </Button>
-    );
+      <div className="space-y-2">
+        <Label className="text-muted-foreground">Starting Point</Label>
+        <div className="flex items-center gap-2">
+          <p className="text-sm text-muted-foreground">
+            No starting points yet - right-click on map or
+          </p>
+          <AddStartingPointDialog onSuccess={refetch} />
+        </div>
+      </div>
+    )
   }
 
   return (
-    <Stack direction="row" alignItems="center" spacing={1}>
-      <TextField
-        fullWidth
-        sx={{ minWidth: 220 }}
-        select
-        size="small"
-        label="Game Starting Point"
-        value={startingPosition?.name || ""}
-        onChange={handleChange}
-      >
-        {namedLocations.map((location) => (
-          <MenuItem key={location.name} value={location.name}>
-            <Stack direction="row" alignItems="center" spacing={1}>
-              <div>{asTitle(location.name)}</div>
-              <Typography variant="body2" color="text.secondary">
-                {formatLatLong([location.lat, location.lng])}
-              </Typography>
-            </Stack>
-          </MenuItem>
-        ))}
-      </TextField>
-      <AddStartingPointDialog onSuccess={refetch} />
-    </Stack>
-  );
+    <div className="space-y-2">
+      <Label>Starting Point</Label>
+      <div className="flex items-center gap-2">
+        <Select value={startingPosition?.name || ""} onValueChange={handleChange}>
+          <SelectTrigger className="flex-1">
+            <SelectValue placeholder="Select starting point" />
+          </SelectTrigger>
+          <SelectContent>
+            {namedLocations.map((location) => (
+              <SelectItem key={location.name} value={location.name}>
+                {asTitle(location.name)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <AddStartingPointDialog onSuccess={refetch} />
+      </div>
+    </div>
+  )
 }

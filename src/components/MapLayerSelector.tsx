@@ -1,50 +1,57 @@
-'use client';
+"use client"
 
-import { useEffect } from 'react';
-import MenuItem from '@mui/material/MenuItem';
-import { TextField } from '@mui/material';
-import { useMapStore, MapLayer, MapLayers, MappingProvider } from '@/stores/map-store';
-import { log } from '@/lib/utils';
+import { useEffect } from "react"
+import { useMapStore, MapLayer, MapLayers, MappingProvider } from "@/stores/map-store"
+import { log } from "@/lib/utils"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
-const mapLayerOptions = Object.values(MapLayer);
+const mapLayerOptions = Object.values(MapLayer)
 
 export default function MapLayerSelector() {
-  const { mapLayer, mappingProvider, setMapLayer } = useMapStore();
+  const { mapLayer, mappingProvider, setMapLayer } = useMapStore()
 
   useEffect(() => {
     if (!mapLayer) {
-      log.debug('MapLayerSelector:mapLayer:initialised to:', MapLayer.OUTDOOR_3857);
-      setMapLayer(MapLayer.OUTDOOR_3857);
+      log.debug("MapLayerSelector:mapLayer:initialised to:", MapLayer.OUTDOOR_3857)
+      setMapLayer(MapLayer.OUTDOOR_3857)
     }
-  }, [mapLayer, setMapLayer]);
+  }, [mapLayer, setMapLayer])
 
   useEffect(() => {
-    log.debug('MapLayerSelector:mapLayer:', mapLayer);
-  }, [mapLayer]);
+    log.debug("MapLayerSelector:mapLayer:", mapLayer)
+  }, [mapLayer])
 
-  function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
-    setMapLayer(event.target.value as MapLayer);
-  }
+  const isDisabled = mappingProvider === MappingProvider.OPEN_STREET_MAPS
 
   return (
-    <TextField
-      fullWidth
-      disabled={mappingProvider === MappingProvider.OPEN_STREET_MAPS}
-      sx={{ minWidth: 220 }}
-      select
-      size="small"
-      label="Map Layer"
-      value={mapLayer || ''}
-      onChange={handleChange}
-    >
-      {mapLayerOptions.map((value) => {
-        const attribute = MapLayers[value];
-        return (
-          <MenuItem key={attribute.name} value={attribute.name}>
-            {attribute.displayName}
-          </MenuItem>
-        );
-      })}
-    </TextField>
-  );
+    <div className="space-y-2">
+      <Label className={isDisabled ? "text-muted-foreground" : ""}>Map Layer</Label>
+      <Select
+        value={mapLayer || ""}
+        onValueChange={(value) => setMapLayer(value as MapLayer)}
+        disabled={isDisabled}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Select layer" />
+        </SelectTrigger>
+        <SelectContent>
+          {mapLayerOptions.map((value) => {
+            const attribute = MapLayers[value]
+            return (
+              <SelectItem key={attribute.name} value={attribute.name}>
+                {attribute.displayName}
+              </SelectItem>
+            )
+          })}
+        </SelectContent>
+      </Select>
+    </div>
+  )
 }

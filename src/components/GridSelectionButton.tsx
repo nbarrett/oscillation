@@ -1,27 +1,19 @@
-'use client';
+"use client"
 
-import { Button } from '@mui/material';
-import { useGameStore, GameTurnState } from '@/stores/game-store';
-import { colours, pluraliseWithCount } from '@/lib/utils';
+import { useGameStore, GameTurnState } from "@/stores/game-store"
+import { pluraliseWithCount } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
 
 export default function GridSelectionButton() {
-  const { selectedGridSquares, gameTurnState, clearGridSelections } = useGameStore();
+  const { selectedGridSquares, gameTurnState, clearGridSelections } = useGameStore()
 
   if (gameTurnState !== GameTurnState.DICE_ROLLED || selectedGridSquares.length === 0) {
-    return null;
+    return null
   }
 
   return (
-    <Button
-      variant="contained"
-      color="primary"
-      onClick={clearGridSelections}
-      sx={{
-        '&': { backgroundColor: colours.osMapsPurple },
-        '&:hover': { backgroundColor: colours.osMapsPink },
-      }}
-    >
-      Clear {pluraliseWithCount(selectedGridSquares.length, 'Move')}
+    <Button variant="outline" size="sm" onClick={clearGridSelections}>
+      Clear {pluraliseWithCount(selectedGridSquares.length, "Move")}
     </Button>
-  );
+  )
 }
