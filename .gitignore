@@ -62,3 +62,6 @@ coverage
 PLAN.md
 
 /src/generated/prisma
+
+# Secrets documentation (contains actual values)
+SECRETS.md

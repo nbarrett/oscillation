@@ -1,28 +1,33 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useCallback } from 'react';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
-import { MapContainer, TileLayer } from 'react-leaflet';
-import { useGameStore, usePlayer, Player } from '@/stores/game-store';
-import { useMapStore, MapLayer, MapLayers, MappingProvider, ProjectionValue } from '@/stores/map-store';
-import { useRouteStore } from '@/stores/route-store';
-import { log } from '@/lib/utils';
-import 'proj4leaflet';
-import PlayerCar from './PlayerCar';
-import Legend from './Legend';
-import RecordMapCentreAndZoom from './RecordMapCentreAndZoom';
-import RecordMapClick from './RecordMapClick';
-import SelectGridSquares from './SelectGridSquares';
+import { useEffect, useState, useCallback } from "react";
+import "leaflet/dist/leaflet.css";
+import L from "leaflet";
+import { MapContainer, TileLayer } from "react-leaflet";
+import { useGameStore } from "@/stores/game-store";
+import { useMapStore, MapLayers, MappingProvider, ProjectionValue } from "@/stores/map-store";
+import { useRouteStore } from "@/stores/route-store";
+import { log } from "@/lib/utils";
+import "proj4leaflet";
+import PlayerCar from "./PlayerCar";
+import Legend from "./Legend";
+import RecordMapCentreAndZoom from "./RecordMapCentreAndZoom";
+import RecordMapClick from "./RecordMapClick";
+import SelectGridSquares from "./SelectGridSquares";
+import MapContextMenu from "./MapContextMenu";
+import ClickPositionMarker from "./ClickPositionMarker";
 
-const customCRS = new L.Proj.CRS(
-  'EPSG:27700',
-  '+proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy +towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 +units=m +no_defs',
-  {
-    resolutions: [896.0, 448.0, 224.0, 112.0, 56.0, 28.0, 14.0, 7.0, 3.5, 1.75],
-    origin: [-238375.0, 1376256.0],
-  }
-);
+function createBritishNationalGridCRS(): L.Proj.CRS | null {
+  if (typeof window === "undefined") return null;
+  return new L.Proj.CRS(
+    "EPSG:27700",
+    "+proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy +towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 +units=m +no_defs",
+    {
+      resolutions: [896.0, 448.0, 224.0, 112.0, 56.0, 28.0, 14.0, 7.0, 3.5, 1.75],
+      origin: [-238375.0, 1376256.0],
+    }
+  );
+}
 
 export default function MapWithCars() {
   const { players, mapZoom, setMapZoom, playerZoomRequest, initialisePlayers } = useGameStore();
@@ -30,16 +35,25 @@ export default function MapWithCars() {
   const { startingPosition } = useRouteStore();
 
   const [map, setMap] = useState<L.Map | null>(null);
+  const [britishNationalGridCRS, setBritishNationalGridCRS] = useState<L.Proj.CRS | null>(null);
 
   const mapLayerAttributes = MapLayers[mapLayer];
-  const useCustomTileLayer =
+
+  const usesBritishNationalGrid =
     mappingProvider !== MappingProvider.OPEN_STREET_MAPS &&
     mapLayerAttributes?.layerParameters?.tileMatrixSet === ProjectionValue.ESPG_27700;
-  const crs = useCustomTileLayer ? customCRS : L.CRS.EPSG3857;
 
-  const canRender = mapLayerAttributes && startingPosition;
-
+  const crs = usesBritishNationalGrid && britishNationalGridCRS ? britishNationalGridCRS : L.CRS.EPSG3857;
+  const canRender = mapLayerAttributes && startingPosition && (!usesBritishNationalGrid || britishNationalGridCRS);
   const playerToZoom = players.find((p) => p.name === playerZoomRequest);
+  const mapKey = `map-${usesBritishNationalGrid ? "27700" : "3857"}`;
+
+  useEffect(() => {
+    const crs = createBritishNationalGridCRS();
+    if (crs) {
+      setBritishNationalGridCRS(crs);
+    }
+  }, []);
 
   useEffect(() => {
     if (startingPosition && players.length === 0) {
@@ -49,23 +63,30 @@ export default function MapWithCars() {
 
   useEffect(() => {
     if (playerToZoom && map) {
-      log.debug('zooming to player:', playerToZoom.name, 'position:', playerToZoom.position);
+      log.debug("zooming to player:", playerToZoom.name, "position:", playerToZoom.position);
       map.flyTo(playerToZoom.position);
     }
   }, [playerToZoom, map]);
 
   useEffect(() => {
-    log.debug('zoom:', mapZoom, 'mapLayerAttributes:', mapLayerAttributes, 'useCustomTileLayer:', useCustomTileLayer);
-    if (useCustomTileLayer) {
+    if (startingPosition && map) {
+      log.debug("flying to starting position:", startingPosition.name);
+      map.flyTo([startingPosition.lat, startingPosition.lng]);
+    }
+  }, [startingPosition, map]);
+
+  useEffect(() => {
+    log.debug("zoom:", mapZoom, "mapLayerAttributes:", mapLayerAttributes, "usesBritishNationalGrid:", usesBritishNationalGrid);
+    if (usesBritishNationalGrid) {
       if (mapZoom < mapLayerAttributes?.minZoom) {
-        log.debug('zoom:', mapZoom, 'below minZoom:', mapLayerAttributes.minZoom);
+        log.debug("zoom:", mapZoom, "below minZoom:", mapLayerAttributes.minZoom);
         setMapZoom(mapLayerAttributes.minZoom);
       } else if (mapZoom > mapLayerAttributes?.maxZoom) {
-        log.debug('zoom:', mapZoom, 'above maxZoom:', mapLayerAttributes.maxZoom);
+        log.debug("zoom:", mapZoom, "above maxZoom:", mapLayerAttributes.maxZoom);
         setMapZoom(mapLayerAttributes.maxZoom);
       }
     }
-  }, [useCustomTileLayer, mapLayerAttributes, mapZoom, setMapZoom]);
+  }, [usesBritishNationalGrid, mapLayerAttributes, mapZoom, setMapZoom]);
 
   const buildTileUrl = useCallback(() => {
     const key = accessToken?.access_token;
@@ -73,15 +94,15 @@ export default function MapWithCars() {
 
     switch (mappingProvider) {
       case MappingProvider.OPEN_STREET_MAPS:
-        return 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+        return "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
       case MappingProvider.OS_MAPS_ZXY:
         return `https://api.os.uk/maps/raster/v1/zxy/${mapLayerAttributes?.layerParameters?.layer}/{z}/{x}/{y}.png?key=${key}`;
       case MappingProvider.OS_MAPS_WMTS:
         const params = mapLayerAttributes
           ? Object.entries(mapLayerAttributes.layerParameters)
               .map(([k, v]) => `${k}=${v}`)
-              .join('&')
-          : '';
+              .join("&")
+          : "";
         return `https://api.os.uk/maps/raster/v1/wmts?key=${key}&${params}`;
       default:
         return null;
@@ -95,17 +116,18 @@ export default function MapWithCars() {
   }
 
   return (
-    <div style={{ height: '80vh', width: '100%' }}>
+    <div style={{ height: "80vh", width: "100%" }}>
       <MapContainer
+        key={mapKey}
         crs={crs}
-        whenReady={() => log.debug('map ready')}
-        minZoom={useCustomTileLayer ? mapLayerAttributes?.minZoom : 0}
-        maxZoom={useCustomTileLayer ? mapLayerAttributes?.maxZoom : 18}
+        whenReady={() => log.debug("map ready")}
+        minZoom={usesBritishNationalGrid ? mapLayerAttributes?.minZoom : 0}
+        maxZoom={usesBritishNationalGrid ? mapLayerAttributes?.maxZoom : 18}
         zoom={mapZoom}
         center={[startingPosition.lat, startingPosition.lng]}
         scrollWheelZoom={true}
         ref={(mapRef) => setMap(mapRef)}
-        style={{ height: '100%' }}
+        style={{ height: "100%" }}
       >
         {tileUrl ? (
           <TileLayer
@@ -122,6 +144,8 @@ export default function MapWithCars() {
         <RecordMapCentreAndZoom />
         <RecordMapClick />
         <SelectGridSquares />
+        <MapContextMenu />
+        <ClickPositionMarker />
       </MapContainer>
     </div>
   );

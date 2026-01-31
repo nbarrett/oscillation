@@ -39,7 +39,7 @@ The game is built with the [T3 Stack](https://create.t3.gg/):
 
 * **Next.js 15** - React framework with App Router
 * **tRPC** - End-to-end typesafe APIs
-* **Prisma** - Type-safe ORM with MongoDB
+* **Prisma** - Type-safe ORM with PostgreSQL (Neon)
 * **Zustand** - Lightweight state management
 * **Material UI** - Component library
 * **React-Leaflet** - Mapping component
@@ -144,7 +144,7 @@ The game is built with the [T3 Stack](https://create.t3.gg/):
 ### Prerequisites
 - Node.js 20+
 - pnpm 9+
-- MongoDB (or use MongoDB Atlas)
+- PostgreSQL (or use Neon free tier)
 
 ### Setup
 
@@ -154,7 +154,7 @@ pnpm install
 
 # Set up environment variables
 cp .env.example .env
-# Edit .env with your MongoDB connection string and OS Maps API keys
+# Edit .env with your PostgreSQL connection string and OS Maps API keys
 
 # Generate Prisma client
 pnpm run db:generate
@@ -166,7 +166,7 @@ pnpm run dev
 ### Environment Variables
 
 Required environment variables:
-- `DATABASE_URL` - MongoDB connection string
+- `DATABASE_URL` - PostgreSQL connection string (Neon recommended)
 - `OS_MAPS_API_KEY` - OS Maps API key
 - `OS_MAPS_API_SECRET` - OS Maps API secret
 

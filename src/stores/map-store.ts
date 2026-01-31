@@ -57,10 +57,10 @@ export interface MapLayerAttributes {
 export const MapLayers: Record<MapLayer, MapLayerAttributes> = {
   LEISURE_27700: {
     name: MapLayer.LEISURE_27700,
-    displayName: 'Leisure 27700',
-    style: 'Leisure',
+    displayName: "Leisure 27700",
+    style: "Leisure",
     minZoom: 0,
-    maxZoom: 8,
+    maxZoom: 9,
     renders: false,
     layerParameters: {
       service: 'WMTS',
@@ -79,10 +79,10 @@ export const MapLayers: Record<MapLayer, MapLayerAttributes> = {
   },
   LIGHT_27700: {
     name: MapLayer.LIGHT_27700,
-    displayName: 'Light 27700',
-    style: 'Light',
+    displayName: "Light 27700",
+    style: "Light",
     minZoom: 0,
-    maxZoom: 8,
+    maxZoom: 9,
     renders: false,
     layerParameters: {
       service: 'WMTS',
@@ -123,10 +123,10 @@ export const MapLayers: Record<MapLayer, MapLayerAttributes> = {
   },
   OUTDOOR_27700: {
     name: MapLayer.OUTDOOR_27700,
-    displayName: 'Outdoor 27700',
-    style: 'Outdoor',
+    displayName: "Outdoor 27700",
+    style: "Outdoor",
     minZoom: 0,
-    maxZoom: 8,
+    maxZoom: 9,
     renders: true,
     layerParameters: {
       service: 'WMTS',
@@ -167,10 +167,10 @@ export const MapLayers: Record<MapLayer, MapLayerAttributes> = {
   },
   ROAD_27700: {
     name: MapLayer.ROAD_27700,
-    displayName: 'Road 27700',
-    style: 'Road',
+    displayName: "Road 27700",
+    style: "Road",
     minZoom: 0,
-    maxZoom: 8,
+    maxZoom: 9,
     renders: true,
     layerParameters: {
       service: 'WMTS',

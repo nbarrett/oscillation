@@ -77,7 +77,7 @@ Oscillation is a Next.js-based board game application using the T3 Stack archite
 | **Framework** | Next.js 14 (App Router) |
 | **API Layer** | tRPC |
 | **ORM** | Prisma |
-| **Database** | MongoDB Atlas |
+| **Database** | PostgreSQL (Neon) |
 | **State Management** | Zustand |
 | **UI Framework** | Material UI |
 | **Maps** | Leaflet with OS Maps |
@@ -119,7 +119,7 @@ npm install
 # Generate Prisma client
 npm run db:generate
 
-# Push schema to MongoDB
+# Push schema to PostgreSQL
 npm run db:push
 
 # Start development server
