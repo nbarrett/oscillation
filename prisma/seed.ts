@@ -3,7 +3,6 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 const defaultStartingPoints = [
-  { name: "London", lat: 51.505, lng: -0.09 },
   { name: "Challock", lat: 51.21861, lng: 0.88011 },
   { name: "Cambridge", lat: 52.17487, lng: 0.1283 },
 ];

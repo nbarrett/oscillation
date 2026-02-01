@@ -4,6 +4,8 @@ import { directionsRouter } from "./routers/directions"
 import { tokenRouter } from "./routers/token"
 import { gameRouter } from "./routers/game"
 import { healthRouter } from "./routers/health"
+import { authRouter } from "./routers/auth"
+import { adminRouter } from "./routers/admin"
 
 export const appRouter = createTRPCRouter({
   locations: locationsRouter,
@@ -11,6 +13,8 @@ export const appRouter = createTRPCRouter({
   token: tokenRouter,
   game: gameRouter,
   health: healthRouter,
+  auth: authRouter,
+  admin: adminRouter,
 })
 
 export type AppRouter = typeof appRouter;

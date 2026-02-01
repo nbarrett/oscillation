@@ -24,8 +24,8 @@ export const directionsRouter = createTRPCRouter({
       const apiKey = process.env.OPENROUTE_API_KEY ?? '5b3ce3597851110001cf6248ce753974beff43f290cdfe4c1a50d56a';
       const { profile, start, end } = input;
 
-      const startInLngLatFormat = `${start[1]},${start[0]}`;
-      const endInLngLatFormat = `${end[1]},${end[0]}`;
+      const startInLngLatFormat = `${start[0]},${start[1]}`;
+      const endInLngLatFormat = `${end[0]},${end[1]}`;
 
       const url = `https://api.openrouteservice.org/v2/directions/${profile}?api_key=${apiKey}&start=${startInLngLatFormat}&end=${endInLngLatFormat}`;
 

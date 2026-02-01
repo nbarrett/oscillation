@@ -7,6 +7,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id        String       @id @default(cuid())
+  nickname  String       @unique
+  pinHash   String
+  players   GamePlayer[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@map("users")
+}
+
 model NamedLocation {
   id   String @id @default(cuid())
   name String
@@ -17,30 +28,35 @@ model NamedLocation {
 }
 
 model GameSession {
-  id          String   @id @default(cuid())
-  code        String   @unique
-  players     GamePlayer[]
-  currentTurn Int      @default(0)
-  dice1       Int?
-  dice2       Int?
-  startLat    Float?
-  startLng    Float?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  code          String   @unique
+  players       GamePlayer[]
+  currentTurn   Int      @default(0)
+  dice1         Int?
+  dice2         Int?
+  startLat      Float?
+  startLng      Float?
+  mapZoom       Int      @default(7)
+  mapCentreLat  Float?
+  mapCentreLng  Float?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@map("game_sessions")
 }
 
 model GamePlayer {
-  id        String      @id @default(cuid())
-  name      String
-  iconType  String
+  id          String      @id @default(cuid())
+  name        String
+  iconType    String
   positionLat Float
   positionLng Float
-  turnOrder Int
-  session   GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  sessionId String
-  joinedAt  DateTime    @default(now())
+  turnOrder   Int
+  session     GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId   String
+  user        User?       @relation(fields: [userId], references: [id])
+  userId      String?
+  joinedAt    DateTime    @default(now())
 
   @@map("game_players")
 }
