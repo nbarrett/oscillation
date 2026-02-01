@@ -140,7 +140,7 @@ npm run typecheck
 ### Semantic Commit Conventions
 Use [Conventional Commits](https://www.conventionalcommits.org/) format:
 
-**Format:** `<type>(<scope>): <description>`
+**Format:** `<type>(<scope>): <description> (ref: #<issue>)`
 
 **Types:**
 - `feat` - New features or enhancements
@@ -156,17 +156,22 @@ Use [Conventional Commits](https://www.conventionalcommits.org/) format:
 - `ui`, `store`, `api` - Technical components
 - `db`, `trpc` - Backend areas
 
+**Issue Reference:**
+- Always include the issue reference at the end of the first line: `(ref: #4)`
+- Use this format even for multi-line commit messages
+
 **Examples:**
 ```
-feat(game): add player turn rotation
-fix(map): resolve grid selection on mobile
-refactor(store): consolidate player state updates
+feat(game): add player turn rotation (ref: #12)
+fix(map): resolve grid selection on mobile (ref: #8)
+refactor(store): consolidate player state updates (ref: #15)
 ```
 
 ### Git Operations - EXPLICIT PERMISSION REQUIRED
 - **NEVER commit without explicit user request**
 - **NEVER push without explicit user request**
 - **NEVER combine commit and push** unless explicitly requested
+- **NEVER force push to main** - this is not allowed under any circumstances
 - Writing/editing files is allowed without permission, but git operations require explicit approval
 
 ## Development Patterns

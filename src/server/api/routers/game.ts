@@ -13,6 +13,33 @@ function generateSessionCode(): string {
 const iconTypes = ["white", "blue", "red", "green"] as const
 
 export const gameRouter = createTRPCRouter({
+  list: publicProcedure
+    .query(async ({ ctx }) => {
+      const sessions = await ctx.db.gameSession.findMany({
+        where: {
+          players: {
+            some: {},
+          },
+        },
+        include: {
+          players: {
+            orderBy: { turnOrder: "asc" },
+          },
+        },
+        orderBy: { updatedAt: "desc" },
+        take: 20,
+      })
+
+      return sessions.map(session => ({
+        id: session.id,
+        code: session.code,
+        playerCount: session.players.length,
+        playerNames: session.players.map(p => p.name),
+        createdAt: session.createdAt,
+        updatedAt: session.updatedAt,
+      }))
+    }),
+
   create: publicProcedure
     .input(z.object({
       playerName: z.string().min(1),

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { useSession, signIn } from "next-auth/react"
-import { useSearchParams, useRouter } from "next/navigation"
 import { Users, Plus, LogIn, Copy, Check, Loader2, UserPlus, ChevronLeft } from "lucide-react"
 import { trpc } from "@/lib/trpc/client"
 import { useGameStore } from "@/stores/game-store"
@@ -11,10 +10,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { MapPreviewHeader } from "@/components/ui/map-preview"
-
-export enum StoredValue {
-  AUTH_TAB = "auth-tab",
-}
 
 export enum AuthTab {
   PLAY = "play",
@@ -65,12 +60,10 @@ function PinInput({ id, name, value, onChange, placeholder, disabled, error }: {
       name={name}
       type="password"
       inputMode="numeric"
-      pattern="[0-9]{4}"
       maxLength={4}
       placeholder={placeholder}
       value={value}
       onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 4))}
-      required
       disabled={disabled}
       autoComplete="new-password"
       data-form-type="other"
@@ -81,8 +74,6 @@ function PinInput({ id, name, value, onChange, placeholder, disabled, error }: {
 
 export default function JoinGame({ startingPosition }: JoinGameProps) {
   const { data: session } = useSession()
-  const router = useRouter()
-  const searchParams = useSearchParams()
 
   const [mode, setMode] = useState<"welcome" | "create" | "join">("welcome")
   const [playerName, setPlayerName] = useState("")
@@ -100,23 +91,15 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
 
   const { setSessionId, setPlayerId, setSessionCode } = useGameStore()
   const { data: locations, refetch: refetchLocations } = trpc.locations.getAll.useQuery()
+  const { data: availableGames } = trpc.game.list.useQuery()
 
-  const authTabParam = searchParams.get(StoredValue.AUTH_TAB) as AuthTab | null
-  const authTab = authTabParam || AuthTab.PLAY
+  const [authTab, setAuthTabState] = useState<AuthTab>(AuthTab.PLAY)
 
   const pinMismatch = confirmPin.length > 0 && registerPin !== confirmPin
   const selectedLocation = locations?.find(l => l.id === selectedLocationId)
 
   function setAuthTab(tab: AuthTab) {
-    const params = new URLSearchParams(searchParams.toString())
-    if (tab === AuthTab.PLAY) {
-      params.delete(StoredValue.AUTH_TAB)
-    } else {
-      params.set(StoredValue.AUTH_TAB, tab)
-    }
-    const query = params.toString()
-    const basePath = window.location.pathname === "/" ? "" : window.location.pathname
-    window.history.replaceState(null, "", query ? `${basePath}?${query}` : window.location.pathname)
+    setAuthTabState(tab)
     setError(null)
   }
 
@@ -187,6 +170,18 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
     setIsAuthLoading(true)
     setError(null)
 
+    if (!loginNickname.trim()) {
+      setError("Please enter your nickname")
+      setIsAuthLoading(false)
+      return
+    }
+
+    if (!loginPin || !/^\d{4}$/.test(loginPin)) {
+      setError("Please enter a valid 4-digit PIN")
+      setIsAuthLoading(false)
+      return
+    }
+
     const result = await signIn("credentials", {
       nickname: loginNickname,
       pin: loginPin,
@@ -212,6 +207,18 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
     e.preventDefault()
     setIsAuthLoading(true)
     setError(null)
+
+    if (!registerNickname.trim()) {
+      setError("Please enter a nickname")
+      setIsAuthLoading(false)
+      return
+    }
+
+    if (!registerPin || !/^\d{4}$/.test(registerPin)) {
+      setError("Please enter a valid 4-digit PIN")
+      setIsAuthLoading(false)
+      return
+    }
 
     if (registerPin !== confirmPin) {
       setError("PINs do not match")
@@ -351,15 +358,48 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
           )}
 
           {mode === "join" && (
-            <div className="space-y-2">
-              <Label htmlFor="game-code">Game Code</Label>
-              <Input
-                id="game-code"
-                placeholder="e.g. ABC123"
-                value={joinCode}
-                onChange={(e) => setJoinCode(e.target.value.toUpperCase().slice(0, 6))}
-                className="font-mono text-lg tracking-widest uppercase"
-              />
+            <div className="space-y-4">
+              {availableGames && availableGames.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Available Games</Label>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {availableGames.map((game) => (
+                      <button
+                        key={game.id}
+                        type="button"
+                        onClick={() => setJoinCode(game.code)}
+                        className={`w-full p-3 rounded-lg border text-left transition-colors ${
+                          joinCode === game.code
+                            ? "border-primary bg-primary/5"
+                            : "border-input hover:bg-muted"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono font-semibold tracking-wider">{game.code}</span>
+                          <span className="text-sm text-muted-foreground">
+                            {game.playerCount}/4 players
+                          </span>
+                        </div>
+                        <div className="text-sm text-muted-foreground mt-1">
+                          {game.playerNames.join(", ")}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="game-code">
+                  {availableGames && availableGames.length > 0 ? "Or enter code manually" : "Game Code"}
+                </Label>
+                <Input
+                  id="game-code"
+                  placeholder="e.g. ABC123"
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value.toUpperCase().slice(0, 6))}
+                  className="font-mono text-lg tracking-widest uppercase"
+                />
+              </div>
             </div>
           )}
 
@@ -439,7 +479,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
           </TabsContent>
 
           <TabsContent value={AuthTab.SIGN_IN} className="mt-0">
-            <form onSubmit={handleLogin} className="space-y-4">
+            <form onSubmit={handleLogin} noValidate className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="login-nickname">Nickname</Label>
                 <Input
@@ -447,7 +487,6 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
                   placeholder="Enter your nickname"
                   value={loginNickname}
                   onChange={(e) => setLoginNickname(e.target.value)}
-                  required
                   disabled={isAuthLoading}
                   autoComplete="username"
                 />
@@ -472,7 +511,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
           </TabsContent>
 
           <TabsContent value={AuthTab.REGISTER} className="mt-0">
-            <form onSubmit={handleRegister} className="space-y-4">
+            <form onSubmit={handleRegister} noValidate className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="register-nickname">Nickname</Label>
                 <Input
@@ -480,7 +519,6 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
                   placeholder="Choose a nickname"
                   value={registerNickname}
                   onChange={(e) => setRegisterNickname(e.target.value)}
-                  required
                   disabled={isAuthLoading}
                   autoComplete="username"
                 />

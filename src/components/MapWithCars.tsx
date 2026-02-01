@@ -29,7 +29,7 @@ function createBritishNationalGridCRS(): L.Proj.CRS | null {
 }
 
 export default function MapWithCars() {
-  const { players, mapZoom, mapCentre, setMapZoom, playerZoomRequest, initialisePlayers } = useGameStore();
+  const { players, mapZoom, mapCentre, setMapZoom, playerZoomRequest } = useGameStore();
   const { accessToken, mapLayer, mappingProvider } = useMapStore();
   const { startingPosition } = useRouteStore();
 
@@ -54,12 +54,7 @@ export default function MapWithCars() {
     }
   }, []);
 
-  useEffect(() => {
-    if (startingPosition && players.length === 0) {
-      initialisePlayers([startingPosition.lat, startingPosition.lng]);
-    }
-  }, [startingPosition, players.length, initialisePlayers]);
-
+  
   useEffect(() => {
     if (map) {
       setTimeout(() => {

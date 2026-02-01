@@ -3,7 +3,6 @@
 import { useEffect } from "react"
 import { trpc } from "@/lib/trpc/client"
 import { useRouteStore } from "@/stores/route-store"
-import { useGameStore } from "@/stores/game-store"
 import { asTitle, log } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
 import {
@@ -17,7 +16,6 @@ import AddStartingPointDialog from "./AddStartingPointDialog"
 
 export default function StartingPositionSelector() {
   const { startingPosition, setStartingPosition, setNamedLocations, namedLocations } = useRouteStore()
-  const { initialisePlayers } = useGameStore()
 
   const { data: locations, refetch } = trpc.locations.getAll.useQuery()
 
@@ -35,12 +33,6 @@ export default function StartingPositionSelector() {
       setStartingPosition(firstLocation)
     }
   }, [namedLocations, startingPosition, setStartingPosition])
-
-  useEffect(() => {
-    if (startingPosition) {
-      initialisePlayers([startingPosition.lat, startingPosition.lng])
-    }
-  }, [startingPosition, initialisePlayers])
 
   function handleChange(value: string) {
     const selected = namedLocations.find((loc) => loc.name === value)
