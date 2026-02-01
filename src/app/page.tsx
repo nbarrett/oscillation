@@ -2,11 +2,13 @@
 
 import dynamic from "next/dynamic"
 import { useEffect, useState } from "react"
-import { Loader2, Gamepad2, ChevronDown, Settings } from "lucide-react"
+import { Loader2, Gamepad2, ChevronDown, Settings, Users, LogOut, Copy, Check } from "lucide-react"
 import { useMapStore } from "@/stores/map-store"
+import { useGameStore } from "@/stores/game-store"
 import { trpc } from "@/lib/trpc/client"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/cn"
 
 const DiceRoller = dynamic(() => import("@/components/DiceRoller"), { ssr: false })
@@ -27,17 +29,50 @@ const MapLayerSelector = dynamic(() => import("@/components/MapLayerSelector"), 
 const MappingProviderSelector = dynamic(() => import("@/components/MappingProviderSelector"), { ssr: false })
 const StartingPositionSelector = dynamic(() => import("@/components/StartingPositionSelector"), { ssr: false })
 const MapPositions = dynamic(() => import("@/components/MapPositions"), { ssr: false })
+const JoinGame = dynamic(() => import("@/components/JoinGame"), { ssr: false })
+const GameSync = dynamic(() => import("@/components/GameSync"), { ssr: false })
 
 export default function GamePage() {
   const setAccessToken = useMapStore((state) => state.setAccessToken)
+  const { sessionId, sessionCode, playerId, leaveSession } = useGameStore()
   const { data: tokenData } = trpc.token.getRawToken.useQuery()
+  const { data: locations } = trpc.locations.getAll.useQuery()
   const [settingsExpanded, setSettingsExpanded] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const utils = trpc.useUtils()
+  const leaveMutation = trpc.game.leave.useMutation({
+    onSuccess: () => {
+      leaveSession()
+      utils.game.state.invalidate()
+    },
+  })
+
+  const startingPosition: [number, number] = locations?.[0]
+    ? [locations[0].lat, locations[0].lng]
+    : [51.4545, -0.9781]
 
   useEffect(() => {
     if (tokenData) {
       setAccessToken(tokenData)
     }
   }, [tokenData, setAccessToken])
+
+  function handleLeaveGame() {
+    if (sessionId && playerId) {
+      leaveMutation.mutate({ sessionId, playerId })
+    }
+  }
+
+  function copyCode() {
+    if (sessionCode) {
+      navigator.clipboard.writeText(sessionCode)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  const inSession = !!sessionId
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -66,44 +101,66 @@ export default function GamePage() {
               v0.2
             </span>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            {inSession && sessionCode && (
+              <div className="hidden sm:flex items-center gap-2 mr-2">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <span className="font-mono text-sm font-medium">{sessionCode}</span>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={copyCode}>
+                  {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleLeaveGame}>
+                  <LogOut className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
+      {inSession && <GameSync />}
+
       <main className="w-full px-4 py-3 flex-1 flex flex-col gap-3">
-        <Card>
-          <CardContent className="p-3 md:p-4">
-            <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-              <div className="flex flex-col md:flex-row md:items-center gap-4 flex-1">
-                <PlayerPositions />
+        {!inSession ? (
+          <div className="flex-1 flex items-center justify-center py-8">
+            <JoinGame startingPosition={startingPosition} />
+          </div>
+        ) : (
+          <>
+            <Card>
+              <CardContent className="p-3 md:p-4">
+                <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                  <div className="flex flex-col md:flex-row md:items-center gap-4 flex-1">
+                    <PlayerPositions />
 
-                <div className="hidden md:block h-8 w-px bg-border" />
+                    <div className="hidden md:block h-8 w-px bg-border" />
 
-                <div className="py-2 md:py-0">
-                  <DiceRoller />
+                    <div className="py-2 md:py-0">
+                      <DiceRoller />
+                    </div>
+                  </div>
+
+                  <div className="hidden lg:block h-8 w-px bg-border" />
+
+                  <button
+                    onClick={() => setSettingsExpanded(!settingsExpanded)}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                      "hover:bg-muted border",
+                      settingsExpanded && "bg-muted"
+                    )}
+                  >
+                    <Settings className="h-4 w-4" />
+                    <span>Settings</span>
+                    <ChevronDown
+                      className={cn(
+                        "h-3 w-3 transition-transform duration-200",
+                        settingsExpanded && "rotate-180"
+                      )}
+                    />
+                  </button>
                 </div>
-              </div>
-
-              <div className="hidden lg:block h-8 w-px bg-border" />
-
-              <button
-                onClick={() => setSettingsExpanded(!settingsExpanded)}
-                className={cn(
-                  "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
-                  "hover:bg-muted border",
-                  settingsExpanded && "bg-muted"
-                )}
-              >
-                <Settings className="h-4 w-4" />
-                <span>Settings</span>
-                <ChevronDown
-                  className={cn(
-                    "h-3 w-3 transition-transform duration-200",
-                    settingsExpanded && "rotate-180"
-                  )}
-                />
-              </button>
-            </div>
 
             <div
               className={cn(
@@ -125,14 +182,16 @@ export default function GamePage() {
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden flex-1">
-          <CardContent className="p-0 h-full">
-            <div className="h-[75vh] min-h-[400px] relative">
-              <MapWithCars />
-              <MapPositions />
-            </div>
-          </CardContent>
-        </Card>
+            <Card className="overflow-hidden flex-1">
+              <CardContent className="p-0 h-full">
+                <div className="h-[75vh] min-h-[400px] relative">
+                  <MapWithCars />
+                  <MapPositions />
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
 
         <footer className="flex flex-col sm:flex-row items-center justify-between gap-2 py-3 text-xs text-muted-foreground">
           <p>

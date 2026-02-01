@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Dices, CheckCircle2 } from "lucide-react"
 import { GameTurnState, useCurrentPlayer, useGameStore } from "@/stores/game-store"
+import { trpc } from "@/lib/trpc/client"
 import { Button } from "@/components/ui/button"
 import { DiceDisplay } from "@/components/ui/dice"
 import GridSelectionButton from "./GridSelectionButton"
@@ -14,6 +15,10 @@ export default function DiceRoller() {
     gameTurnState,
     handleDiceRoll,
     handleEndTurn,
+    sessionId,
+    playerId,
+    players,
+    currentPlayerName,
   } = useGameStore()
 
   const [isRolling, setRolling] = useState(false)
@@ -24,12 +29,31 @@ export default function DiceRoller() {
   const total = dice1Value + dice2Value
   const playerName = player?.name || ""
 
+  const currentPlayerData = players.find(p => p.name === currentPlayerName)
+  const myPlayer = players.find((_, i) => {
+    const gameState = trpc.useUtils().game.state.getData({ sessionId: sessionId! })
+    return gameState?.players[i]?.id === playerId
+  })
+  const isMyTurn = myPlayer?.name === currentPlayerName
+
+  const rollDiceMutation = trpc.game.rollDice.useMutation()
+  const endTurnMutation = trpc.game.endTurn.useMutation()
+
   useEffect(() => {
     if (hasSettled && !isRolling) {
-      handleDiceRoll(total)
+      if (sessionId && playerId) {
+        rollDiceMutation.mutate({
+          sessionId,
+          playerId,
+          dice1: dice1Value,
+          dice2: dice2Value,
+        })
+      } else {
+        handleDiceRoll(total)
+      }
       setHasSettled(false)
     }
-  }, [hasSettled, isRolling, total, handleDiceRoll])
+  }, [hasSettled, isRolling, total, handleDiceRoll, sessionId, playerId, dice1Value, dice2Value, rollDiceMutation])
 
   function rollDice() {
     if (!isRolling) {
@@ -43,6 +67,14 @@ export default function DiceRoller() {
         setRolling(false)
         setHasSettled(true)
       }, 2000)
+    }
+  }
+
+  function handleEndTurnClick() {
+    if (sessionId && playerId) {
+      endTurnMutation.mutate({ sessionId, playerId })
+    } else {
+      handleEndTurn()
     }
   }
 
@@ -86,7 +118,7 @@ export default function DiceRoller() {
         <Button
           className="flex-1 sm:flex-none gap-2"
           variant="secondary"
-          onClick={handleEndTurn}
+          onClick={handleEndTurnClick}
           disabled={gameTurnState !== GameTurnState.DICE_ROLLED}
         >
           <CheckCircle2 className="h-4 w-4" />

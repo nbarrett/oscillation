@@ -52,6 +52,9 @@ interface GameState {
   selectedGridSquares: SelectedGrid[];
   playerZoomRequest: string | null;
   gridClearRequest: number;
+  sessionId: string | null;
+  playerId: string | null;
+  sessionCode: string | null;
 
   setPlayers: (players: Player[]) => void;
   setGameTurnState: (state: GameTurnState) => void;
@@ -71,6 +74,10 @@ interface GameState {
   handleEndTurn: () => void;
   playerRouteReceived: () => void;
   initialisePlayers: (startingPosition: [number, number]) => void;
+  setSessionId: (sessionId: string | null) => void;
+  setPlayerId: (playerId: string | null) => void;
+  setSessionCode: (code: string | null) => void;
+  leaveSession: () => void;
 }
 
 const defaultZoom = 7;
@@ -88,6 +95,9 @@ export const useGameStore = create<GameState>()(
       selectedGridSquares: [],
       playerZoomRequest: null,
       gridClearRequest: 0,
+      sessionId: null,
+      playerId: null,
+      sessionCode: null,
 
       setPlayers: (players) => set({ players }),
 
@@ -171,7 +181,7 @@ export const useGameStore = create<GameState>()(
       },
 
       initialisePlayers: (startingPosition) => {
-        const iconTypes: ('white' | 'blue' | 'red')[] = ['white', 'blue', 'red'];
+        const iconTypes: ("white" | "blue" | "red")[] = ["white", "blue", "red"]
         const players: Player[] = iconTypes.map((iconType, index) => ({
           name: `Player ${index + 1}`,
           iconType,
@@ -179,22 +189,40 @@ export const useGameStore = create<GameState>()(
             startingPosition[0] + 0.00014023745552549371 * index,
             startingPosition[1] + -0.0002467632293701172 * index,
           ] as [number, number],
-        }));
+        }))
 
         set({
           players,
           currentPlayerName: players[0].name,
           gameTurnState: GameTurnState.ROLL_DICE,
           playerZoomRequest: players[0].name,
-        });
+        })
       },
+
+      setSessionId: (sessionId) => set({ sessionId }),
+
+      setPlayerId: (playerId) => set({ playerId }),
+
+      setSessionCode: (sessionCode) => set({ sessionCode }),
+
+      leaveSession: () => set({
+        sessionId: null,
+        playerId: null,
+        sessionCode: null,
+        players: [],
+        currentPlayerName: null,
+        gameTurnState: GameTurnState.ROLL_DICE,
+      }),
     }),
     {
-      name: 'oscillation-game',
+      name: "oscillation-game",
       partialize: (state) => ({
         players: state.players,
         currentPlayerName: state.currentPlayerName,
         mapZoom: state.mapZoom,
+        sessionId: state.sessionId,
+        playerId: state.playerId,
+        sessionCode: state.sessionCode,
       }),
     }
   )
