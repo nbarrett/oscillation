@@ -29,8 +29,9 @@ RUN pnpm run build
 FROM node:20-slim AS runner
 WORKDIR /app
 
-# Install OpenSSL for Prisma runtime
+# Install OpenSSL for Prisma runtime and enable corepack for pnpm
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+RUN corepack enable && corepack prepare pnpm@latest --activate
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -44,10 +45,11 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/node_modules/.pnpm/@prisma+client*/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/.pnpm/@prisma+engines@*/node_modules/@prisma/engines ./node_modules/@prisma/engines
-COPY --from=builder /app/node_modules/.pnpm/@prisma+engines-version@*/node_modules/@prisma/engines-version ./node_modules/@prisma/engines-version
-COPY --from=builder /app/node_modules/.pnpm/prisma*/node_modules/prisma ./node_modules/prisma
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/package.json ./package.json
+
+# Install only prisma CLI for migrations
+RUN pnpm add prisma --save-dev
 
 USER nextjs
 
