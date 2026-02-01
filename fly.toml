@@ -5,7 +5,7 @@ app = "oscillation"
 primary_region = "lhr"
 
 [deploy]
-  release_command = "node node_modules/prisma/build/index.js migrate deploy"
+  release_command = "sh scripts/migrate.sh"
 
 [env]
   PORT = "8080"
