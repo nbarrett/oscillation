@@ -29,13 +29,6 @@ export default function DiceRoller() {
   const total = dice1Value + dice2Value
   const playerName = player?.name || ""
 
-  const currentPlayerData = players.find(p => p.name === currentPlayerName)
-  const myPlayer = players.find((_, i) => {
-    const gameState = trpc.useUtils().game.state.getData({ sessionId: sessionId! })
-    return gameState?.players[i]?.id === playerId
-  })
-  const isMyTurn = myPlayer?.name === currentPlayerName
-
   const rollDiceMutation = trpc.game.rollDice.useMutation()
   const endTurnMutation = trpc.game.endTurn.useMutation()
 
