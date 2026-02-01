@@ -9,6 +9,7 @@ import { trpc } from "@/lib/trpc/client"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/cn"
 
 const DiceRoller = dynamic(() => import("@/components/DiceRoller"), { ssr: false })
@@ -104,14 +105,31 @@ export default function GamePage() {
           <div className="flex items-center gap-2">
             {inSession && sessionCode && (
               <div className="hidden sm:flex items-center gap-2 mr-2">
-                <Users className="h-4 w-4 text-muted-foreground" />
-                <span className="font-mono text-sm font-medium">{sessionCode}</span>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={copyCode}>
-                  {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                </Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleLeaveGame}>
-                  <LogOut className="h-3 w-3" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1.5 cursor-help">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-mono text-sm font-medium">{sessionCode}</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>Game code - share with friends to join</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={copyCode}>
+                      {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{copied ? "Copied!" : "Copy game code"}</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleLeaveGame}>
+                      <LogOut className="h-3 w-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Leave game</TooltipContent>
+                </Tooltip>
               </div>
             )}
             <ThemeToggle />
