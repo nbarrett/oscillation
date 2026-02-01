@@ -48,8 +48,8 @@ COPY --from=builder /app/node_modules/.pnpm/@prisma+client*/node_modules/.prisma
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/package.json ./package.json
 
-# Install only prisma CLI for migrations
-RUN pnpm add prisma --save-dev
+# Install only prisma CLI for migrations and fix ownership
+RUN pnpm add prisma --save-dev && chown -R nextjs:nodejs node_modules
 
 USER nextjs
 
