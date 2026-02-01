@@ -10,7 +10,6 @@ import { useRouteStore } from "@/stores/route-store";
 import { log } from "@/lib/utils";
 import "proj4leaflet";
 import PlayerCar from "./PlayerCar";
-import Legend from "./Legend";
 import RecordMapCentreAndZoom from "./RecordMapCentreAndZoom";
 import RecordMapClick from "./RecordMapClick";
 import SelectGridSquares from "./SelectGridSquares";
@@ -30,7 +29,7 @@ function createBritishNationalGridCRS(): L.Proj.CRS | null {
 }
 
 export default function MapWithCars() {
-  const { players, mapZoom, setMapZoom, playerZoomRequest, initialisePlayers } = useGameStore();
+  const { players, mapZoom, mapCentre, setMapZoom, playerZoomRequest, initialisePlayers } = useGameStore();
   const { accessToken, mapLayer, mappingProvider } = useMapStore();
   const { startingPosition } = useRouteStore();
 
@@ -62,18 +61,20 @@ export default function MapWithCars() {
   }, [startingPosition, players.length, initialisePlayers]);
 
   useEffect(() => {
+    if (map) {
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 100);
+    }
+  }, [map]);
+
+  useEffect(() => {
     if (playerToZoom && map) {
       log.debug("zooming to player:", playerToZoom.name, "position:", playerToZoom.position);
       map.flyTo(playerToZoom.position);
     }
   }, [playerToZoom, map]);
 
-  useEffect(() => {
-    if (startingPosition && map) {
-      log.debug("flying to starting position:", startingPosition.name);
-      map.flyTo([startingPosition.lat, startingPosition.lng]);
-    }
-  }, [startingPosition, map]);
 
   useEffect(() => {
     log.debug("zoom:", mapZoom, "mapLayerAttributes:", mapLayerAttributes, "usesBritishNationalGrid:", usesBritishNationalGrid);
@@ -124,7 +125,7 @@ export default function MapWithCars() {
         minZoom={usesBritishNationalGrid ? mapLayerAttributes?.minZoom : 0}
         maxZoom={usesBritishNationalGrid ? mapLayerAttributes?.maxZoom : 18}
         zoom={mapZoom}
-        center={[startingPosition.lat, startingPosition.lng]}
+        center={mapCentre || [startingPosition.lat, startingPosition.lng]}
         scrollWheelZoom={true}
         ref={(mapRef) => setMap(mapRef)}
         style={{ height: "100%" }}
@@ -140,7 +141,6 @@ export default function MapWithCars() {
         {players.map((player, key) => (
           <PlayerCar key={key} player={player} />
         ))}
-        <Legend map={map} />
         <RecordMapCentreAndZoom />
         <RecordMapClick />
         <SelectGridSquares />

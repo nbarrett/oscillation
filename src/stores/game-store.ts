@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { log } from '@/lib/utils';
 
 export enum GameTurnState {
   ROLL_DICE = 'ROLL_DICE',
@@ -10,7 +11,7 @@ export enum GameTurnState {
 
 export interface Player {
   position: [number, number];
-  nextPosition?: [number, number];
+  previousPosition?: [number, number];
   name: string;
   iconType: 'white' | 'blue' | 'red';
 }
@@ -69,7 +70,7 @@ interface GameState {
   setPlayerZoomRequest: (name: string | null) => void;
   clearGridSelections: () => void;
   updatePlayerPosition: (playerName: string, position: [number, number]) => void;
-  updatePlayerNextPosition: (playerName: string, nextPosition: [number, number] | null) => void;
+  movePlayerTo: (playerName: string, newPosition: [number, number]) => void;
   handleDiceRoll: (result: number) => void;
   handleEndTurn: () => void;
   playerRouteReceived: () => void;
@@ -130,17 +131,25 @@ export const useGameStore = create<GameState>()(
         gridClearRequest: state.gridClearRequest + 1,
       })),
 
-      updatePlayerPosition: (playerName, position) => set((state) => ({
-        players: state.players.map((player) =>
-          player.name === playerName ? { ...player, position } : player
-        ),
-      })),
+      updatePlayerPosition: (playerName, position) => {
+        log.debug("updatePlayerPosition:", playerName, "to:", position);
+        return set((state) => ({
+          players: state.players.map((player) =>
+            player.name === playerName ? { ...player, position } : player
+          ),
+        }));
+      },
 
-      updatePlayerNextPosition: (playerName, nextPosition) => set((state) => ({
-        players: state.players.map((player) =>
-          player.name === playerName ? { ...player, nextPosition: nextPosition ?? undefined } : player
-        ),
-      })),
+      movePlayerTo: (playerName, newPosition) => {
+        log.debug("movePlayerTo:", playerName, "newPosition:", newPosition);
+        return set((state) => ({
+          players: state.players.map((player) =>
+            player.name === playerName
+              ? { ...player, previousPosition: player.position, position: newPosition }
+              : player
+          ),
+        }));
+      },
 
       handleDiceRoll: (result) => set({
         diceResult: result,
@@ -169,11 +178,12 @@ export const useGameStore = create<GameState>()(
         const currentPlayer = state.players.find(
           (p) => p.name === state.currentPlayerName
         );
-        if (currentPlayer?.nextPosition) {
+        log.debug("playerRouteReceived: currentPlayer:", currentPlayer?.name, "previousPosition:", currentPlayer?.previousPosition);
+        if (currentPlayer?.previousPosition) {
           set({
             players: state.players.map((player) =>
               player.name === state.currentPlayerName
-                ? { ...player, position: player.nextPosition!, nextPosition: undefined }
+                ? { ...player, previousPosition: undefined }
                 : player
             ),
           });
@@ -217,9 +227,8 @@ export const useGameStore = create<GameState>()(
     {
       name: "oscillation-game",
       partialize: (state) => ({
-        players: state.players,
-        currentPlayerName: state.currentPlayerName,
         mapZoom: state.mapZoom,
+        mapCentre: state.mapCentre,
         sessionId: state.sessionId,
         playerId: state.playerId,
         sessionCode: state.sessionCode,

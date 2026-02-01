@@ -74,11 +74,19 @@
 }
 
 .custom-popup .leaflet-popup-content-wrapper {
-  @apply bg-popover text-popover-foreground rounded-lg shadow-lg;
+  @apply bg-background/95 text-foreground rounded-md shadow-md border backdrop-blur-sm;
 }
 
 .custom-popup .leaflet-popup-content {
-  @apply m-3 text-sm;
+  @apply m-2 text-xs font-medium;
+}
+
+.custom-popup .leaflet-popup-tip {
+  @apply hidden;
+}
+
+.custom-popup .leaflet-popup-close-button {
+  @apply hidden;
 }
 
 .dice-scene {

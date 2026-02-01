@@ -3,6 +3,8 @@
 import dynamic from "next/dynamic"
 import { useEffect, useState } from "react"
 import { Loader2, Gamepad2, ChevronDown, Settings, Users, LogOut, Copy, Check } from "lucide-react"
+import { AuthDialog } from "@/components/auth/auth-dialog"
+import { UserMenu } from "@/components/auth/user-menu"
 import { useMapStore } from "@/stores/map-store"
 import { useGameStore } from "@/stores/game-store"
 import { trpc } from "@/lib/trpc/client"
@@ -49,9 +51,9 @@ export default function GamePage() {
     },
   })
 
-  const startingPosition: [number, number] = locations?.[0]
+  const startingPosition: [number, number] | null = locations?.[0]
     ? [locations[0].lat, locations[0].lng]
-    : [51.4545, -0.9781]
+    : null
 
   useEffect(() => {
     if (tokenData) {
@@ -132,6 +134,8 @@ export default function GamePage() {
                 </Tooltip>
               </div>
             )}
+            {inSession && <AuthDialog />}
+            <UserMenu />
             <ThemeToggle />
           </div>
         </div>
@@ -200,9 +204,9 @@ export default function GamePage() {
           </CardContent>
         </Card>
 
-            <Card className="overflow-hidden flex-1">
-              <CardContent className="p-0 h-full">
-                <div className="h-[75vh] min-h-[400px] relative">
+            <Card className="overflow-hidden">
+              <CardContent className="p-0">
+                <div className="h-[calc(100vh-220px)] min-h-[400px] relative">
                   <MapWithCars />
                   <MapPositions />
                 </div>

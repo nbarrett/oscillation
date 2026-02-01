@@ -24,8 +24,7 @@ export default function PlayerCar({ player }: PlayerCarProps) {
     gameTurnState,
     diceResult,
     currentPlayerName,
-    updatePlayerPosition,
-    updatePlayerNextPosition,
+    movePlayerTo,
   } = useGameStore();
 
   const active = player.name === currentPlayerName;
@@ -36,25 +35,18 @@ export default function PlayerCar({ player }: PlayerCarProps) {
 
   const eventHandlers = useMemo(
     () => ({
-      dragstart() {
-        if (active && markerRef.current) {
-          const latLng = markerRef.current.getLatLng();
-          log.debug('drag start for:', player.name, 'position:', [latLng.lat, latLng.lng]);
-          updatePlayerPosition(player.name, [latLng.lat, latLng.lng]);
-        }
-      },
       dragend() {
         if (active && markerRef.current) {
           const latLng = markerRef.current.getLatLng();
-          log.debug('drag end for:', player.name, 'position:', [latLng.lat, latLng.lng]);
-          updatePlayerNextPosition(player.name, [latLng.lat, latLng.lng]);
+          log.debug("Car dropped:", player.name, "at position:", [latLng.lat, latLng.lng]);
+          movePlayerTo(player.name, [latLng.lat, latLng.lng]);
         }
       },
       mouseover() {
         markerRef.current?.openPopup();
       },
     }),
-    [player, active, updatePlayerPosition, updatePlayerNextPosition]
+    [player, active, movePlayerTo]
   );
 
   useEffect(() => {
@@ -87,7 +79,7 @@ export default function PlayerCar({ player }: PlayerCarProps) {
       ref={markerRef}
     >
       <PlayerMoveRoute player={player} />
-      <Popup className="custom-popup">{popupCaption()}</Popup>
+      <Popup className="custom-popup" offset={[0, -50]}>{popupCaption()}</Popup>
     </Marker>
   );
 }

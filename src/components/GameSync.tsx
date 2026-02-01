@@ -2,10 +2,10 @@
 
 import { useEffect } from "react"
 import { trpc } from "@/lib/trpc/client"
-import { useGameStore, GameTurnState } from "@/stores/game-store"
+import { useGameStore, GameTurnState, Player } from "@/stores/game-store"
 
 export default function GameSync() {
-  const { sessionId, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState } = useGameStore()
+  const { sessionId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState } = useGameStore()
 
   const { data: gameState } = trpc.game.state.useQuery(
     { sessionId: sessionId! },
@@ -17,11 +17,22 @@ export default function GameSync() {
 
   useEffect(() => {
     if (gameState) {
-      const players = gameState.players.map(p => ({
-        name: p.name,
-        iconType: p.iconType as "white" | "blue" | "red",
-        position: p.position,
-      }))
+      const players: Player[] = gameState.players.map(p => {
+        const localPlayer = localPlayers.find(lp => lp.name === p.name)
+        if (localPlayer?.previousPosition) {
+          return {
+            name: p.name,
+            iconType: p.iconType as "white" | "blue" | "red",
+            position: localPlayer.position,
+            previousPosition: localPlayer.previousPosition,
+          }
+        }
+        return {
+          name: p.name,
+          iconType: p.iconType as "white" | "blue" | "red",
+          position: localPlayer?.position ?? p.position,
+        }
+      })
 
       setPlayers(players)
 

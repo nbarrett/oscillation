@@ -7,6 +7,7 @@ import { trpc } from "@/lib/trpc/client"
 import superjson from "superjson"
 import { ThemeProvider } from "next-themes"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { SessionProvider } from "@/components/auth/session-provider"
 
 function baseUrl() {
   if (typeof window !== "undefined") return ""
@@ -28,19 +29,21 @@ export function Providers({ children }: { children: React.ReactNode }) {
   )
 
   return (
-    <trpc.Provider client={trpcClient} queryClient={queryClient}>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <TooltipProvider>
-            {children}
-          </TooltipProvider>
-        </ThemeProvider>
-      </QueryClientProvider>
-    </trpc.Provider>
+    <SessionProvider>
+      <trpc.Provider client={trpcClient} queryClient={queryClient}>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <TooltipProvider>
+              {children}
+            </TooltipProvider>
+          </ThemeProvider>
+        </QueryClientProvider>
+      </trpc.Provider>
+    </SessionProvider>
   )
 }

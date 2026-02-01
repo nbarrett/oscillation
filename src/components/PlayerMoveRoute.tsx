@@ -24,10 +24,10 @@ export default function PlayerMoveRoute({ player }: PlayerMoveRouteProps) {
   const [positions, setPositions] = useState<LatLngTuple[]>([]);
 
   const active = player.name === currentPlayer?.name;
-  const hasNextPosition = !!player.nextPosition;
+  const hasPreviousPosition = !!player.previousPosition;
 
-  const startPosition = active && hasNextPosition ? toApiCoordinateFormat(player.position) : null;
-  const endPosition = active && hasNextPosition ? toApiCoordinateFormat(player.nextPosition) : null;
+  const startPosition = active && hasPreviousPosition ? toApiCoordinateFormat(player.previousPosition) : null;
+  const endPosition = active && hasPreviousPosition ? toApiCoordinateFormat(player.position) : null;
 
   const { data: directionsResponse } = trpc.directions.getDirections.useQuery(
     {
@@ -50,7 +50,7 @@ export default function PlayerMoveRoute({ player }: PlayerMoveRouteProps) {
       const receivedPositions = toLeafletCoordinateFormat(coords);
 
       if (receivedPositions.length > 0) {
-        log.debug('PlayerMoveRoute: positions received for player:', player.name);
+        log.debug("PlayerMoveRoute: received", receivedPositions.length, "positions for player:", player.name);
         setPositions(receivedPositions);
         playerRouteReceived();
       }
