@@ -71,13 +71,36 @@ jobs:
 
       - name: Verify deployment
         run: |
-          sleep 10
-          # Fail if health check fails
+          echo "Waiting for deployment to stabilize..."
+          sleep 15
+
+          echo "Checking app homepage..."
           curl -sf https://oscillation.fly.dev/ | grep -q "_next" || {
-            echo "Health check failed - Next.js app not responding correctly"
+            echo "FAIL: Next.js app not responding"
             exit 1
           }
-          echo "Health check passed - Next.js app is responding"
+          echo "PASS: Homepage loads"
+
+          echo "Checking tRPC health endpoint..."
+          HEALTH=$(curl -sf "https://oscillation.fly.dev/api/trpc/health.check" 2>&1) || {
+            echo "FAIL: Health endpoint not responding"
+            echo "Response: $HEALTH"
+            exit 1
+          }
+
+          echo "$HEALTH" | grep -q '"status":"ok"' || {
+            echo "FAIL: Health check returned unexpected response"
+            echo "Response: $HEALTH"
+            exit 1
+          }
+
+          echo "$HEALTH" | grep -q '"database":"connected"' || {
+            echo "FAIL: Database not connected"
+            echo "Response: $HEALTH"
+            exit 1
+          }
+
+          echo "PASS: Health check passed - app and database working"
 
       - name: Get logs on failure
         if: failure()
