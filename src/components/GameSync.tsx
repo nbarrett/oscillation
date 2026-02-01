@@ -1,19 +1,27 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import { trpc } from "@/lib/trpc/client"
 import { useGameStore, GameTurnState, Player } from "@/stores/game-store"
 
 export default function GameSync() {
-  const { sessionId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState } = useGameStore()
+  const { sessionId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, leaveSession } = useGameStore()
+  const hasCheckedSession = useRef(false)
 
-  const { data: gameState } = trpc.game.state.useQuery(
+  const { data: gameState, isFetched } = trpc.game.state.useQuery(
     { sessionId: sessionId! },
     {
       enabled: !!sessionId,
       refetchInterval: 2000,
     }
   )
+
+  useEffect(() => {
+    if (isFetched && !gameState && sessionId && !hasCheckedSession.current) {
+      hasCheckedSession.current = true
+      leaveSession()
+    }
+  }, [isFetched, gameState, sessionId, leaveSession])
 
   useEffect(() => {
     if (gameState) {

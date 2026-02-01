@@ -34,10 +34,8 @@ function PinInput({ id, name, placeholder, disabled }: {
       name={name}
       type="password"
       inputMode="numeric"
-      pattern="[0-9]{4}"
       maxLength={4}
       placeholder={placeholder}
-      required
       disabled={disabled}
       autoComplete="new-password"
       data-form-type="other"
@@ -75,8 +73,20 @@ export function AuthForm({ onSuccess, showMapPreview = true }: AuthFormProps) {
     setError(null)
 
     const formData = new FormData(e.currentTarget)
-    const nickname = formData.get("nickname") as string
+    const nickname = (formData.get("nickname") as string).trim()
     const pin = formData.get("pin") as string
+
+    if (!nickname) {
+      setError("Please enter your nickname")
+      setIsLoading(false)
+      return
+    }
+
+    if (!pin || !/^\d{4}$/.test(pin)) {
+      setError("Please enter a valid 4-digit PIN")
+      setIsLoading(false)
+      return
+    }
 
     try {
       const result = await signIn("credentials", { nickname, pin, redirect: false })
@@ -100,9 +110,21 @@ export function AuthForm({ onSuccess, showMapPreview = true }: AuthFormProps) {
     setError(null)
 
     const formData = new FormData(e.currentTarget)
-    const nickname = formData.get("nickname") as string
+    const nickname = (formData.get("nickname") as string).trim()
     const pin = formData.get("pin") as string
     const confirmPin = formData.get("confirmPin") as string
+
+    if (!nickname) {
+      setError("Please enter a nickname")
+      setIsLoading(false)
+      return
+    }
+
+    if (!pin || !/^\d{4}$/.test(pin)) {
+      setError("Please enter a valid 4-digit PIN")
+      setIsLoading(false)
+      return
+    }
 
     if (pin !== confirmPin) {
       setError("PINs do not match")
@@ -125,10 +147,10 @@ export function AuthForm({ onSuccess, showMapPreview = true }: AuthFormProps) {
           </TabsList>
 
           <TabsContent value="login" className="mt-0">
-            <form onSubmit={handleLogin} className="space-y-4">
+            <form onSubmit={handleLogin} noValidate className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="login-nickname">Nickname</Label>
-                <Input id="login-nickname" name="nickname" placeholder="Enter your nickname" required disabled={isLoading} autoComplete="username" />
+                <Input id="login-nickname" name="nickname" placeholder="Enter your nickname" disabled={isLoading} autoComplete="username" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="login-pin">PIN</Label>
@@ -142,10 +164,10 @@ export function AuthForm({ onSuccess, showMapPreview = true }: AuthFormProps) {
           </TabsContent>
 
           <TabsContent value="register" className="mt-0">
-            <form onSubmit={handleRegister} className="space-y-4">
+            <form onSubmit={handleRegister} noValidate className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="register-nickname">Nickname</Label>
-                <Input id="register-nickname" name="nickname" placeholder="Choose a nickname" required disabled={isLoading} autoComplete="username" />
+                <Input id="register-nickname" name="nickname" placeholder="Choose a nickname" disabled={isLoading} autoComplete="username" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="register-pin">PIN</Label>
