@@ -19,6 +19,8 @@ export default function DiceRoller() {
     playerId,
     players,
     currentPlayerName,
+    diceResult,
+    movementPath,
   } = useGameStore()
 
   const [isRolling, setRolling] = useState(false)
@@ -86,8 +88,16 @@ export default function DiceRoller() {
           </div>
 
           {showResult && (
-            <div className="text-lg font-bold text-primary whitespace-nowrap">
-              You rolled {total}!
+            <div className="flex flex-col">
+              <div className="text-lg font-bold text-primary whitespace-nowrap">
+                You rolled {total}!
+              </div>
+              {diceResult && (
+                <div className="text-sm text-muted-foreground">
+                  <div>Moves: {movementPath.length}/{diceResult}</div>
+                  <div className="text-xs">Click green squares (A/B roads only)</div>
+                </div>
+              )}
             </div>
           )}
         </div>

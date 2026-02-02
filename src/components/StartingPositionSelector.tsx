@@ -58,6 +58,7 @@ export default function StartingPositionSelector() {
   return (
     <div className="space-y-2">
       <Label>Starting Point</Label>
+      <p className="text-xs text-muted-foreground">Must be on an A road (pink)</p>
       <div className="flex items-center gap-2">
         <Select value={startingPosition?.name || ""} onValueChange={handleChange}>
           <SelectTrigger className="flex-1">

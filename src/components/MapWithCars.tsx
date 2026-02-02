@@ -13,6 +13,7 @@ import PlayerCar from "./PlayerCar";
 import RecordMapCentreAndZoom from "./RecordMapCentreAndZoom";
 import RecordMapClick from "./RecordMapClick";
 import SelectGridSquares from "./SelectGridSquares";
+import ValidMoveHighlights from "./ValidMoveHighlights";
 import MapContextMenu from "./MapContextMenu";
 import ClickPositionMarker from "./ClickPositionMarker";
 import GridOverlay from "./GridOverlay";
@@ -141,6 +142,7 @@ export default function MapWithCars() {
         <RecordMapCentreAndZoom />
         <RecordMapClick />
         <SelectGridSquares />
+        <ValidMoveHighlights />
         <MapContextMenu />
         <ClickPositionMarker />
         <GridOverlay />
