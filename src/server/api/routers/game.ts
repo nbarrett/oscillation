@@ -100,11 +100,15 @@ export const gameRouter = createTRPCRouter({
         throw new Error("Game is full (maximum 4 players).")
       }
 
-      const existingName = session.players.find(
+      const existingPlayer = session.players.find(
         p => p.name.toLowerCase() === input.playerName.toLowerCase()
       )
-      if (existingName) {
-        throw new Error("Someone with that name is already in the game.")
+      if (existingPlayer) {
+        return {
+          sessionId: session.id,
+          code: session.code,
+          playerId: existingPlayer.id,
+        }
       }
 
       const turnOrder = session.players.length

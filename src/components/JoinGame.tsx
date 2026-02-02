@@ -424,23 +424,115 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
     )
   }
 
+  if (!session) {
+    return (
+      <div className="w-full max-w-2xl mx-auto overflow-hidden rounded-lg border bg-card">
+        <MapPreviewHeader height="h-80" />
+        <div className="p-6">
+          <Tabs value={authTab === AuthTab.PLAY ? AuthTab.SIGN_IN : authTab} onValueChange={(v) => setAuthTab(v as AuthTab)}>
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value={AuthTab.SIGN_IN} className="gap-1.5">
+                <LogIn className="h-3.5 w-3.5" />
+                Sign In
+              </TabsTrigger>
+              <TabsTrigger value={AuthTab.REGISTER} className="gap-1.5">
+                <UserPlus className="h-3.5 w-3.5" />
+                Register
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value={AuthTab.SIGN_IN} className="mt-0">
+              <form onSubmit={handleLogin} noValidate className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="login-nickname">Nickname</Label>
+                  <Input
+                    id="login-nickname"
+                    placeholder="Enter your nickname"
+                    value={loginNickname}
+                    onChange={(e) => setLoginNickname(e.target.value)}
+                    disabled={isAuthLoading}
+                    autoComplete="username"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="login-pin">PIN</Label>
+                  <PinInput
+                    id="login-pin"
+                    name="login-pin"
+                    placeholder="4-digit PIN"
+                    value={loginPin}
+                    onChange={setLoginPin}
+                    disabled={isAuthLoading}
+                  />
+                </div>
+                {error && <ErrorMessage message={error} />}
+                <Button type="submit" className="w-full" disabled={isAuthLoading}>
+                  {isAuthLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  {isAuthLoading ? "Signing in..." : "Sign In"}
+                </Button>
+              </form>
+            </TabsContent>
+
+            <TabsContent value={AuthTab.REGISTER} className="mt-0">
+              <form onSubmit={handleRegister} noValidate className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="register-nickname">Nickname</Label>
+                  <Input
+                    id="register-nickname"
+                    placeholder="Choose a nickname"
+                    value={registerNickname}
+                    onChange={(e) => setRegisterNickname(e.target.value)}
+                    disabled={isAuthLoading}
+                    autoComplete="username"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="register-pin">PIN</Label>
+                  <PinInput
+                    id="register-pin"
+                    name="register-pin"
+                    placeholder="4-digit PIN"
+                    value={registerPin}
+                    onChange={setRegisterPin}
+                    disabled={isAuthLoading}
+                    error={pinMismatch}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-pin">Confirm PIN</Label>
+                  <PinInput
+                    id="confirm-pin"
+                    name="confirm-pin"
+                    placeholder="Confirm PIN"
+                    value={confirmPin}
+                    onChange={setConfirmPin}
+                    disabled={isAuthLoading}
+                    error={pinMismatch}
+                  />
+                </div>
+                {pinMismatch && <ErrorMessage message="PINs do not match" />}
+                {error && !pinMismatch && <ErrorMessage message={error} />}
+                <Button type="submit" className="w-full" disabled={isAuthLoading || pinMismatch}>
+                  {isAuthLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  {isAuthLoading ? "Creating account..." : "Create Account"}
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="w-full max-w-2xl mx-auto overflow-hidden rounded-lg border bg-card">
       <MapPreviewHeader height="h-80" />
       <div className="p-6">
         <Tabs value={authTab} onValueChange={(v) => setAuthTab(v as AuthTab)}>
-          <TabsList className="grid w-full grid-cols-3 mb-4">
+          <TabsList className="grid w-full grid-cols-1 mb-4">
             <TabsTrigger value={AuthTab.PLAY} className="gap-1.5">
               <Users className="h-3.5 w-3.5" />
               Play
-            </TabsTrigger>
-            <TabsTrigger value={AuthTab.SIGN_IN} className="gap-1.5">
-              <LogIn className="h-3.5 w-3.5" />
-              Sign In
-            </TabsTrigger>
-            <TabsTrigger value={AuthTab.REGISTER} className="gap-1.5">
-              <UserPlus className="h-3.5 w-3.5" />
-              Register
             </TabsTrigger>
           </TabsList>
 
@@ -471,89 +563,6 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
               </Button>
             </div>
 
-            {!session?.user && (
-              <p className="text-xs text-center text-muted-foreground">
-                Sign in or register to save your game progress
-              </p>
-            )}
-          </TabsContent>
-
-          <TabsContent value={AuthTab.SIGN_IN} className="mt-0">
-            <form onSubmit={handleLogin} noValidate className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="login-nickname">Nickname</Label>
-                <Input
-                  id="login-nickname"
-                  placeholder="Enter your nickname"
-                  value={loginNickname}
-                  onChange={(e) => setLoginNickname(e.target.value)}
-                  disabled={isAuthLoading}
-                  autoComplete="username"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="login-pin">PIN</Label>
-                <PinInput
-                  id="login-pin"
-                  name="login-pin"
-                  placeholder="4-digit PIN"
-                  value={loginPin}
-                  onChange={setLoginPin}
-                  disabled={isAuthLoading}
-                />
-              </div>
-              {error && <ErrorMessage message={error} />}
-              <Button type="submit" className="w-full" disabled={isAuthLoading}>
-                {isAuthLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {isAuthLoading ? "Signing in..." : "Sign In"}
-              </Button>
-            </form>
-          </TabsContent>
-
-          <TabsContent value={AuthTab.REGISTER} className="mt-0">
-            <form onSubmit={handleRegister} noValidate className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="register-nickname">Nickname</Label>
-                <Input
-                  id="register-nickname"
-                  placeholder="Choose a nickname"
-                  value={registerNickname}
-                  onChange={(e) => setRegisterNickname(e.target.value)}
-                  disabled={isAuthLoading}
-                  autoComplete="username"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="register-pin">PIN</Label>
-                <PinInput
-                  id="register-pin"
-                  name="register-pin"
-                  placeholder="4-digit PIN"
-                  value={registerPin}
-                  onChange={setRegisterPin}
-                  disabled={isAuthLoading}
-                  error={pinMismatch}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirm-pin">Confirm PIN</Label>
-                <PinInput
-                  id="confirm-pin"
-                  name="confirm-pin"
-                  placeholder="Confirm PIN"
-                  value={confirmPin}
-                  onChange={setConfirmPin}
-                  disabled={isAuthLoading}
-                  error={pinMismatch}
-                />
-                {pinMismatch && <PinMismatchWarning />}
-              </div>
-              {error && <ErrorMessage message={error} />}
-              <Button type="submit" className="w-full" disabled={isAuthLoading || pinMismatch}>
-                {isAuthLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {isAuthLoading ? "Creating account..." : "Create Account"}
-              </Button>
-            </form>
           </TabsContent>
         </Tabs>
       </div>
