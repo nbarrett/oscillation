@@ -339,6 +339,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
           {mode === "create" && (
             <div className="space-y-2">
               <Label>Starting Point</Label>
+              <p className="text-xs text-muted-foreground">Must be on an A road (pink roads on the map)</p>
               <div className="flex items-center gap-2">
                 <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
                   <SelectTrigger className="flex-1">

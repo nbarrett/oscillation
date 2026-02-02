@@ -40,6 +40,37 @@ export interface MapClickPosition {
 
 export interface SelectedGrid {
   gridSquareLatLongs: { lat: number; lng: number }[];
+  gridKey: string; // Unique key based on grid coordinates (e.g., "1234-5678")
+}
+
+// Helper to create a grid key from eastings/northings (floored to 100m)
+export function createGridKey(eastings: string, northings: string): string {
+  const e = Math.floor(parseInt(eastings, 10) / 100) * 100;
+  const n = Math.floor(parseInt(northings, 10) / 100) * 100;
+  return `${e}-${n}`;
+}
+
+// Check if two grid keys represent adjacent squares (N/S/E/W only, no diagonal)
+export function areGridsAdjacent(key1: string, key2: string): boolean {
+  const [e1, n1] = key1.split('-').map(Number);
+  const [e2, n2] = key2.split('-').map(Number);
+
+  const eDiff = Math.abs(e1 - e2);
+  const nDiff = Math.abs(n1 - n2);
+
+  // Adjacent means exactly 100m apart in one direction, 0 in the other
+  return (eDiff === 100 && nDiff === 0) || (eDiff === 0 && nDiff === 100);
+}
+
+// Get adjacent grid keys for a given grid key
+export function getAdjacentGridKeys(gridKey: string): string[] {
+  const [e, n] = gridKey.split('-').map(Number);
+  return [
+    `${e}-${n + 100}`, // North
+    `${e}-${n - 100}`, // South
+    `${e + 100}-${n}`, // East
+    `${e - 100}-${n}`, // West
+  ];
 }
 
 interface GameState {
@@ -51,6 +82,8 @@ interface GameState {
   mapClickPosition: MapClickPosition | null;
   mapZoom: number;
   selectedGridSquares: SelectedGrid[];
+  movementPath: string[]; // Ordered list of grid keys representing the path
+  playerStartGridKey: string | null; // Grid key where current player started their turn
   playerZoomRequest: string | null;
   gridClearRequest: number;
   sessionId: string | null;
@@ -67,6 +100,12 @@ interface GameState {
   setSelectedGridSquares: (grids: SelectedGrid[]) => void;
   addSelectedGridSquare: (grid: SelectedGrid) => void;
   removeSelectedGridSquare: (index: number) => void;
+  setMovementPath: (path: string[]) => void;
+  addToMovementPath: (gridKey: string) => void;
+  removeFromMovementPath: (gridKey: string) => void;
+  setPlayerStartGridKey: (gridKey: string | null) => void;
+  canSelectGrid: (gridKey: string) => boolean;
+  getLastPathGridKey: () => string | null;
   setPlayerZoomRequest: (name: string | null) => void;
   clearGridSelections: () => void;
   updatePlayerPosition: (playerName: string, position: [number, number]) => void;
@@ -94,6 +133,8 @@ export const useGameStore = create<GameState>()(
       mapClickPosition: null,
       mapZoom: defaultZoom,
       selectedGridSquares: [],
+      movementPath: [],
+      playerStartGridKey: null,
       playerZoomRequest: null,
       gridClearRequest: 0,
       sessionId: null,
@@ -124,10 +165,57 @@ export const useGameStore = create<GameState>()(
         selectedGridSquares: state.selectedGridSquares.filter((_, i) => i !== index),
       })),
 
+      setMovementPath: (movementPath) => set({ movementPath }),
+
+      addToMovementPath: (gridKey) => set((state) => ({
+        movementPath: [...state.movementPath, gridKey],
+      })),
+
+      removeFromMovementPath: (gridKey) => set((state) => {
+        const index = state.movementPath.indexOf(gridKey);
+        if (index === -1) return state;
+        // Only allow removing from the end of the path
+        if (index === state.movementPath.length - 1) {
+          return { movementPath: state.movementPath.slice(0, -1) };
+        }
+        return state;
+      }),
+
+      setPlayerStartGridKey: (playerStartGridKey) => set({ playerStartGridKey }),
+
+      canSelectGrid: (gridKey) => {
+        const state = get();
+        // Can't select if no dice rolled
+        if (!state.diceResult) return false;
+        // Can't select if already at max moves
+        if (state.movementPath.length >= state.diceResult) return false;
+        // Can't select if already in path
+        if (state.movementPath.includes(gridKey)) return false;
+
+        // If path is empty, must be adjacent to player's starting grid
+        if (state.movementPath.length === 0) {
+          if (!state.playerStartGridKey) return false;
+          return areGridsAdjacent(gridKey, state.playerStartGridKey);
+        }
+
+        // Otherwise must be adjacent to last grid in path
+        const lastGridKey = state.movementPath[state.movementPath.length - 1];
+        return areGridsAdjacent(gridKey, lastGridKey);
+      },
+
+      getLastPathGridKey: () => {
+        const state = get();
+        if (state.movementPath.length === 0) {
+          return state.playerStartGridKey;
+        }
+        return state.movementPath[state.movementPath.length - 1];
+      },
+
       setPlayerZoomRequest: (playerZoomRequest) => set({ playerZoomRequest }),
 
       clearGridSelections: () => set((state) => ({
         selectedGridSquares: [],
+        movementPath: [],
         gridClearRequest: state.gridClearRequest + 1,
       })),
 
@@ -169,6 +257,8 @@ export const useGameStore = create<GameState>()(
           currentPlayerName: nextPlayer?.name ?? null,
           diceResult: null,
           selectedGridSquares: [],
+          movementPath: [],
+          playerStartGridKey: null,
           gridClearRequest: state.gridClearRequest + 1,
         });
       },

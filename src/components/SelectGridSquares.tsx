@@ -4,15 +4,24 @@ import { useEffect } from 'react';
 import { useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { isEqual } from "es-toolkit/compat";
-import { useGameStore, GridReferenceData, GridSquareCorners, SelectedGrid } from '@/stores/game-store';
+import {
+  useGameStore,
+  GridReferenceData,
+  GridSquareCorners,
+  SelectedGrid,
+  createGridKey,
+} from '@/stores/game-store';
+import { gridHasRoad, isRoadDataLoaded } from '@/lib/road-data';
 import { colours, log } from '@/lib/utils';
 
 class IdentifiedPolygon extends L.Polygon {
   firstLatLong: L.LatLng;
+  gridKey: string;
 
-  constructor(gridSquareLatLongs: L.LatLng[], options?: L.PolylineOptions) {
+  constructor(gridSquareLatLongs: L.LatLng[], gridKey: string, options?: L.PolylineOptions) {
     super(gridSquareLatLongs, options);
     this.firstLatLong = gridSquareLatLongs[0];
+    this.gridKey = gridKey;
   }
 }
 
@@ -57,51 +66,62 @@ export default function SelectGridSquares() {
     selectedGridSquares,
     diceResult,
     gridClearRequest,
+    movementPath,
     setSelectedGridSquares,
     addSelectedGridSquare,
     removeSelectedGridSquare,
+    addToMovementPath,
+    removeFromMovementPath,
+    canSelectGrid,
+    setMovementPath,
   } = useGameStore();
 
-  function findExistingGridSquareIndex(gridSquareLatLongs: L.LatLng[]): number {
-    return selectedGridSquares.findIndex(
-      (item) => item.gridSquareLatLongs.length > 0 &&
-        isEqual(item.gridSquareLatLongs[0], { lat: gridSquareLatLongs[0].lat, lng: gridSquareLatLongs[0].lng })
-    );
+  function findExistingGridSquareIndex(gridKey: string): number {
+    return selectedGridSquares.findIndex((item) => item.gridKey === gridKey);
   }
 
-  function deselectGridSquare(gridSquareLatLongs: L.LatLng[], existingIndex: number) {
+  function deselectGridSquare(gridKey: string, existingIndex: number) {
+    // Only allow deselecting from the end of the path
+    const pathIndex = movementPath.indexOf(gridKey);
+    if (pathIndex !== movementPath.length - 1) {
+      log.info("Cannot deselect grid that's not at the end of the path");
+      return;
+    }
+
     map.eachLayer((layer) => {
-      if (isIdentifiedPolygon(layer)) {
-        const firstLL = gridSquareLatLongs[0];
-        if (isEqual({ lat: layer.firstLatLong.lat, lng: layer.firstLatLong.lng }, { lat: firstLL.lat, lng: firstLL.lng })) {
-          log.info("removing polygon for deselection");
-          layer.remove();
-        }
+      if (isIdentifiedPolygon(layer) && layer.gridKey === gridKey) {
+        log.info("removing polygon for deselection");
+        layer.remove();
       }
     });
     removeSelectedGridSquare(existingIndex);
+    removeFromMovementPath(gridKey);
   }
 
-  function selectGridSquare(gridSquareLatLongs: L.LatLng[]) {
-    const gridSquare = new IdentifiedPolygon(gridSquareLatLongs, {
+  function selectGridSquare(gridSquareLatLongs: L.LatLng[], gridKey: string) {
+    const gridSquare = new IdentifiedPolygon(gridSquareLatLongs, gridKey, {
       interactive: true,
       color: colours.osMapsPurple,
-      weight: 1,
+      weight: 2,
+      fillOpacity: 0.3,
     });
 
     gridSquare.addTo(map);
     addSelectedGridSquare({
       gridSquareLatLongs: gridSquareLatLongs.map((ll) => ({ lat: ll.lat, lng: ll.lng })),
+      gridKey,
     });
-    log.info("added grid square polygon");
-  }
-
-  function canSelectMoreGridSquares(): boolean {
-    return !!(diceResult && diceResult > selectedGridSquares.length);
+    addToMovementPath(gridKey);
+    log.info("added grid square to movement path:", gridKey);
   }
 
   useEffect(() => {
     if (!mapClickPosition || !map) return;
+
+    const gridKey = createGridKey(
+      mapClickPosition.gridReferenceData.eastings,
+      mapClickPosition.gridReferenceData.northings
+    );
 
     const gridSquareLatLongs = calculateGridReferenceSquare(
       map,
@@ -111,12 +131,20 @@ export default function SelectGridSquares() {
 
     if (gridSquareLatLongs.length === 0) return;
 
-    const existingIndex = findExistingGridSquareIndex(gridSquareLatLongs);
+    const existingIndex = findExistingGridSquareIndex(gridKey);
 
     if (existingIndex !== -1) {
-      deselectGridSquare(gridSquareLatLongs, existingIndex);
-    } else if (canSelectMoreGridSquares()) {
-      selectGridSquare(gridSquareLatLongs);
+      // Try to deselect (only works if it's the last in path)
+      deselectGridSquare(gridKey, existingIndex);
+    } else if (canSelectGrid(gridKey)) {
+      // Additional road validation
+      if (isRoadDataLoaded() && !gridHasRoad(gridKey)) {
+        log.info("Cannot select grid - no A or B road in this square");
+        return;
+      }
+      selectGridSquare(gridSquareLatLongs, gridKey);
+    } else {
+      log.info("Cannot select grid - not adjacent to current path or max moves reached");
     }
   }, [mapClickPosition]);
 
@@ -128,6 +156,7 @@ export default function SelectGridSquares() {
       }
     });
     setSelectedGridSquares([]);
+    setMovementPath([]);
   }
 
   useEffect(() => {

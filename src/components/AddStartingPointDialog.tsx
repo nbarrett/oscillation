@@ -135,7 +135,7 @@ export default function AddStartingPointDialog({ onSuccess }: AddStartingPointDi
         <DialogHeader>
           <DialogTitle>Add Starting Point</DialogTitle>
           <DialogDescription>
-            Add a new game starting location to the database.
+            Add a new game starting location. <strong>Important:</strong> Starting points must be on an A road (pink roads on the map).
           </DialogDescription>
         </DialogHeader>
 
