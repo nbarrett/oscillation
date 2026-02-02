@@ -258,18 +258,24 @@ export const gameRouter = createTRPCRouter({
       playerId: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
-      await ctx.db.gamePlayer.delete({
+      const player = await ctx.db.gamePlayer.findUnique({
         where: { id: input.playerId },
       })
 
-      const remainingPlayers = await ctx.db.gamePlayer.count({
-        where: { sessionId: input.sessionId },
-      })
-
-      if (remainingPlayers === 0) {
-        await ctx.db.gameSession.delete({
-          where: { id: input.sessionId },
+      if (player) {
+        await ctx.db.gamePlayer.delete({
+          where: { id: input.playerId },
         })
+
+        const remainingPlayers = await ctx.db.gamePlayer.count({
+          where: { sessionId: input.sessionId },
+        })
+
+        if (remainingPlayers === 0) {
+          await ctx.db.gameSession.delete({
+            where: { id: input.sessionId },
+          }).catch(() => {})
+        }
       }
 
       return { success: true }
