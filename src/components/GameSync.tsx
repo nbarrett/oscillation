@@ -3,10 +3,13 @@
 import { useEffect, useRef } from "react"
 import { trpc } from "@/lib/trpc/client"
 import { useGameStore, GameTurnState, Player } from "@/stores/game-store"
+import { useNotificationStore } from "@/stores/notification-store"
 
 export default function GameSync() {
-  const { sessionId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, leaveSession } = useGameStore()
+  const { sessionId, playerId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, leaveSession } = useGameStore()
+  const { addNotification } = useNotificationStore()
   const hasCheckedSession = useRef(false)
+  const previousPlayerNamesRef = useRef<string[]>([])
 
   const { data: gameState, isFetched } = trpc.game.state.useQuery(
     { sessionId: sessionId! },
@@ -25,6 +28,21 @@ export default function GameSync() {
 
   useEffect(() => {
     if (gameState) {
+      const currentPlayerNames = gameState.players.map(p => p.name)
+      const previousNames = previousPlayerNamesRef.current
+
+      // Detect new players (but only after initial load)
+      if (previousNames.length > 0) {
+        const myPlayer = gameState.players.find(p => p.id === playerId)
+        const newPlayers = currentPlayerNames.filter(
+          name => !previousNames.includes(name) && name !== myPlayer?.name
+        )
+        newPlayers.forEach(name => {
+          addNotification(`${name} joined the game`, "success")
+        })
+      }
+      previousPlayerNamesRef.current = currentPlayerNames
+
       const players: Player[] = gameState.players.map(p => {
         const localPlayer = localPlayers.find(lp => lp.name === p.name)
         if (localPlayer?.previousPosition) {
@@ -56,7 +74,7 @@ export default function GameSync() {
         setGameTurnState(GameTurnState.ROLL_DICE)
       }
     }
-  }, [gameState, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState])
+  }, [gameState, playerId, addNotification, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState])
 
   return null
 }

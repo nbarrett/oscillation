@@ -9,6 +9,7 @@ import { ThemeProvider } from "next-themes"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { SessionProvider } from "@/components/auth/session-provider"
 import { ErrorSnackbar } from "@/components/error-snackbar"
+import { NotificationBanner } from "@/components/notification-banner"
 import { useErrorStore } from "@/stores/error-store"
 import { TRPCClientError } from "@trpc/client"
 
@@ -64,6 +65,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           >
             <TooltipProvider>
               {children}
+              <NotificationBanner />
               <ErrorSnackbar />
             </TooltipProvider>
           </ThemeProvider>
