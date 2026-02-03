@@ -23,7 +23,7 @@ function gridReferenceDataFromLatLong(map: L.Map, latlng: L.LatLng): GridReferen
   const row = parseInt(eastings.substring(0, 1), 10);
   const column = parseInt(northings.substring(0, 1), 10);
   const gridCode = gridReferenceCodes[row]?.[column] || 'XX';
-  const gridReference = `${gridCode} ${eastings.substring(1, 5)} ${northings.substring(1, 5)}`;
+  const gridReference = `${gridCode} ${eastings.substring(1, 4)} ${northings.substring(1, 4)}`;
 
   return { eastings, northings, row, column, gridCode, gridReference };
 }
@@ -34,12 +34,12 @@ function calculateGridSquareCorners(gridReferenceData: GridReferenceData): GridS
   const eastings = parts[1];
   const northings = parts[2];
 
-  const eastingFloor = Math.floor(parseInt(eastings, 10) / 100) * 100;
-  const northingFloor = Math.floor(parseInt(northings, 10) / 100) * 100;
-  const eastingCeil = eastingFloor + 100;
-  const northingCeil = northingFloor + 100;
+  const eastingFloor = Math.floor(parseInt(eastings, 10) / 10) * 10;
+  const northingFloor = Math.floor(parseInt(northings, 10) / 10) * 10;
+  const eastingCeil = eastingFloor + 10;
+  const northingCeil = northingFloor + 10;
 
-  const pad = (n: number) => n.toString().padStart(4, '0');
+  const pad = (n: number) => n.toString().padStart(3, '0');
 
   return {
     northWest: `${gridReferenceData.gridCode} ${pad(eastingFloor)} ${pad(northingCeil)}`,
