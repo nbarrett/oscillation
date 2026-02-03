@@ -15,6 +15,7 @@ import RecordMapClick from "./RecordMapClick";
 import SelectGridSquares from "./SelectGridSquares";
 import MapContextMenu from "./MapContextMenu";
 import ClickPositionMarker from "./ClickPositionMarker";
+import GridOverlay from "./GridOverlay";
 
 function createBritishNationalGridCRS(): L.Proj.CRS | null {
   if (typeof window === "undefined") return null;
@@ -141,6 +142,7 @@ export default function MapWithCars() {
         <SelectGridSquares />
         <MapContextMenu />
         <ClickPositionMarker />
+        <GridOverlay />
       </MapContainer>
     </div>
   );
