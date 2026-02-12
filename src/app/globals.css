@@ -186,3 +186,34 @@
 .player-card-hover {
   @apply transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5;
 }
+
+/* 3D Car Icons */
+.car-3d-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+.car-3d-container {
+  pointer-events: auto;
+}
+
+.car-3d-container:hover {
+  transform: scale(1.15) !important;
+}
+
+.leaflet-marker-draggable .car-3d-container {
+  cursor: grab;
+}
+
+.leaflet-marker-draggable:active .car-3d-container {
+  cursor: grabbing;
+}
+
+.pub-marker-icon {
+  background: transparent !important;
+  border: none !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
