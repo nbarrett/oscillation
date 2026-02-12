@@ -31,6 +31,7 @@ const ProfileSelector = dynamic(() => import("@/components/ProfileSelector"), { 
 const MapLayerSelector = dynamic(() => import("@/components/MapLayerSelector"), { ssr: false })
 const MappingProviderSelector = dynamic(() => import("@/components/MappingProviderSelector"), { ssr: false })
 const StartingPositionSelector = dynamic(() => import("@/components/StartingPositionSelector"), { ssr: false })
+const PubIconSelector = dynamic(() => import("@/components/PubIconSelector"), { ssr: false })
 const MapPositions = dynamic(() => import("@/components/MapPositions"), { ssr: false })
 const JoinGame = dynamic(() => import("@/components/JoinGame"), { ssr: false })
 const GameSync = dynamic(() => import("@/components/GameSync"), { ssr: false })
@@ -192,11 +193,12 @@ export default function GamePage() {
             >
               <div className="overflow-hidden">
                 <div className="pt-4 pb-1 border-t">
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                     <ProfileSelector />
                     <MappingProviderSelector />
                     <MapLayerSelector />
                     <StartingPositionSelector />
+                    <PubIconSelector />
                   </div>
                 </div>
               </div>

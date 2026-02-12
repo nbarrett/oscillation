@@ -16,7 +16,7 @@ import { TRPCClientError } from "@trpc/client"
 function baseUrl() {
   if (typeof window !== "undefined") return ""
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
-  return `http://localhost:${process.env.PORT ?? 3000}`
+  return `http://localhost:${process.env.PORT ?? 3002}`
 }
 
 function handleTRPCError(error: unknown) {
