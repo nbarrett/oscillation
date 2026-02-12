@@ -1,17 +1,10 @@
-/**
- * Road data utilities for determining which grid squares contain A or B roads.
- * Uses OpenStreetMap Overpass API to query road classifications.
- *
- * UK Road Classifications in OSM:
- * - A roads: highway=trunk, highway=primary (pink on OS maps)
- * - B roads: highway=secondary (brown on OS maps)
- */
+import { log } from "@/lib/utils";
 
 export interface RoadSegment {
   id: number;
   type: 'A' | 'B';
-  ref?: string; // Road number like "A252" or "B2068"
-  coordinates: [number, number][]; // [lat, lng] pairs
+  ref?: string;
+  coordinates: [number, number][];
 }
 
 export interface RoadDataCache {
@@ -22,22 +15,18 @@ export interface RoadDataCache {
     east: number;
   };
   roads: RoadSegment[];
-  gridSquaresWithRoads: Set<string>; // Grid keys that contain A/B roads
+  gridSquaresWithRoads: Set<string>;
   timestamp: number;
 }
 
 let roadDataCache: RoadDataCache | null = null;
 
-/**
- * Query Overpass API for A and B roads in a bounding box
- */
 async function queryOverpassForRoads(
   south: number,
   west: number,
   north: number,
   east: number
 ): Promise<RoadSegment[]> {
-  // Overpass QL query for A roads (trunk, primary) and B roads (secondary)
   const query = `
     [out:json][timeout:25];
     (
@@ -64,7 +53,6 @@ async function queryOverpassForRoads(
 
   const data = await response.json();
 
-  // Build node lookup
   const nodes: Map<number, [number, number]> = new Map();
   for (const element of data.elements) {
     if (element.type === 'node') {
@@ -72,7 +60,6 @@ async function queryOverpassForRoads(
     }
   }
 
-  // Extract road segments
   const roads: RoadSegment[] = [];
   for (const element of data.elements) {
     if (element.type === 'way' && element.tags?.highway) {
@@ -109,13 +96,7 @@ async function queryOverpassForRoads(
   return roads;
 }
 
-/**
- * Convert lat/lng to OS grid key (100m grid)
- * This is a simplified conversion - for accuracy we'd need proj4
- */
 function latLngToGridKey(lat: number, lng: number): string {
-  // Approximate conversion from WGS84 to British National Grid
-  // This is a simplified formula - good enough for 100m grid squares
   const lat0 = 49.0;
   const lng0 = -2.0;
   const k0 = 0.9996012717;
@@ -126,27 +107,21 @@ function latLngToGridKey(lat: number, lng: number): string {
   const lngRad = (lng * Math.PI) / 180;
   const lng0Rad = (lng0 * Math.PI) / 180;
 
-  // Simplified transverse mercator (good for UK)
-  const a = 6377563.396; // Airy 1830 semi-major axis
+  const a = 6377563.396;
   const n = (a - 6356256.909) / (a + 6356256.909);
 
   const latDiff = lat - lat0;
   const lngDiff = lng - lng0;
 
-  // Very simplified approximation for UK
   const easting = e0 + lngDiff * 111320 * Math.cos(latRad) * k0;
   const northing = n0 + latDiff * 110540 * k0;
 
-  // Round to 100m grid
   const e = Math.floor(easting / 100) * 100;
   const n2 = Math.floor(northing / 100) * 100;
 
   return `${e}-${n2}`;
 }
 
-/**
- * Check if a line segment intersects with a grid square
- */
 function lineIntersectsGrid(
   lat1: number,
   lng1: number,
@@ -154,8 +129,7 @@ function lineIntersectsGrid(
   lng2: number,
   gridKey: string
 ): boolean {
-  // Get all grid keys along the line segment
-  const steps = 10; // Check 10 points along the segment
+  const steps = 10;
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
     const lat = lat1 + t * (lat2 - lat1);
@@ -168,25 +142,19 @@ function lineIntersectsGrid(
   return false;
 }
 
-/**
- * Determine which grid squares contain A/B roads
- */
 function calculateGridSquaresWithRoads(roads: RoadSegment[]): Set<string> {
   const gridSquares = new Set<string>();
 
   for (const road of roads) {
-    // Add grid key for each coordinate
     for (const [lat, lng] of road.coordinates) {
       const gridKey = latLngToGridKey(lat, lng);
       gridSquares.add(gridKey);
     }
 
-    // Also check points along road segments
     for (let i = 0; i < road.coordinates.length - 1; i++) {
       const [lat1, lng1] = road.coordinates[i];
       const [lat2, lng2] = road.coordinates[i + 1];
 
-      // Sample points along the segment
       const steps = Math.ceil(
         Math.sqrt(Math.pow(lat2 - lat1, 2) + Math.pow(lng2 - lng1, 2)) * 1000
       );
@@ -203,16 +171,12 @@ function calculateGridSquaresWithRoads(roads: RoadSegment[]): Set<string> {
   return gridSquares;
 }
 
-/**
- * Load road data for an area around a position
- */
 export async function loadRoadData(
   centerLat: number,
   centerLng: number,
   radiusKm: number = 5
 ): Promise<void> {
-  // Calculate bounding box
-  const latDelta = radiusKm / 111; // ~111km per degree latitude
+  const latDelta = radiusKm / 111;
   const lngDelta = radiusKm / (111 * Math.cos((centerLat * Math.PI) / 180));
 
   const south = centerLat - latDelta;
@@ -220,7 +184,6 @@ export async function loadRoadData(
   const west = centerLng - lngDelta;
   const east = centerLng + lngDelta;
 
-  // Check if we already have data for this area
   if (roadDataCache) {
     const { bounds } = roadDataCache;
     if (
@@ -228,13 +191,13 @@ export async function loadRoadData(
       north <= bounds.north &&
       west >= bounds.west &&
       east <= bounds.east &&
-      Date.now() - roadDataCache.timestamp < 30 * 60 * 1000 // 30 min cache
+      Date.now() - roadDataCache.timestamp < 30 * 60 * 1000
     ) {
-      return; // Already have data
+      return;
     }
   }
 
-  console.log('Loading road data for area:', { south, west, north, east });
+  log.info("Loading road data for area:", { south, west, north, east });
 
   try {
     const roads = await queryOverpassForRoads(south, west, north, east);
@@ -247,50 +210,64 @@ export async function loadRoadData(
       timestamp: Date.now(),
     };
 
-    console.log(
+    log.info(
       `Loaded ${roads.length} road segments, ${gridSquaresWithRoads.size} grid squares with roads`
     );
   } catch (error) {
-    console.error('Failed to load road data:', error);
+    log.error("Failed to load road data:", error);
   }
 }
 
-/**
- * Check if a grid square contains an A or B road
- */
 export function gridHasRoad(gridKey: string): boolean {
   if (!roadDataCache) {
-    // No data loaded yet - allow all moves
     return true;
   }
   return roadDataCache.gridSquaresWithRoads.has(gridKey);
 }
 
-/**
- * Get all grid keys that have roads and are adjacent to the given key
- */
 export function getAdjacentRoadGrids(gridKey: string): string[] {
   const [e, n] = gridKey.split('-').map(Number);
   const adjacent = [
-    `${e}-${n + 100}`, // North
-    `${e}-${n - 100}`, // South
-    `${e + 100}-${n}`, // East
-    `${e - 100}-${n}`, // West
+    `${e}-${n + 100}`,
+    `${e}-${n - 100}`,
+    `${e + 100}-${n}`,
+    `${e - 100}-${n}`,
   ];
 
   return adjacent.filter((key) => gridHasRoad(key));
 }
 
-/**
- * Check if road data is loaded
- */
+export function reachableRoadGrids(
+  startGridKey: string,
+  maxSteps: number,
+  excludeKeys: Set<string> = new Set()
+): Map<string, number> {
+  const visited = new Map<string, number>();
+  if (!isRoadDataLoaded() || !gridHasRoad(startGridKey)) return visited;
+
+  const queue: Array<{ key: string; depth: number }> = [{ key: startGridKey, depth: 0 }];
+  visited.set(startGridKey, 0);
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (current.depth >= maxSteps) continue;
+
+    const neighbors = getAdjacentRoadGrids(current.key);
+    for (const neighbor of neighbors) {
+      if (visited.has(neighbor) || excludeKeys.has(neighbor)) continue;
+      visited.set(neighbor, current.depth + 1);
+      queue.push({ key: neighbor, depth: current.depth + 1 });
+    }
+  }
+
+  visited.delete(startGridKey);
+  return visited;
+}
+
 export function isRoadDataLoaded(): boolean {
   return roadDataCache !== null;
 }
 
-/**
- * Get road data cache for debugging
- */
 export function getRoadDataCache(): RoadDataCache | null {
   return roadDataCache;
 }

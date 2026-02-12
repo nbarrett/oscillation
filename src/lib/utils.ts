@@ -34,6 +34,9 @@ export const colours = {
   redCar: 'rgb(238 25 29)',
   osMapsPurple: '#453c90',
   osMapsPink: '#d40058',
+  immediateMove: "#4CAF50",
+  reachableMove: "#81C784",
+  playerStart: "#2196F3",
 };
 
 const isDev = process.env.NODE_ENV === "development";
