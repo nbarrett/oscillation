@@ -43,7 +43,7 @@ export default function CarIconSelector() {
         <div className="flex items-center gap-3">
           <Slider
             value={[carSize]}
-            onValueChange={([value]) => setCarSize(value)}
+            onValueChange={([value]: number[]) => setCarSize(value)}
             min={CAR_SIZE_MIN}
             max={CAR_SIZE_MAX}
             step={10}

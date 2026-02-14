@@ -34,7 +34,7 @@ export const phonesRouter = createTRPCRouter({
           lng: el.lon ?? el.center?.lon,
           name: el.tags?.name ?? el.tags?.description ?? "Telephone",
         }))
-        .filter((el): el is { id: number; lat: number; lng: number; name: string | null } =>
+        .filter((el): el is { id: number; lat: number; lng: number; name: string } =>
           el.lat != null && el.lng != null
         );
 

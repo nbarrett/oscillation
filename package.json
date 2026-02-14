@@ -40,7 +40,7 @@
     "loglevel": "^1.8.1",
     "lucide-react": "^0.563.0",
     "luxon": "^3.4.4",
-    "next": "^14.2.5",
+    "next": "14.2.35",
     "next-auth": "5.0.0-beta.30",
     "next-themes": "^0.4.6",
     "prisma": "^5.22.0",
