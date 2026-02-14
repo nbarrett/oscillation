@@ -9,6 +9,7 @@ import {
   GameTurnState,
   createGridKey,
   getAdjacentGridKeys,
+  occupiedGridKeys,
 } from '@/stores/game-store';
 import { loadRoadData, isRoadDataLoaded, reachableRoadGrids } from "@/lib/road-data";
 import { colours, log } from '@/lib/utils';
@@ -59,6 +60,8 @@ export default function ValidMoveHighlights() {
     playerStartGridKey,
     selectedGridSquares,
     setPlayerStartGridKey,
+    players,
+    currentPlayerName,
   } = useGameStore();
 
   useEffect(() => {
@@ -125,18 +128,35 @@ export default function ValidMoveHighlights() {
     if (movesRemaining <= 0) return;
 
     const selectedKeys = new Set(selectedGridSquares.map((g) => g.gridKey));
-    const excludeKeys = new Set(selectedKeys);
+    const occupied = occupiedGridKeys(players, currentPlayerName ?? "");
+    const excludeKeys = new Set([...selectedKeys, ...occupied]);
     if (playerStartGridKey) excludeKeys.add(playerStartGridKey);
 
     if (isRoadDataLoaded()) {
       const reachable = reachableRoadGrids(referenceGridKey, movesRemaining, excludeKeys);
 
       reachable.forEach((distance, gridKey) => {
+        const isExactEndpoint = distance === movesRemaining;
         const isImmediate = distance === 1;
-        const color = isImmediate ? colours.immediateMove : colours.reachableMove;
-        const fillOpacity = isImmediate ? 0.15 : 0.08;
-        const weight = isImmediate ? 2 : 1;
-        const dashArray = isImmediate ? "5, 5" : "3, 7";
+
+        if (!isExactEndpoint && !isImmediate) return;
+
+        let color: string;
+        let fillOpacity: number;
+        let weight: number;
+        let dashArray: string;
+
+        if (isExactEndpoint) {
+          color = colours.exactEndpoint;
+          fillOpacity = 0.25;
+          weight = 3;
+          dashArray = "";
+        } else {
+          color = colours.immediateMove;
+          fillOpacity = 0.1;
+          weight = 1;
+          dashArray = "3, 7";
+        }
 
         const polygon = createGridPolygon(map, gridKey, color, fillOpacity, "valid-move-highlight");
         if (polygon) {
@@ -146,7 +166,7 @@ export default function ValidMoveHighlights() {
       });
     } else {
       const adjacentKeys = getAdjacentGridKeys(referenceGridKey);
-      const validMoveKeys = adjacentKeys.filter((key) => !selectedKeys.has(key) && key !== playerStartGridKey);
+      const validMoveKeys = adjacentKeys.filter((key) => !selectedKeys.has(key) && !occupied.has(key) && key !== playerStartGridKey);
 
       validMoveKeys.forEach((gridKey) => {
         const polygon = createGridPolygon(map, gridKey, colours.immediateMove, 0.15, "valid-move-highlight");
@@ -160,7 +180,7 @@ export default function ValidMoveHighlights() {
     if (roadDataLoading) {
       log.debug("Road data still loading...");
     }
-  }, [map, gameTurnState, diceResult, movementPath, playerStartGridKey, selectedGridSquares, roadDataReady, roadDataLoading]);
+  }, [map, gameTurnState, diceResult, movementPath, playerStartGridKey, selectedGridSquares, roadDataReady, roadDataLoading, players, currentPlayerName]);
 
   useEffect(() => {
     return () => {
