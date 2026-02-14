@@ -207,6 +207,8 @@ export const gameRouter = createTRPCRouter({
     .input(z.object({
       sessionId: z.string(),
       playerId: z.string(),
+      newLat: z.number().optional(),
+      newLng: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const session = await ctx.db.gameSession.findUnique({
@@ -221,6 +223,16 @@ export const gameRouter = createTRPCRouter({
       const currentPlayer = session.players[session.currentTurn]
       if (currentPlayer?.id !== input.playerId) {
         throw new Error("It's not your turn!")
+      }
+
+      if (input.newLat != null && input.newLng != null) {
+        await ctx.db.gamePlayer.update({
+          where: { id: input.playerId },
+          data: {
+            positionLat: input.newLat,
+            positionLng: input.newLng,
+          },
+        })
       }
 
       const nextTurn = (session.currentTurn + 1) % session.players.length

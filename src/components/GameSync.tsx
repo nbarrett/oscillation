@@ -6,7 +6,7 @@ import { useGameStore, GameTurnState, Player } from "@/stores/game-store"
 import { useNotificationStore } from "@/stores/notification-store"
 
 export default function GameSync() {
-  const { sessionId, playerId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, leaveSession } = useGameStore()
+  const { sessionId, playerId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName, leaveSession } = useGameStore()
   const { addNotification } = useNotificationStore()
   const hasCheckedSession = useRef(false)
   const previousPlayerNamesRef = useRef<string[]>([])
@@ -31,7 +31,6 @@ export default function GameSync() {
       const currentPlayerNames = gameState.players.map(p => p.name)
       const previousNames = previousPlayerNamesRef.current
 
-      // Detect new players (but only after initial load)
       if (previousNames.length > 0) {
         const myPlayer = gameState.players.find(p => p.id === playerId)
         const newPlayers = currentPlayerNames.filter(
@@ -63,19 +62,36 @@ export default function GameSync() {
 
       setPlayers(players)
 
-      const currentPlayer = gameState.players[gameState.currentTurn]
-      if (currentPlayer) {
-        setCurrentPlayer(currentPlayer.name)
+      const myPlayer = gameState.players.find(p => p.id === playerId)
+      if (myPlayer) {
+        setLocalPlayerName(myPlayer.name)
       }
 
-      if (gameState.dice1 !== null && gameState.dice2 !== null) {
-        setDiceResult(gameState.dice1 + gameState.dice2)
-        setGameTurnState(GameTurnState.DICE_ROLLED)
-      } else {
-        setGameTurnState(GameTurnState.ROLL_DICE)
+      const { pendingServerUpdate } = useGameStore.getState()
+      if (!pendingServerUpdate) {
+        const serverCurrentPlayer = gameState.players[gameState.currentTurn]
+        const localState = useGameStore.getState()
+        const turnChanged = serverCurrentPlayer && serverCurrentPlayer.name !== localState.currentPlayerName
+
+        if (turnChanged) {
+          localState.clearGridSelections()
+          localState.setPlayerStartGridKey(null)
+        }
+
+        if (serverCurrentPlayer) {
+          setCurrentPlayer(serverCurrentPlayer.name)
+        }
+
+        if (gameState.dice1 !== null && gameState.dice2 !== null) {
+          setDiceResult(gameState.dice1 + gameState.dice2)
+          setGameTurnState(GameTurnState.DICE_ROLLED)
+        } else if (turnChanged || !localState.diceResult) {
+          setDiceResult(null)
+          setGameTurnState(GameTurnState.ROLL_DICE)
+        }
       }
     }
-  }, [gameState, playerId, addNotification, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState])
+  }, [gameState, playerId, addNotification, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName])
 
   return null
 }

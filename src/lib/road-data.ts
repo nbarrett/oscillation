@@ -162,7 +162,7 @@ async function queryOverpassForRoads(
 
 export function gridKeyToLatLng(gridKey: string): [number, number] {
   const [e, n] = gridKey.split("-").map(Number);
-  const [lng, lat] = proj4(BNG, "EPSG:4326", [e + 50, n + 50]);
+  const [lng, lat] = proj4(BNG, "EPSG:4326", [e + 500, n + 500]);
   const snapped = nearestRoadPosition(lat, lng);
   return snapped ?? [lat, lng];
 }
@@ -190,8 +190,8 @@ export function nearestRoadPosition(lat: number, lng: number): [number, number] 
 
 export function latLngToGridKey(lat: number, lng: number): string {
   const [easting, northing] = proj4("EPSG:4326", BNG, [lng, lat]);
-  const e = Math.floor(easting / 100) * 100;
-  const n = Math.floor(northing / 100) * 100;
+  const e = Math.floor(easting / 1000) * 1000;
+  const n = Math.floor(northing / 1000) * 1000;
   return `${e}-${n}`;
 }
 
@@ -305,24 +305,24 @@ export function gridHasRoad(gridKey: string): boolean {
 }
 
 export function getAdjacentRoadGrids(gridKey: string): string[] {
-  const [e, n] = gridKey.split('-').map(Number);
+  const [e, n] = gridKey.split("-").map(Number);
   const adjacent = [
-    `${e}-${n + 100}`,
-    `${e}-${n - 100}`,
-    `${e + 100}-${n}`,
-    `${e - 100}-${n}`,
+    `${e}-${n + 1000}`,
+    `${e}-${n - 1000}`,
+    `${e + 1000}-${n}`,
+    `${e - 1000}-${n}`,
   ];
-
-  return adjacent.filter((key) => gridHasRoad(key));
+  const roadNeighbors = adjacent.filter((key) => gridHasRoad(key));
+  return roadNeighbors.length > 0 ? roadNeighbors : adjacent;
 }
 
 function allAdjacentGrids(gridKey: string): string[] {
   const [e, n] = gridKey.split("-").map(Number);
   return [
-    `${e}-${n + 100}`,
-    `${e}-${n - 100}`,
-    `${e + 100}-${n}`,
-    `${e - 100}-${n}`,
+    `${e}-${n + 1000}`,
+    `${e}-${n - 1000}`,
+    `${e + 1000}-${n}`,
+    `${e - 1000}-${n}`,
   ];
 }
 
