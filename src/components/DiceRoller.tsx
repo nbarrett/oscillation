@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Dices, CheckCircle2, LocateFixed } from "lucide-react"
 import { GameTurnState, useCurrentPlayer, useGameStore } from "@/stores/game-store"
+import { gridKeyToLatLng } from "@/lib/road-data"
 import { trpc } from "@/lib/trpc/client"
 import { Button } from "@/components/ui/button"
 import { DiceDisplay } from "@/components/ui/dice"
@@ -33,6 +34,7 @@ export default function DiceRoller() {
   const playerName = player?.name || ""
 
   const rollDiceMutation = trpc.game.rollDice.useMutation()
+  const updatePositionMutation = trpc.game.updatePosition.useMutation()
   const endTurnMutation = trpc.game.endTurn.useMutation()
 
   useEffect(() => {
@@ -66,6 +68,19 @@ export default function DiceRoller() {
   }
 
   function handleEndTurnClick() {
+    const { movementPath } = useGameStore.getState()
+
+    if (sessionId && playerId && movementPath.length > 0) {
+      const lastGridKey = movementPath[movementPath.length - 1]
+      const destination = gridKeyToLatLng(lastGridKey)
+      updatePositionMutation.mutate({
+        sessionId,
+        playerId,
+        lat: destination[0],
+        lng: destination[1],
+      })
+    }
+
     handleEndTurn()
     if (sessionId && playerId) {
       endTurnMutation.mutate({ sessionId, playerId })
