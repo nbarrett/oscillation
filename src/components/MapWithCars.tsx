@@ -32,7 +32,7 @@ function createBritishNationalGridCRS(): L.Proj.CRS | null {
 }
 
 export default function MapWithCars() {
-  const { players, mapZoom, mapCentre, setMapZoom, playerZoomRequest } = useGameStore();
+  const { players, mapZoom, mapCentre, setMapZoom, playerZoomRequest, setPlayerZoomRequest } = useGameStore();
   const { accessToken, mapLayer, mappingProvider } = useMapStore();
   const { startingPosition } = useRouteStore();
 
@@ -69,9 +69,10 @@ export default function MapWithCars() {
   useEffect(() => {
     if (playerToZoom && map) {
       log.debug("zooming to player:", playerToZoom.name, "position:", playerToZoom.position);
-      map.flyTo(playerToZoom.position);
+      map.flyTo(playerToZoom.position, 9);
+      setPlayerZoomRequest(null);
     }
-  }, [playerToZoom, map]);
+  }, [playerToZoom, map, setPlayerZoomRequest]);
 
 
   useEffect(() => {

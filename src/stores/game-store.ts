@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { log } from "@/lib/utils";
-import { latLngToGridKey, gridKeyToLatLng, gridHasRoad, isRoadDataLoaded, nearestRoadPosition } from "@/lib/road-data";
+import { latLngToGridKey, gridKeyToLatLng, nearestRoadPosition } from "@/lib/road-data";
 
 export enum GameTurnState {
   ROLL_DICE = "ROLL_DICE",
@@ -45,19 +45,9 @@ export interface SelectedGrid {
 }
 
 export function createGridKey(eastings: string, northings: string): string {
-  const e = Math.floor(parseInt(eastings, 10) / 100) * 100;
-  const n = Math.floor(parseInt(northings, 10) / 100) * 100;
+  const e = Math.floor(parseInt(eastings, 10) / 1000) * 1000;
+  const n = Math.floor(parseInt(northings, 10) / 1000) * 1000;
   return `${e}-${n}`;
-}
-
-export function areGridsAdjacent(key1: string, key2: string): boolean {
-  const [e1, n1] = key1.split("-").map(Number);
-  const [e2, n2] = key2.split("-").map(Number);
-
-  const eDiff = Math.abs(e1 - e2);
-  const nDiff = Math.abs(n1 - n2);
-
-  return (eDiff === 100 && nDiff === 0) || (eDiff === 0 && nDiff === 100);
 }
 
 export function occupiedGridKeys(players: Player[], excludePlayerName: string): Set<string> {
@@ -73,10 +63,10 @@ export function occupiedGridKeys(players: Player[], excludePlayerName: string): 
 export function getAdjacentGridKeys(gridKey: string): string[] {
   const [e, n] = gridKey.split("-").map(Number);
   return [
-    `${e}-${n + 100}`,
-    `${e}-${n - 100}`,
-    `${e + 100}-${n}`,
-    `${e - 100}-${n}`,
+    `${e}-${n + 1000}`,
+    `${e}-${n - 1000}`,
+    `${e + 1000}-${n}`,
+    `${e - 1000}-${n}`,
   ];
 }
 
@@ -96,11 +86,13 @@ interface GameState {
   sessionId: string | null;
   playerId: string | null;
   sessionCode: string | null;
+  localPlayerName: string | null;
+  pendingServerUpdate: boolean;
 
   setPlayers: (players: Player[]) => void;
   setGameTurnState: (state: GameTurnState) => void;
   setCurrentPlayer: (name: string) => void;
-  setDiceResult: (result: number) => void;
+  setDiceResult: (result: number | null) => void;
   setMapCentre: (centre: [number, number]) => void;
   setMapClickPosition: (position: MapClickPosition | null) => void;
   setMapZoom: (zoom: number) => void;
@@ -124,6 +116,8 @@ interface GameState {
   setSessionId: (sessionId: string | null) => void;
   setPlayerId: (playerId: string | null) => void;
   setSessionCode: (code: string | null) => void;
+  setLocalPlayerName: (name: string | null) => void;
+  setPendingServerUpdate: (pending: boolean) => void;
   leaveSession: () => void;
 }
 
@@ -147,6 +141,8 @@ export const useGameStore = create<GameState>()(
       sessionId: null,
       playerId: null,
       sessionCode: null,
+      localPlayerName: null,
+      pendingServerUpdate: false,
 
       setPlayers: (players) => set({ players }),
 
@@ -194,18 +190,13 @@ export const useGameStore = create<GameState>()(
         if (!state.diceResult) return false;
         if (state.movementPath.length >= state.diceResult) return false;
         if (state.movementPath.includes(gridKey)) return false;
+
         const occupied = occupiedGridKeys(state.players, state.currentPlayerName ?? "");
         if (occupied.has(gridKey)) return false;
 
-        const lastKey = state.movementPath.length > 0
-          ? state.movementPath[state.movementPath.length - 1]
-          : state.playerStartGridKey;
-        if (!lastKey) return false;
+        if (gridKey === state.playerStartGridKey) return false;
 
-        const currentlyOnRoad = gridHasRoad(lastKey);
-        if (isRoadDataLoaded() && currentlyOnRoad && !gridHasRoad(gridKey)) return false;
-
-        return areGridsAdjacent(gridKey, lastKey);
+        return true;
       },
 
       getLastPathGridKey: () => {
@@ -262,6 +253,7 @@ export const useGameStore = create<GameState>()(
           diceResult: result,
           gameTurnState: GameTurnState.DICE_ROLLED,
           playerStartGridKey: startGridKey,
+          playerZoomRequest: state.currentPlayerName,
         };
 
         if (snapped) {
@@ -345,10 +337,15 @@ export const useGameStore = create<GameState>()(
 
       setSessionCode: (sessionCode) => set({ sessionCode }),
 
+      setLocalPlayerName: (localPlayerName) => set({ localPlayerName }),
+
+      setPendingServerUpdate: (pendingServerUpdate) => set({ pendingServerUpdate }),
+
       leaveSession: () => set({
         sessionId: null,
         playerId: null,
         sessionCode: null,
+        localPlayerName: null,
         players: [],
         currentPlayerName: null,
         gameTurnState: GameTurnState.ROLL_DICE,
@@ -362,6 +359,7 @@ export const useGameStore = create<GameState>()(
         sessionId: state.sessionId,
         playerId: state.playerId,
         sessionCode: state.sessionCode,
+        localPlayerName: state.localPlayerName,
       }),
     }
   )

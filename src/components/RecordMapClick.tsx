@@ -60,7 +60,7 @@ export default function RecordMapClick() {
     }
 
     const handleClick = (e: L.LeafletMouseEvent) => {
-      log.debug('you clicked map at position', formatLatLong({ lat: e.latlng.lat, lng: e.latlng.lng }));
+      log.info("MAP CLICK at", formatLatLong({ lat: e.latlng.lat, lng: e.latlng.lng }));
       const gridReferenceData = gridReferenceDataFromLatLong(map, e.latlng);
       const gridSquareCorners = calculateGridSquareCorners(gridReferenceData);
       setMapClickPosition({

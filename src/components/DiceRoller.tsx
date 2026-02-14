@@ -23,6 +23,8 @@ export default function DiceRoller() {
     currentPlayerName,
     diceResult,
     movementPath,
+    localPlayerName,
+    setPendingServerUpdate,
   } = useGameStore()
 
   const [isRolling, setRolling] = useState(false)
@@ -32,13 +34,14 @@ export default function DiceRoller() {
   const [dice2Value, setDice2Value] = useState(1)
   const total = dice1Value + dice2Value
   const playerName = player?.name || ""
+  const isMyTurn = localPlayerName !== null && localPlayerName === currentPlayerName
 
   const rollDiceMutation = trpc.game.rollDice.useMutation()
-  const updatePositionMutation = trpc.game.updatePosition.useMutation()
   const endTurnMutation = trpc.game.endTurn.useMutation()
 
   useEffect(() => {
     if (hasSettled && !isRolling) {
+      setPendingServerUpdate(true)
       handleDiceRoll(total)
       if (sessionId && playerId) {
         rollDiceMutation.mutate({
@@ -46,11 +49,15 @@ export default function DiceRoller() {
           playerId,
           dice1: dice1Value,
           dice2: dice2Value,
+        }, {
+          onSettled: () => setPendingServerUpdate(false),
         })
+      } else {
+        setPendingServerUpdate(false)
       }
       setHasSettled(false)
     }
-  }, [hasSettled, isRolling, total, handleDiceRoll, sessionId, playerId, dice1Value, dice2Value, rollDiceMutation])
+  }, [hasSettled, isRolling, total, handleDiceRoll, sessionId, playerId, dice1Value, dice2Value, rollDiceMutation, setPendingServerUpdate])
 
   function rollDice() {
     if (!isRolling) {
@@ -68,22 +75,22 @@ export default function DiceRoller() {
   }
 
   function handleEndTurnClick() {
-    const { movementPath } = useGameStore.getState()
-
-    if (sessionId && playerId && movementPath.length > 0) {
-      const lastGridKey = movementPath[movementPath.length - 1]
-      const destination = gridKeyToLatLng(lastGridKey)
-      updatePositionMutation.mutate({
-        sessionId,
-        playerId,
-        lat: destination[0],
-        lng: destination[1],
-      })
-    }
-
+    const destination = movementPath.length > 0
+      ? gridKeyToLatLng(movementPath[movementPath.length - 1])
+      : null;
+    setPendingServerUpdate(true)
     handleEndTurn()
     if (sessionId && playerId) {
-      endTurnMutation.mutate({ sessionId, playerId })
+      endTurnMutation.mutate({
+        sessionId,
+        playerId,
+        newLat: destination?.[0],
+        newLng: destination?.[1],
+      }, {
+        onSettled: () => setPendingServerUpdate(false),
+      })
+    } else {
+      setPendingServerUpdate(false)
     }
   }
 
@@ -127,7 +134,7 @@ export default function DiceRoller() {
         <Button
           className="flex-1 sm:flex-none gap-2"
           onClick={rollDice}
-          disabled={isRolling || gameTurnState !== GameTurnState.ROLL_DICE}
+          disabled={isRolling || !isMyTurn || gameTurnState !== GameTurnState.ROLL_DICE}
         >
           <Dices className="h-4 w-4" />
           {isRolling ? "Rolling..." : "Roll Dice"}
@@ -136,7 +143,7 @@ export default function DiceRoller() {
           className="flex-1 sm:flex-none gap-2"
           variant="secondary"
           onClick={handleEndTurnClick}
-          disabled={gameTurnState !== GameTurnState.DICE_ROLLED}
+          disabled={!isMyTurn || gameTurnState !== GameTurnState.DICE_ROLLED}
         >
           <CheckCircle2 className="h-4 w-4" />
           End Turn

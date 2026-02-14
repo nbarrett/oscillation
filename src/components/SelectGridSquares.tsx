@@ -3,13 +3,10 @@
 import { useEffect } from "react";
 import { useMap } from "react-leaflet";
 import L from "leaflet";
-import {
-  useGameStore,
-  GridReferenceData,
-  GridSquareCorners,
-} from "@/stores/game-store";
+import { useGameStore } from "@/stores/game-store";
 import { latLngToGridKey } from "@/lib/road-data";
-import { colours, log } from "@/lib/utils";
+import { gridKeyToLatLngs } from "@/lib/grid-polygon";
+import { colours } from "@/lib/utils";
 
 class IdentifiedPolygon extends L.Polygon {
   firstLatLong: L.LatLng;
@@ -24,36 +21,6 @@ class IdentifiedPolygon extends L.Polygon {
 
 function isIdentifiedPolygon(layer: L.Layer): layer is IdentifiedPolygon {
   return (layer as IdentifiedPolygon).firstLatLong !== undefined;
-}
-
-function transformGridReference(
-  cornerGridReference: string,
-  gridReferenceData: GridReferenceData,
-  map: L.Map
-): { cornerLatLng: L.LatLng | null } {
-  try {
-    const parts = cornerGridReference.split(" ");
-    const cornerEasting = parseInt(`${gridReferenceData.row}${parts[1]}`.padEnd(gridReferenceData.eastings.length, "0"), 10);
-    const cornerNorthing = parseInt(`${gridReferenceData.column}${parts[2]}`.padEnd(gridReferenceData.northings.length, "0"), 10);
-
-    const cornerPoint = new L.Point(cornerEasting, cornerNorthing);
-    const cornerLatLng = map.options.crs!.unproject(cornerPoint);
-    return { cornerLatLng };
-  } catch (e) {
-    log.error("Failed to transform grid reference:", e);
-    return { cornerLatLng: null };
-  }
-}
-
-function calculateGridReferenceSquare(
-  map: L.Map,
-  gridReferenceData: GridReferenceData,
-  gridSquareCorners: GridSquareCorners
-): L.LatLng[] {
-  const corners = Object.values(gridSquareCorners);
-  return corners
-    .map((corner) => transformGridReference(corner, gridReferenceData, map).cornerLatLng)
-    .filter((latLng): latLng is L.LatLng => latLng !== null);
 }
 
 export default function SelectGridSquares() {
@@ -113,14 +80,7 @@ export default function SelectGridSquares() {
       mapClickPosition.latLng.lng
     );
 
-    const gridSquareLatLongs = calculateGridReferenceSquare(
-      map,
-      mapClickPosition.gridReferenceData,
-      mapClickPosition.gridSquareCorners
-    );
-
-    if (gridSquareLatLongs.length === 0) return;
-
+    const gridSquareLatLongs = gridKeyToLatLngs(map, gridKey);
     const existingIndex = findExistingGridSquareIndex(gridKey);
 
     if (existingIndex !== -1) {
