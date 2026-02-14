@@ -146,7 +146,37 @@ The game is built with the [T3 Stack](https://create.t3.gg/):
 - pnpm 9+
 - PostgreSQL (or use Neon free tier)
 
-### Setup
+### Quick Start
+
+The easiest way to get the dev server running is with the provided scripts:
+
+```bash
+# macOS / Linux
+./run-dev.sh
+
+# Windows (PowerShell)
+.\run-dev.ps1
+
+# Windows (Command Prompt)
+run-dev.bat
+```
+
+These scripts handle Node.js version checks, dependency installation, Prisma client generation, schema push, and starting the dev server on port 3002.
+
+To stop all dev processes:
+
+```bash
+# macOS / Linux
+./kill-dev.sh
+
+# Windows (PowerShell)
+.\kill-dev.ps1
+
+# Windows (Command Prompt)
+kill-dev.bat
+```
+
+### Manual Setup
 
 ```bash
 # Install dependencies
@@ -158,6 +188,9 @@ cp .env.example .env
 
 # Generate Prisma client
 pnpm run db:generate
+
+# Push schema to database
+pnpm run db:push
 
 # Run development server
 pnpm run dev

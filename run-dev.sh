@@ -78,7 +78,7 @@ ensure_pnpm() {
 
 ensure_env_file() {
   if [ ! -f "$ROOT_DIR/.env" ]; then
-    fail "Missing $ROOT_DIR/.env. Copy .env.example and populate DATABASE_URL and AUTH_SECRET before running."
+    fail "Missing $ROOT_DIR/.env. Copy .env.example and populate DATABASE_URL and OS_MAPS_API_KEY before running."
   fi
 }
 
@@ -126,7 +126,7 @@ install_deps() {
 
 push_schema() {
   pushd "$ROOT_DIR" >/dev/null
-  info "Pushing schema to MongoDB..."
+  info "Pushing schema to PostgreSQL..."
   pnpm exec prisma db push
   popd >/dev/null
 }
@@ -172,7 +172,7 @@ main() {
   start_dev
 
   trap cleanup EXIT INT TERM
-  info "Klaserie Camps dev server -> http://localhost:${DEV_PORT:-3002}"
+  info "Oscillation dev server -> http://localhost:${DEV_PORT:-3002}"
   info "Press Ctrl+C to stop."
   wait
 }
