@@ -1,17 +1,15 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { useMap } from 'react-leaflet';
-import L from 'leaflet';
-import { isEqual } from "es-toolkit/compat";
+import { useEffect } from "react";
+import { useMap } from "react-leaflet";
+import L from "leaflet";
 import {
   useGameStore,
   GridReferenceData,
   GridSquareCorners,
-  SelectedGrid,
-  createGridKey,
-} from '@/stores/game-store';
-import { colours, log } from '@/lib/utils';
+} from "@/stores/game-store";
+import { latLngToGridKey } from "@/lib/road-data";
+import { colours, log } from "@/lib/utils";
 
 class IdentifiedPolygon extends L.Polygon {
   firstLatLong: L.LatLng;
@@ -34,15 +32,15 @@ function transformGridReference(
   map: L.Map
 ): { cornerLatLng: L.LatLng | null } {
   try {
-    const parts = cornerGridReference.split(' ');
-    const cornerEasting = parseInt(`${gridReferenceData.row}${parts[1]}`.padEnd(gridReferenceData.eastings.length, '0'), 10);
-    const cornerNorthing = parseInt(`${gridReferenceData.column}${parts[2]}`.padEnd(gridReferenceData.northings.length, '0'), 10);
+    const parts = cornerGridReference.split(" ");
+    const cornerEasting = parseInt(`${gridReferenceData.row}${parts[1]}`.padEnd(gridReferenceData.eastings.length, "0"), 10);
+    const cornerNorthing = parseInt(`${gridReferenceData.column}${parts[2]}`.padEnd(gridReferenceData.northings.length, "0"), 10);
 
     const cornerPoint = new L.Point(cornerEasting, cornerNorthing);
     const cornerLatLng = map.options.crs!.unproject(cornerPoint);
     return { cornerLatLng };
   } catch (e) {
-    log.error('failed to transform grid reference:', e);
+    log.error("Failed to transform grid reference:", e);
     return { cornerLatLng: null };
   }
 }
@@ -63,7 +61,6 @@ export default function SelectGridSquares() {
   const {
     mapClickPosition,
     selectedGridSquares,
-    diceResult,
     gridClearRequest,
     movementPath,
     setSelectedGridSquares,
@@ -80,16 +77,11 @@ export default function SelectGridSquares() {
   }
 
   function deselectGridSquare(gridKey: string, existingIndex: number) {
-    // Only allow deselecting from the end of the path
     const pathIndex = movementPath.indexOf(gridKey);
-    if (pathIndex !== movementPath.length - 1) {
-      log.info("Cannot deselect grid that's not at the end of the path");
-      return;
-    }
+    if (pathIndex !== movementPath.length - 1) return;
 
     map.eachLayer((layer) => {
       if (isIdentifiedPolygon(layer) && layer.gridKey === gridKey) {
-        log.info("removing polygon for deselection");
         layer.remove();
       }
     });
@@ -111,15 +103,14 @@ export default function SelectGridSquares() {
       gridKey,
     });
     addToMovementPath(gridKey);
-    log.info("added grid square to movement path:", gridKey);
   }
 
   useEffect(() => {
     if (!mapClickPosition || !map) return;
 
-    const gridKey = createGridKey(
-      mapClickPosition.gridReferenceData.eastings,
-      mapClickPosition.gridReferenceData.northings
+    const gridKey = latLngToGridKey(
+      mapClickPosition.latLng.lat,
+      mapClickPosition.latLng.lng
     );
 
     const gridSquareLatLongs = calculateGridReferenceSquare(
@@ -133,31 +124,23 @@ export default function SelectGridSquares() {
     const existingIndex = findExistingGridSquareIndex(gridKey);
 
     if (existingIndex !== -1) {
-      // Try to deselect (only works if it's the last in path)
       deselectGridSquare(gridKey, existingIndex);
     } else if (canSelectGrid(gridKey)) {
       selectGridSquare(gridSquareLatLongs, gridKey);
-    } else {
-      log.info("Cannot select grid - not adjacent to current path or max moves reached");
     }
   }, [mapClickPosition]);
 
-  function clearAllPolygons() {
-    log.info("clearing all grid selections");
-    map.eachLayer((layer) => {
-      if (layer instanceof L.Polygon) {
-        layer.remove();
-      }
-    });
-    setSelectedGridSquares([]);
-    setMovementPath([]);
-  }
-
   useEffect(() => {
     if (gridClearRequest > 0) {
-      clearAllPolygons();
+      map.eachLayer((layer) => {
+        if (layer instanceof L.Polygon) {
+          layer.remove();
+        }
+      });
+      setSelectedGridSquares([]);
+      setMovementPath([]);
     }
-  }, [gridClearRequest, map, setSelectedGridSquares]);
+  }, [gridClearRequest, map, setSelectedGridSquares, setMovementPath]);
 
   return null;
 }

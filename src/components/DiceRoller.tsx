@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Dices, CheckCircle2 } from "lucide-react"
+import { Dices, CheckCircle2, LocateFixed } from "lucide-react"
 import { GameTurnState, useCurrentPlayer, useGameStore } from "@/stores/game-store"
 import { trpc } from "@/lib/trpc/client"
 import { Button } from "@/components/ui/button"
@@ -15,6 +15,7 @@ export default function DiceRoller() {
     gameTurnState,
     handleDiceRoll,
     handleEndTurn,
+    setPlayerZoomRequest,
     sessionId,
     playerId,
     players,
@@ -36,6 +37,7 @@ export default function DiceRoller() {
 
   useEffect(() => {
     if (hasSettled && !isRolling) {
+      handleDiceRoll(total)
       if (sessionId && playerId) {
         rollDiceMutation.mutate({
           sessionId,
@@ -43,8 +45,6 @@ export default function DiceRoller() {
           dice1: dice1Value,
           dice2: dice2Value,
         })
-      } else {
-        handleDiceRoll(total)
       }
       setHasSettled(false)
     }
@@ -66,10 +66,9 @@ export default function DiceRoller() {
   }
 
   function handleEndTurnClick() {
+    handleEndTurn()
     if (sessionId && playerId) {
       endTurnMutation.mutate({ sessionId, playerId })
-    } else {
-      handleEndTurn()
     }
   }
 
@@ -126,6 +125,15 @@ export default function DiceRoller() {
         >
           <CheckCircle2 className="h-4 w-4" />
           End Turn
+        </Button>
+        <Button
+          className="flex-1 sm:flex-none gap-2"
+          variant="outline"
+          onClick={() => setPlayerZoomRequest(playerName)}
+          disabled={!playerName}
+        >
+          <LocateFixed className="h-4 w-4" />
+          Find My Car
         </Button>
         <GridSelectionButton />
       </div>

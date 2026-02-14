@@ -5,6 +5,9 @@ const prisma = new PrismaClient();
 const defaultStartingPoints = [
   { name: "Challock", lat: 51.21861, lng: 0.88011 },
   { name: "Cambridge", lat: 52.17487, lng: 0.1283 },
+  { name: "Preston", lat: 53.7632, lng: -2.7031 },
+  { name: "Bamber Bridge", lat: 53.7275, lng: -2.6625 },
+  { name: "Blackburn", lat: 53.7500, lng: -2.4849 },
 ];
 
 async function main() {

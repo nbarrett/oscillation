@@ -1,19 +1,19 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { Polyline } from 'react-leaflet';
-import { trpc } from '@/lib/trpc/client';
-import { useGameStore, useCurrentPlayer, Player } from '@/stores/game-store';
-import { useRouteStore, Profile } from '@/stores/route-store';
-import { colours, log } from '@/lib/utils';
-import type { LatLngTuple } from 'leaflet';
+import { useEffect, useState } from "react";
+import { Polyline } from "react-leaflet";
+import { trpc } from "@/lib/trpc/client";
+import { useGameStore, useCurrentPlayer, Player } from "@/stores/game-store";
+import { useRouteStore, Profile } from "@/stores/route-store";
+import { colours, log } from "@/lib/utils";
+import type { LatLngTuple } from "leaflet";
 
 interface PlayerMoveRouteProps {
   player: Player;
 }
 
-function toApiCoordinateFormat(position: LatLngTuple | undefined): [number, number] | null {
-  if (!position || position.length < 2) return null;
+function toApiCoordinateFormat(position: [number, number] | null): [number, number] | null {
+  if (!position) return null;
   return [position[1], position[0]];
 }
 
