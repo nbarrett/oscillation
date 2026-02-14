@@ -1,7 +1,8 @@
-import { create } from "zustand";
-import { persist } from "zustand/middleware";
-import { log } from "@/lib/utils";
-import { latLngToGridKey, gridKeyToLatLng, nearestRoadPosition } from "@/lib/road-data";
+import { create } from "zustand"
+import { persist } from "zustand/middleware"
+import { log } from "@/lib/utils"
+import { latLngToGridKey, gridKeyToLatLng, gridHasRoad, isRoadDataLoaded, nearestRoadPosition } from "@/lib/road-data"
+import { CAR_STYLES } from "@/stores/car-store"
 
 export enum GameTurnState {
   ROLL_DICE = "ROLL_DICE",
@@ -14,7 +15,7 @@ export interface Player {
   position: [number, number];
   previousPosition: [number, number] | null;
   name: string;
-  iconType: "white" | "blue" | "red";
+  iconType: string
 }
 
 export interface GridReferenceData {
@@ -312,8 +313,7 @@ export const useGameStore = create<GameState>()(
       },
 
       initialisePlayers: (startingPosition) => {
-        const iconTypes: ("white" | "blue" | "red")[] = ["white", "blue", "red"]
-        const players: Player[] = iconTypes.map((iconType, index) => ({
+        const players: Player[] = CAR_STYLES.slice(0, 3).map((iconType, index) => ({
           name: `Player ${index + 1}`,
           iconType,
           position: [

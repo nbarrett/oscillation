@@ -1,25 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { log } from "@/lib/utils";
-
-interface OverpassNode {
-  type: "node";
-  id: number;
-  lat: number;
-  lon: number;
-  tags?: Record<string, string>;
-}
-
-interface OverpassWay {
-  type: "way";
-  id: number;
-  geometry?: { lat: number; lon: number }[];
-  tags?: Record<string, string>;
-}
-
-interface OverpassResponse {
-  elements: (OverpassNode | OverpassWay)[];
-}
+import { queryOverpass, type OverpassElement } from "@/server/overpass";
 
 function distanceMetres(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
@@ -46,27 +28,6 @@ function distanceToSegment(
 }
 
 const ROAD_PROXIMITY_METRES = 75;
-const MAX_RETRIES = 3;
-
-async function fetchOverpassWithRetry(query: string): Promise<Response> {
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const response = await fetch("https://overpass-api.de/api/interpreter", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: `data=${encodeURIComponent(query)}`,
-    });
-
-    if ((response.status === 429 || response.status === 504) && attempt < MAX_RETRIES) {
-      const delay = Math.pow(2, attempt + 1) * 1000;
-      log.info(`Overpass API ${response.status}, retrying in ${delay / 1000}s (attempt ${attempt + 1}/${MAX_RETRIES})`);
-      await new Promise((resolve) => setTimeout(resolve, delay));
-      continue;
-    }
-
-    return response;
-  }
-  throw new Error("Overpass API: max retries exceeded");
-}
 
 export const pubsRouter = createTRPCRouter({
   inBounds: publicProcedure
@@ -90,20 +51,14 @@ export const pubsRouter = createTRPCRouter({
         "out body geom;",
       ].join("");
 
-      const response = await fetchOverpassWithRetry(query);
+      const data = await queryOverpass(query);
 
-      if (!response.ok) {
-        throw new Error(`Overpass API error: ${response.statusText}`);
-      }
-
-      const data = (await response.json()) as OverpassResponse;
-
-      const pubs: OverpassNode[] = [];
-      const roads: OverpassWay[] = [];
+      const pubs: (OverpassElement & { lat: number; lon: number })[] = [];
+      const roads: OverpassElement[] = [];
 
       for (const el of data.elements) {
-        if (el.type === "node") {
-          pubs.push(el);
+        if (el.type === "node" && el.lat != null && el.lon != null) {
+          pubs.push(el as OverpassElement & { lat: number; lon: number });
         } else if (el.type === "way" && el.geometry) {
           roads.push(el);
         }

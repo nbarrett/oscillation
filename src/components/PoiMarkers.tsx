@@ -4,11 +4,10 @@ import { useEffect, useRef, useCallback, useMemo } from "react";
 import { useMap } from "react-leaflet";
 import L from "leaflet";
 import { log } from "@/lib/utils";
-import { usePubStore } from "@/stores/pub-store";
-import { PUB_ICON_OPTIONS, POI_COLOURS } from "@/stores/poi-icons";
+import { useErrorStore } from "@/stores/error-store";
 import { usePoiSettingsStore } from "@/stores/poi-settings-store";
 import { useCurrentPlayer } from "@/stores/game-store";
-import { api } from "@/lib/trpc/client";
+import { type PoiItem, type PoiIconOption, type FetchedBounds } from "@/stores/poi-types";
 import { latLngToGridKey, gridHasRoad } from "@/lib/road-data";
 
 const MAX_VISIBLE_MARKERS = 200;
@@ -17,9 +16,9 @@ const DEBOUNCE_MS = 500;
 const ICON_SIZE = 48;
 const POI_RADIUS_METRES = 10_000;
 
-function buildIcon(svgTemplate: string): L.DivIcon {
+function buildIcon(svgTemplate: string, colour: string): L.DivIcon {
   const coloured = svgTemplate
-    .replace(/currentColor/g, POI_COLOURS.pub)
+    .replace(/currentColor/g, colour)
     .replace(/<svg /, `<svg width="${ICON_SIZE}" height="${ICON_SIZE}" `);
 
   return L.divIcon({
@@ -43,58 +42,81 @@ function expandBounds(bounds: L.LatLngBounds, factor: number) {
   };
 }
 
-export default function PubMarkers() {
+interface PoiMarkersProps<T extends string> {
+  label: string;
+  colour: string;
+  items: PoiItem[];
+  show: boolean;
+  iconStyle: T;
+  iconOptions: PoiIconOption<T>[];
+  fetchedBounds: FetchedBounds | null;
+  boundsContainedByFetched: (bounds: FetchedBounds) => boolean;
+  setItems: (items: PoiItem[]) => void;
+  setFetchedBounds: (bounds: FetchedBounds) => void;
+  fetchItems: (bounds: FetchedBounds) => Promise<PoiItem[]>;
+}
+
+export default function PoiMarkers<T extends string>({
+  label,
+  colour,
+  items,
+  show,
+  iconStyle,
+  iconOptions,
+  boundsContainedByFetched,
+  setItems,
+  setFetchedBounds,
+  fetchItems,
+}: PoiMarkersProps<T>) {
   const map = useMap();
   const layerRef = useRef<L.LayerGroup | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fetchingRef = useRef(false);
-  const trpcUtils = api.useUtils();
-
-  const { pubs, showPubs, pubIconStyle, setPubs, setFetchedBounds, boundsContainedByFetched } = usePubStore();
+  const addError = useErrorStore((s) => s.addError);
   const iconDetailMode = usePoiSettingsStore((s) => s.iconDetailMode);
   const currentPlayer = useCurrentPlayer();
 
   const icon = useMemo(() => {
-    const option = PUB_ICON_OPTIONS.find((o) => o.style === pubIconStyle) ?? PUB_ICON_OPTIONS[0]!;
+    const option = iconOptions.find((o) => o.style === iconStyle) ?? iconOptions[0]!;
     const svgSource = iconDetailMode === "simple" ? option.simpleSvg : option.svg;
-    return buildIcon(svgSource);
-  }, [pubIconStyle, iconDetailMode]);
+    return buildIcon(svgSource, colour);
+  }, [iconStyle, iconOptions, colour, iconDetailMode]);
 
   const renderMarkers = useCallback(() => {
     if (!layerRef.current || !map) return;
 
     layerRef.current.clearLayers();
 
-    if (!showPubs) return;
+    if (!show) return;
 
     const playerLatLng = currentPlayer
       ? L.latLng(currentPlayer.position[0], currentPlayer.position[1])
       : null;
 
     const mapBounds = map.getBounds();
-    const visible = pubs
-      .filter((pub) => {
-        if (!mapBounds.contains([pub.lat, pub.lng])) return false;
-        if (!gridHasRoad(latLngToGridKey(pub.lat, pub.lng))) return false;
+    const visible = items
+      .filter((item) => {
+        if (!mapBounds.contains([item.lat, item.lng])) return false;
+        if (!gridHasRoad(latLngToGridKey(item.lat, item.lng))) return false;
         if (playerLatLng) {
-          return playerLatLng.distanceTo(L.latLng(pub.lat, pub.lng)) <= POI_RADIUS_METRES;
+          return playerLatLng.distanceTo(L.latLng(item.lat, item.lng)) <= POI_RADIUS_METRES;
         }
         return true;
       })
       .slice(0, MAX_VISIBLE_MARKERS);
 
-    for (const pub of visible) {
-      const marker = L.marker([pub.lat, pub.lng], { icon });
-      if (pub.name) {
-        marker.bindTooltip(pub.name);
+    for (const item of visible) {
+      const marker = L.marker([item.lat, item.lng], { icon });
+      if (item.name) {
+        marker.bindTooltip(item.name);
       }
       layerRef.current.addLayer(marker);
     }
 
-    log.debug("PubMarkers: rendered", visible.length, "of", pubs.length, "pubs");
-  }, [map, pubs, showPubs, icon, currentPlayer]);
+    log.debug(`${label}: rendered`, visible.length, "of", items.length);
+  }, [map, items, show, icon, label, currentPlayer]);
 
-  const fetchPubs = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     if (!map || fetchingRef.current) return;
 
     const mapBounds = map.getBounds();
@@ -106,25 +128,26 @@ export default function PubMarkers() {
 
     fetchingRef.current = true;
     try {
-      const result = await trpcUtils.pubs.inBounds.fetch(expanded);
-      setPubs(result);
+      const result = await fetchItems(expanded);
+      setItems(result);
       setFetchedBounds(expanded);
-      log.debug("PubMarkers: fetched", result.length, "pubs");
+      log.debug(`${label}: fetched`, result.length);
     } catch (err) {
-      log.error("PubMarkers: failed to fetch pubs", err);
+      log.error(`${label}: failed to fetch`, err);
+      addError(`Failed to load ${label.toLowerCase()} — the Overpass API may be busy. Try panning or zooming to retry.`);
     } finally {
       fetchingRef.current = false;
     }
-  }, [map, trpcUtils, setPubs, setFetchedBounds, boundsContainedByFetched]);
+  }, [map, fetchItems, setItems, setFetchedBounds, boundsContainedByFetched, addError, label]);
 
   const debouncedFetch = useCallback(() => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
     debounceRef.current = setTimeout(() => {
-      void fetchPubs();
+      void fetchData();
     }, DEBOUNCE_MS);
-  }, [fetchPubs]);
+  }, [fetchData]);
 
   useEffect(() => {
     if (!map) return;
@@ -133,7 +156,7 @@ export default function PubMarkers() {
       layerRef.current = L.layerGroup().addTo(map);
     }
 
-    void fetchPubs();
+    void fetchData();
 
     map.on("moveend", debouncedFetch);
     map.on("zoomend", debouncedFetch);
@@ -150,7 +173,7 @@ export default function PubMarkers() {
         layerRef.current = null;
       }
     };
-  }, [map, debouncedFetch, fetchPubs]);
+  }, [map, debouncedFetch, fetchData]);
 
   useEffect(() => {
     renderMarkers();
