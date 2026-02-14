@@ -11,7 +11,6 @@ import {
   SelectedGrid,
   createGridKey,
 } from '@/stores/game-store';
-import { gridHasRoad, isRoadDataLoaded } from '@/lib/road-data';
 import { colours, log } from '@/lib/utils';
 
 class IdentifiedPolygon extends L.Polygon {
@@ -137,11 +136,6 @@ export default function SelectGridSquares() {
       // Try to deselect (only works if it's the last in path)
       deselectGridSquare(gridKey, existingIndex);
     } else if (canSelectGrid(gridKey)) {
-      // Additional road validation
-      if (isRoadDataLoaded() && !gridHasRoad(gridKey)) {
-        log.info("Cannot select grid - no A or B road in this square");
-        return;
-      }
       selectGridSquare(gridSquareLatLongs, gridKey);
     } else {
       log.info("Cannot select grid - not adjacent to current path or max moves reached");

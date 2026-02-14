@@ -22,7 +22,63 @@ export interface RoadDataCache {
   timestamp: number;
 }
 
+const STORAGE_KEY = "oscillation-road-data";
+const STORAGE_MAX_AGE = 24 * 60 * 60 * 1000;
+
 let roadDataCache: RoadDataCache | null = null;
+
+function saveToStorage(cache: RoadDataCache): void {
+  try {
+    const serializable = {
+      bounds: cache.bounds,
+      roads: cache.roads,
+      gridSquaresWithRoads: Array.from(cache.gridSquaresWithRoads),
+      timestamp: cache.timestamp,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(serializable));
+  } catch (e) {
+    log.error("Failed to save road data to storage:", e);
+  }
+}
+
+function loadFromStorage(): RoadDataCache | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.timestamp > STORAGE_MAX_AGE) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+    return {
+      bounds: parsed.bounds,
+      roads: parsed.roads,
+      gridSquaresWithRoads: new Set(parsed.gridSquaresWithRoads),
+      timestamp: parsed.timestamp,
+    };
+  } catch (e) {
+    log.error("Failed to load road data from storage:", e);
+    return null;
+  }
+}
+
+async function queryOverpassWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries: number = 3
+): Promise<Response> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const response = await fetch(url, options);
+    if (response.status === 429 && attempt < maxRetries) {
+      const delay = Math.pow(2, attempt + 1) * 1000;
+      log.info(`Overpass API rate limited, retrying in ${delay / 1000}s (attempt ${attempt + 1}/${maxRetries})`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      continue;
+    }
+    return response;
+  }
+  throw new Error("Overpass API: max retries exceeded");
+}
 
 async function queryOverpassForRoads(
   south: number,
@@ -42,7 +98,7 @@ async function queryOverpassForRoads(
     out skel qt;
   `;
 
-  const response = await fetch('https://overpass-api.de/api/interpreter', {
+  const response = await queryOverpassWithRetry('https://overpass-api.de/api/interpreter', {
     method: 'POST',
     body: `data=${encodeURIComponent(query)}`,
     headers: {
@@ -168,6 +224,10 @@ export async function loadRoadData(
   const west = centerLng - lngDelta;
   const east = centerLng + lngDelta;
 
+  if (!roadDataCache) {
+    roadDataCache = loadFromStorage();
+  }
+
   if (roadDataCache) {
     const { bounds } = roadDataCache;
     if (
@@ -175,7 +235,7 @@ export async function loadRoadData(
       north <= bounds.north &&
       west >= bounds.west &&
       east <= bounds.east &&
-      Date.now() - roadDataCache.timestamp < 30 * 60 * 1000
+      Date.now() - roadDataCache.timestamp < STORAGE_MAX_AGE
     ) {
       return;
     }
@@ -193,6 +253,8 @@ export async function loadRoadData(
       gridSquaresWithRoads,
       timestamp: Date.now(),
     };
+
+    saveToStorage(roadDataCache);
 
     log.info(
       `Loaded ${roads.length} road segments, ${gridSquaresWithRoads.size} grid squares with roads`

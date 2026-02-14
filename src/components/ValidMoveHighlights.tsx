@@ -11,7 +11,7 @@ import {
   getAdjacentGridKeys,
   occupiedGridKeys,
 } from '@/stores/game-store';
-import { loadRoadData, isRoadDataLoaded, reachableRoadGrids } from "@/lib/road-data";
+import { loadRoadData, isRoadDataLoaded, reachableRoadGrids, gridHasRoad } from "@/lib/road-data";
 import { colours, log } from '@/lib/utils';
 
 function createGridPolygon(
@@ -166,7 +166,7 @@ export default function ValidMoveHighlights() {
       });
     } else {
       const adjacentKeys = getAdjacentGridKeys(referenceGridKey);
-      const validMoveKeys = adjacentKeys.filter((key) => !selectedKeys.has(key) && !occupied.has(key) && key !== playerStartGridKey);
+      const validMoveKeys = adjacentKeys.filter((key) => !selectedKeys.has(key) && !occupied.has(key) && key !== playerStartGridKey && gridHasRoad(key));
 
       validMoveKeys.forEach((gridKey) => {
         const polygon = createGridPolygon(map, gridKey, colours.immediateMove, 0.15, "valid-move-highlight");

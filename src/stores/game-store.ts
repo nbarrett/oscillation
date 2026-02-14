@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { log } from '@/lib/utils';
-import { latLngToGridKey } from '@/lib/road-data';
+import { latLngToGridKey, gridHasRoad, isRoadDataLoaded } from '@/lib/road-data';
 
 export enum GameTurnState {
   ROLL_DICE = 'ROLL_DICE',
@@ -202,6 +202,7 @@ export const useGameStore = create<GameState>()(
         if (state.movementPath.includes(gridKey)) return false;
         const occupied = occupiedGridKeys(state.players, state.currentPlayerName ?? "");
         if (occupied.has(gridKey)) return false;
+        if (isRoadDataLoaded() && !gridHasRoad(gridKey)) return false;
 
         if (state.movementPath.length === 0) {
           if (!state.playerStartGridKey) return false;
