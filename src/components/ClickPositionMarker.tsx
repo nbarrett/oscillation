@@ -60,7 +60,7 @@ async function reverseGeocode(lat: number, lng: number): Promise<string> {
 }
 
 export default function ClickPositionMarker() {
-  const { mapClickPosition } = useGameStore()
+  const { mapClickPosition, players } = useGameStore()
   const [locationName, setLocationName] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -111,7 +111,7 @@ export default function ClickPositionMarker() {
     })
   }
 
-  if (!mapClickPosition?.latLng) {
+  if (!mapClickPosition?.latLng || players.length > 0) {
     return null
   }
 
