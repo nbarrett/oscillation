@@ -112,27 +112,45 @@ Oscillation is a Next.js-based board game application using the T3 Stack archite
 
 ## Development Commands
 
+### Dev Scripts
+
+The project includes cross-platform scripts to start/stop the dev environment:
+
+```bash
+# Start dev server (handles deps, prisma generate, schema push, port 3002)
+./run-dev.sh        # macOS / Linux
+.\run-dev.ps1       # Windows PowerShell
+run-dev.bat         # Windows Command Prompt
+
+# Stop all dev processes
+./kill-dev.sh       # macOS / Linux
+.\kill-dev.ps1      # Windows PowerShell
+kill-dev.bat        # Windows Command Prompt
+```
+
+### Manual Commands
+
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Generate Prisma client
-npm run db:generate
+pnpm run db:generate
 
 # Push schema to PostgreSQL
-npm run db:push
+pnpm run db:push
 
 # Start development server
-npm run dev
+pnpm run dev
 
 # Build for production
-npm run build
+pnpm run build
 
 # Start production server
-npm start
+pnpm start
 
 # Type checking
-npm run typecheck
+pnpm run typecheck
 ```
 
 ## Git Workflow

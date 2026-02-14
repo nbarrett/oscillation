@@ -1,6 +1,6 @@
-# Kill Klaserie Camps development processes (Windows PowerShell)
+# Kill Oscillation development processes (Windows PowerShell)
 
-Write-Host "Stopping Klaserie Camps development server..." -ForegroundColor Yellow
+Write-Host "Stopping Oscillation development server..." -ForegroundColor Yellow
 
 # Kill processes on the dev port (default 3000)
 $port = if ($env:DEV_PORT) { [int]$env:DEV_PORT } else { 3002 }

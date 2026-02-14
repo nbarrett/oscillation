@@ -1,7 +1,7 @@
 #!/bin/bash
-# Kill Klaserie Camps development processes
+# Kill Oscillation development processes
 
-echo "Stopping Klaserie Camps development server..."
+echo "Stopping Oscillation development server..."
 
 # Kill Next.js dev processes
 pkill -f "next dev" 2>/dev/null

@@ -69,7 +69,7 @@ function Ensure-Pnpm {
 function Ensure-EnvFile {
     $envPath = Join-Path $RepoRoot ".env"
     if (-not (Test-Path $envPath)) {
-        Throw-Error "Missing $envPath. Copy .env.example and populate DATABASE_URL and AUTH_SECRET before running."
+        Throw-Error "Missing $envPath. Copy .env.example and populate DATABASE_URL and OS_MAPS_API_KEY before running."
     }
 }
 
@@ -119,7 +119,7 @@ function Install-Dependencies {
 function Push-Schema {
     Push-Location $RepoRoot
     try {
-        Write-Info "Pushing schema to MongoDB..."
+        Write-Info "Pushing schema to PostgreSQL..."
         pnpm exec prisma db push
     }
     finally {
@@ -139,7 +139,7 @@ function Start-DevServer {
 
     if (Test-Path $logPath) { Remove-Item $logPath }
 
-    $job = Start-Job -Name "klaserie-camps-dev" -ScriptBlock {
+    $job = Start-Job -Name "oscillation-dev" -ScriptBlock {
         param($WorkingDir)
         Set-StrictMode -Version Latest
         Set-Location $WorkingDir
@@ -147,7 +147,7 @@ function Start-DevServer {
     } -ArgumentList $RepoRoot
 
     $port = if ($env:DEV_PORT) { $env:DEV_PORT } else { "3002" }
-    Write-Info "Klaserie Camps dev server -> http://localhost:$port"
+    Write-Info "Oscillation dev server -> http://localhost:$port"
     Write-Info "Logs -> $logPath"
     Write-Info "Press Ctrl+C to stop."
 
