@@ -36,6 +36,7 @@ export const colours = {
   osMapsPink: '#d40058',
   immediateMove: "#4CAF50",
   reachableMove: "#81C784",
+  exactEndpoint: "#00FF64",
   playerStart: "#2196F3",
 };
 

@@ -57,6 +57,7 @@ export default function GameSync() {
           name: p.name,
           iconType: p.iconType as "white" | "blue" | "red",
           position: localPlayer?.position ?? p.position,
+          previousPosition: null,
         }
       })
 

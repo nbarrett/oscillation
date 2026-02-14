@@ -110,6 +110,11 @@ async function queryOverpassForRoads(
     throw new Error(`Overpass API error: ${response.status}`);
   }
 
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("json")) {
+    throw new Error(`Overpass API returned non-JSON response: ${contentType}`);
+  }
+
   const data = await response.json();
 
   const nodes: Map<number, [number, number]> = new Map();
@@ -153,6 +158,34 @@ async function queryOverpassForRoads(
   }
 
   return roads;
+}
+
+export function gridKeyToLatLng(gridKey: string): [number, number] {
+  const [e, n] = gridKey.split("-").map(Number);
+  const [lng, lat] = proj4(BNG, "EPSG:4326", [e + 50, n + 50]);
+  const snapped = nearestRoadPosition(lat, lng);
+  return snapped ?? [lat, lng];
+}
+
+export function nearestRoadPosition(lat: number, lng: number): [number, number] | null {
+  if (!roadDataCache) return null;
+
+  let bestDist = Infinity;
+  let bestCoord: [number, number] | null = null;
+
+  for (const road of roadDataCache.roads) {
+    for (const [rLat, rLng] of road.coordinates) {
+      const dLat = rLat - lat;
+      const dLng = rLng - lng;
+      const dist = dLat * dLat + dLng * dLng;
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestCoord = [rLat, rLng];
+      }
+    }
+  }
+
+  return bestCoord;
 }
 
 export function latLngToGridKey(lat: number, lng: number): string {
@@ -283,13 +316,23 @@ export function getAdjacentRoadGrids(gridKey: string): string[] {
   return adjacent.filter((key) => gridHasRoad(key));
 }
 
+function allAdjacentGrids(gridKey: string): string[] {
+  const [e, n] = gridKey.split("-").map(Number);
+  return [
+    `${e}-${n + 100}`,
+    `${e}-${n - 100}`,
+    `${e + 100}-${n}`,
+    `${e - 100}-${n}`,
+  ];
+}
+
 export function reachableRoadGrids(
   startGridKey: string,
   maxSteps: number,
   excludeKeys: Set<string> = new Set()
 ): Map<string, number> {
   const visited = new Map<string, number>();
-  if (!isRoadDataLoaded() || !gridHasRoad(startGridKey)) return visited;
+  if (!isRoadDataLoaded()) return visited;
 
   const queue: Array<{ key: string; depth: number }> = [{ key: startGridKey, depth: 0 }];
   visited.set(startGridKey, 0);
@@ -298,7 +341,11 @@ export function reachableRoadGrids(
     const current = queue.shift()!;
     if (current.depth >= maxSteps) continue;
 
-    const neighbors = getAdjacentRoadGrids(current.key);
+    const onRoad = gridHasRoad(current.key);
+    const neighbors = onRoad
+      ? getAdjacentRoadGrids(current.key)
+      : allAdjacentGrids(current.key);
+
     for (const neighbor of neighbors) {
       if (visited.has(neighbor) || excludeKeys.has(neighbor)) continue;
       visited.set(neighbor, current.depth + 1);

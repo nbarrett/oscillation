@@ -1,18 +1,17 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useState } from 'react';
-import { useMap } from 'react-leaflet';
-import L from 'leaflet';
+import { useEffect, useRef, useState } from "react";
+import { useMap } from "react-leaflet";
+import L from "leaflet";
 import {
   useGameStore,
   useCurrentPlayer,
   GameTurnState,
-  createGridKey,
   getAdjacentGridKeys,
   occupiedGridKeys,
-} from '@/stores/game-store';
-import { loadRoadData, isRoadDataLoaded, reachableRoadGrids, gridHasRoad } from "@/lib/road-data";
-import { colours, log } from '@/lib/utils';
+} from "@/stores/game-store";
+import { latLngToGridKey, loadRoadData, isRoadDataLoaded, reachableRoadGrids, gridHasRoad, nearestRoadPosition } from "@/lib/road-data";
+import { colours, log } from "@/lib/utils";
 
 function createGridPolygon(
   map: L.Map,
@@ -22,7 +21,7 @@ function createGridPolygon(
   className?: string
 ): L.Polygon | null {
   try {
-    const [easting, northing] = gridKey.split('-').map(Number);
+    const [easting, northing] = gridKey.split("-").map(Number);
 
     const corners = [
       new L.Point(easting, northing + 100),
@@ -41,7 +40,7 @@ function createGridPolygon(
       interactive: false,
     });
   } catch (e) {
-    log.error('Failed to create grid polygon:', e);
+    log.error("Failed to create grid polygon:", e);
     return null;
   }
 }
@@ -60,6 +59,7 @@ export default function ValidMoveHighlights() {
     playerStartGridKey,
     selectedGridSquares,
     setPlayerStartGridKey,
+    updatePlayerPosition,
     players,
     currentPlayerName,
   } = useGameStore();
@@ -72,9 +72,8 @@ export default function ValidMoveHighlights() {
       try {
         await loadRoadData(currentPlayer.position[0], currentPlayer.position[1], 10);
         setRoadDataReady(true);
-        log.info('Road data loaded successfully');
       } catch (error) {
-        log.error('Failed to load road data:', error);
+        log.error("Failed to load road data:", error);
       } finally {
         setRoadDataLoading(false);
       }
@@ -84,19 +83,24 @@ export default function ValidMoveHighlights() {
   }, [currentPlayer, roadDataReady]);
 
   useEffect(() => {
-    if (!map || !currentPlayer) return;
+    if (!map || !currentPlayer || !currentPlayerName) return;
+    if (gameTurnState !== GameTurnState.DICE_ROLLED) return;
 
-    if (gameTurnState === GameTurnState.DICE_ROLLED && !playerStartGridKey) {
-      const playerLatLng = L.latLng(currentPlayer.position[0], currentPlayer.position[1]);
-      const osCoords = map.options.crs!.project(playerLatLng);
-      const gridKey = createGridKey(
-        Math.round(osCoords.x).toString(),
-        Math.round(osCoords.y).toString()
-      );
-      log.info('Setting player start grid key:', gridKey);
+    if (!playerStartGridKey) {
+      const gridKey = latLngToGridKey(currentPlayer.position[0], currentPlayer.position[1]);
       setPlayerStartGridKey(gridKey);
+      return;
     }
-  }, [map, currentPlayer, gameTurnState, playerStartGridKey, setPlayerStartGridKey]);
+
+    if (roadDataReady && !gridHasRoad(playerStartGridKey)) {
+      const snapped = nearestRoadPosition(currentPlayer.position[0], currentPlayer.position[1]);
+      if (snapped) {
+        const newGridKey = latLngToGridKey(snapped[0], snapped[1]);
+        updatePlayerPosition(currentPlayerName, snapped);
+        setPlayerStartGridKey(newGridKey);
+      }
+    }
+  }, [map, currentPlayer, currentPlayerName, gameTurnState, playerStartGridKey, setPlayerStartGridKey, roadDataReady, updatePlayerPosition]);
 
   useEffect(() => {
     if (!map) return;
@@ -175,10 +179,6 @@ export default function ValidMoveHighlights() {
           layerGroupRef.current?.addLayer(polygon);
         }
       });
-    }
-
-    if (roadDataLoading) {
-      log.debug("Road data still loading...");
     }
   }, [map, gameTurnState, diceResult, movementPath, playerStartGridKey, selectedGridSquares, roadDataReady, roadDataLoading, players, currentPlayerName]);
 
