@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { log } from '@/lib/utils';
+import { latLngToGridKey } from '@/lib/road-data';
 
 export enum GameTurnState {
   ROLL_DICE = 'ROLL_DICE',
@@ -62,7 +63,16 @@ export function areGridsAdjacent(key1: string, key2: string): boolean {
   return (eDiff === 100 && nDiff === 0) || (eDiff === 0 && nDiff === 100);
 }
 
-// Get adjacent grid keys for a given grid key
+export function occupiedGridKeys(players: Player[], excludePlayerName: string): Set<string> {
+  const keys = new Set<string>();
+  for (const player of players) {
+    if (player.name !== excludePlayerName) {
+      keys.add(latLngToGridKey(player.position[0], player.position[1]));
+    }
+  }
+  return keys;
+}
+
 export function getAdjacentGridKeys(gridKey: string): string[] {
   const [e, n] = gridKey.split('-').map(Number);
   return [
@@ -189,16 +199,15 @@ export const useGameStore = create<GameState>()(
         if (!state.diceResult) return false;
         // Can't select if already at max moves
         if (state.movementPath.length >= state.diceResult) return false;
-        // Can't select if already in path
         if (state.movementPath.includes(gridKey)) return false;
+        const occupied = occupiedGridKeys(state.players, state.currentPlayerName ?? "");
+        if (occupied.has(gridKey)) return false;
 
-        // If path is empty, must be adjacent to player's starting grid
         if (state.movementPath.length === 0) {
           if (!state.playerStartGridKey) return false;
           return areGridsAdjacent(gridKey, state.playerStartGridKey);
         }
 
-        // Otherwise must be adjacent to last grid in path
         const lastGridKey = state.movementPath[state.movementPath.length - 1];
         return areGridsAdjacent(gridKey, lastGridKey);
       },

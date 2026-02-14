@@ -99,7 +99,7 @@ async function queryOverpassForRoads(
   return roads;
 }
 
-function latLngToGridKey(lat: number, lng: number): string {
+export function latLngToGridKey(lat: number, lng: number): string {
   const [easting, northing] = proj4("EPSG:4326", BNG, [lng, lat]);
   const e = Math.floor(easting / 100) * 100;
   const n = Math.floor(northing / 100) * 100;
