@@ -18,6 +18,10 @@ import MapContextMenu from "./MapContextMenu";
 import ClickPositionMarker from "./ClickPositionMarker";
 import GridOverlay from "./GridOverlay";
 import PubMarkers from "./PubMarkers";
+import SpireMarkers from "./ChurchMarkers";
+import TowerMarkers from "./TowerMarkers";
+import PhoneMarkers from "./PhoneMarkers";
+import SchoolMarkers from "./SchoolMarkers";
 
 function createBritishNationalGridCRS(): L.Proj.CRS | null {
   if (typeof window === "undefined") return null;
@@ -148,6 +152,10 @@ export default function MapWithCars() {
         <ClickPositionMarker />
         <GridOverlay />
         <PubMarkers />
+        <SpireMarkers />
+        <TowerMarkers />
+        <PhoneMarkers />
+        <SchoolMarkers />
       </MapContainer>
     </div>
   );

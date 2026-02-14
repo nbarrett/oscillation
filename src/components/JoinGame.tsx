@@ -5,6 +5,8 @@ import { useSession, signIn } from "next-auth/react"
 import { Users, Plus, LogIn, Copy, Check, Loader2, UserPlus, ChevronLeft } from "lucide-react"
 import { trpc } from "@/lib/trpc/client"
 import { useGameStore } from "@/stores/game-store"
+import { useCarStore } from "@/stores/car-store"
+import CarIconSelector from "./CarIconSelector"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -90,6 +92,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
   const [selectedLocationId, setSelectedLocationId] = useState<string>("")
 
   const { setSessionId, setPlayerId, setSessionCode } = useGameStore()
+  const { preferredCar } = useCarStore()
   const { data: locations, refetch: refetchLocations } = trpc.locations.getAll.useQuery()
   const { data: availableGames } = trpc.game.list.useQuery()
 
@@ -243,6 +246,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
       playerName: playerName.trim(),
       startLat: selectedLocation.lat,
       startLng: selectedLocation.lng,
+      iconType: preferredCar,
     })
   }
 
@@ -259,6 +263,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
     joinGame.mutate({
       code: joinCode.toUpperCase(),
       playerName: playerName.trim(),
+      iconType: preferredCar,
     })
   }
 
@@ -335,6 +340,8 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
               autoFocus
             />
           </div>
+
+          <CarIconSelector />
 
           {mode === "create" && (
             <div className="space-y-2">

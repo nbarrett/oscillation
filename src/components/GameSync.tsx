@@ -47,14 +47,14 @@ export default function GameSync() {
         if (localPlayer?.previousPosition) {
           return {
             name: p.name,
-            iconType: p.iconType as "white" | "blue" | "red",
+            iconType: p.iconType,
             position: localPlayer.position,
             previousPosition: localPlayer.previousPosition,
           }
         }
         return {
           name: p.name,
-          iconType: p.iconType as "white" | "blue" | "red",
+          iconType: p.iconType,
           position: p.position,
           previousPosition: null,
         }

@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { createTRPCRouter, publicProcedure } from "../trpc"
+import { CAR_STYLES } from "@/stores/car-store"
 
 function generateSessionCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -9,8 +10,6 @@ function generateSessionCode(): string {
   }
   return code
 }
-
-const iconTypes = ["white", "blue", "red", "green"] as const
 
 export const gameRouter = createTRPCRouter({
   list: publicProcedure
@@ -45,6 +44,7 @@ export const gameRouter = createTRPCRouter({
       playerName: z.string().min(1),
       startLat: z.number(),
       startLng: z.number(),
+      iconType: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       let code = generateSessionCode()
@@ -64,7 +64,7 @@ export const gameRouter = createTRPCRouter({
           players: {
             create: {
               name: input.playerName,
-              iconType: iconTypes[0],
+              iconType: input.iconType ?? CAR_STYLES[0],
               positionLat: input.startLat,
               positionLng: input.startLng,
               turnOrder: 0,
@@ -85,6 +85,7 @@ export const gameRouter = createTRPCRouter({
     .input(z.object({
       code: z.string().length(6),
       playerName: z.string().min(1),
+      iconType: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const session = await ctx.db.gameSession.findUnique({
@@ -112,7 +113,7 @@ export const gameRouter = createTRPCRouter({
       }
 
       const turnOrder = session.players.length
-      const iconType = iconTypes[turnOrder] || "white"
+      const iconType = input.iconType ?? CAR_STYLES[turnOrder % CAR_STYLES.length]
 
       const offsetLat = (session.startLat || 0) + 0.00014 * turnOrder
       const offsetLng = (session.startLng || 0) - 0.00025 * turnOrder
@@ -162,7 +163,7 @@ export const gameRouter = createTRPCRouter({
         players: session.players.map(p => ({
           id: p.id,
           name: p.name,
-          iconType: p.iconType as "white" | "blue" | "red",
+          iconType: p.iconType,
           position: [p.positionLat, p.positionLng] as [number, number],
           turnOrder: p.turnOrder,
         })),

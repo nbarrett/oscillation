@@ -31,7 +31,13 @@ const ProfileSelector = dynamic(() => import("@/components/ProfileSelector"), { 
 const MapLayerSelector = dynamic(() => import("@/components/MapLayerSelector"), { ssr: false })
 const MappingProviderSelector = dynamic(() => import("@/components/MappingProviderSelector"), { ssr: false })
 const StartingPositionSelector = dynamic(() => import("@/components/StartingPositionSelector"), { ssr: false })
+const CarIconSelector = dynamic(() => import("@/components/CarIconSelector"), { ssr: false })
 const PubIconSelector = dynamic(() => import("@/components/PubIconSelector"), { ssr: false })
+const SpireIconSelector = dynamic(() => import("@/components/ChurchIconSelector"), { ssr: false })
+const TowerIconSelector = dynamic(() => import("@/components/TowerIconSelector"), { ssr: false })
+const PhoneIconSelector = dynamic(() => import("@/components/PhoneIconSelector"), { ssr: false })
+const SchoolIconSelector = dynamic(() => import("@/components/SchoolIconSelector"), { ssr: false })
+const IconDetailToggle = dynamic(() => import("@/components/IconDetailToggle"), { ssr: false })
 const MapPositions = dynamic(() => import("@/components/MapPositions"), { ssr: false })
 const JoinGame = dynamic(() => import("@/components/JoinGame"), { ssr: false })
 const GameSync = dynamic(() => import("@/components/GameSync"), { ssr: false })
@@ -198,7 +204,13 @@ export default function GamePage() {
                     <MappingProviderSelector />
                     <MapLayerSelector />
                     <StartingPositionSelector />
+                    <CarIconSelector />
+                    <IconDetailToggle />
                     <PubIconSelector />
+                    <SpireIconSelector />
+                    <TowerIconSelector />
+                    <PhoneIconSelector />
+                    <SchoolIconSelector />
                   </div>
                 </div>
               </div>

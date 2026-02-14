@@ -1,16 +1,10 @@
 "use client"
 
 import { useEffect } from "react"
-import { Car } from "lucide-react"
-import { useGameStore, useCurrentPlayer, GameTurnState, Player } from "@/stores/game-store"
+import { useGameStore, useCurrentPlayer, GameTurnState } from "@/stores/game-store"
+import { carImageForStyle } from "@/stores/car-store"
 import { log } from "@/lib/utils"
 import { cn } from "@/lib/cn"
-
-const playerColors: Record<Player["iconType"], string> = {
-  white: "text-slate-600 dark:text-slate-300",
-  blue: "text-blue-600 dark:text-blue-400",
-  red: "text-red-600 dark:text-red-400",
-}
 
 export default function PlayerPositions() {
   const {
@@ -82,7 +76,11 @@ export default function PlayerPositions() {
             )}
             onClick={() => handlePlayerClick(player.name)}
           >
-            <Car className={cn("h-4 w-4", playerColors[player.iconType])} />
+            <img
+              src={carImageForStyle(player.iconType)}
+              alt="car"
+              className="h-5 w-8 object-contain"
+            />
             <span className={cn(
               "font-medium",
               isCurrentPlayer && "text-primary"
