@@ -1,4 +1,7 @@
+import proj4 from "proj4";
 import { log } from "@/lib/utils";
+
+const BNG = "+proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy +towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 +units=m +no_defs";
 
 export interface RoadSegment {
   id: number;
@@ -97,29 +100,10 @@ async function queryOverpassForRoads(
 }
 
 function latLngToGridKey(lat: number, lng: number): string {
-  const lat0 = 49.0;
-  const lng0 = -2.0;
-  const k0 = 0.9996012717;
-  const e0 = 400000;
-  const n0 = -100000;
-
-  const latRad = (lat * Math.PI) / 180;
-  const lngRad = (lng * Math.PI) / 180;
-  const lng0Rad = (lng0 * Math.PI) / 180;
-
-  const a = 6377563.396;
-  const n = (a - 6356256.909) / (a + 6356256.909);
-
-  const latDiff = lat - lat0;
-  const lngDiff = lng - lng0;
-
-  const easting = e0 + lngDiff * 111320 * Math.cos(latRad) * k0;
-  const northing = n0 + latDiff * 110540 * k0;
-
+  const [easting, northing] = proj4("EPSG:4326", BNG, [lng, lat]);
   const e = Math.floor(easting / 100) * 100;
-  const n2 = Math.floor(northing / 100) * 100;
-
-  return `${e}-${n2}`;
+  const n = Math.floor(northing / 100) * 100;
+  return `${e}-${n}`;
 }
 
 function lineIntersectsGrid(
