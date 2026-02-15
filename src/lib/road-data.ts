@@ -347,7 +347,7 @@ export function reachableRoadGrids(
   excludeKeys: Set<string> = new Set()
 ): Map<string, number> {
   const visited = new Map<string, number>();
-  if (!isRoadDataLoaded()) return visited;
+  const hasRoads = isRoadDataLoaded();
 
   const queue: Array<{ key: string; depth: number }> = [{ key: startGridKey, depth: 0 }];
   visited.set(startGridKey, 0);
@@ -356,8 +356,7 @@ export function reachableRoadGrids(
     const current = queue.shift()!;
     if (current.depth >= maxSteps) continue;
 
-    const onRoad = gridHasRoad(current.key);
-    const neighbors = onRoad
+    const neighbors = hasRoads && gridHasRoad(current.key)
       ? getAdjacentRoadGrids(current.key)
       : allAdjacentGrids(current.key);
 
@@ -370,6 +369,45 @@ export function reachableRoadGrids(
 
   visited.delete(startGridKey);
   return visited;
+}
+
+export function shortestPath(
+  startGridKey: string,
+  targetGridKey: string,
+  maxSteps: number,
+  excludeKeys: Set<string> = new Set()
+): string[] | null {
+  const hasRoads = isRoadDataLoaded();
+  const cameFrom = new Map<string, string>();
+  const queue: Array<{ key: string; depth: number }> = [{ key: startGridKey, depth: 0 }];
+  const visited = new Set<string>([startGridKey]);
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (current.key === targetGridKey && current.depth > 0) {
+      const path: string[] = [];
+      let step = targetGridKey;
+      while (step !== startGridKey) {
+        path.unshift(step);
+        step = cameFrom.get(step)!;
+      }
+      return path;
+    }
+    if (current.depth >= maxSteps) continue;
+
+    const neighbors = hasRoads && gridHasRoad(current.key)
+      ? getAdjacentRoadGrids(current.key)
+      : allAdjacentGrids(current.key);
+
+    for (const neighbor of neighbors) {
+      if (visited.has(neighbor) || excludeKeys.has(neighbor)) continue;
+      visited.add(neighbor);
+      cameFrom.set(neighbor, current.key);
+      queue.push({ key: neighbor, depth: current.depth + 1 });
+    }
+  }
+
+  return null;
 }
 
 export function isRoadDataLoaded(): boolean {

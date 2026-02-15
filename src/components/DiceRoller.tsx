@@ -116,7 +116,6 @@ export default function DiceRoller() {
               {diceResult && (
                 <div className="text-sm text-muted-foreground">
                   <div>Moves: {movementPath.length}/{diceResult}</div>
-                  <div className="text-xs">Click green squares (A/B roads only)</div>
                 </div>
               )}
             </div>

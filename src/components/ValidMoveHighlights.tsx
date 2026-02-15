@@ -12,6 +12,18 @@ import { latLngToGridKey } from "@/lib/road-data";
 import { createGridPolygon } from "@/lib/grid-polygon";
 import { colours } from "@/lib/utils";
 
+function colorForDistance(steps: number, maxSteps: number): string {
+  if (steps === 1) return colours.immediateMove;
+  if (steps === maxSteps) return colours.exactEndpoint;
+  return colours.reachableMove;
+}
+
+function opacityForDistance(steps: number, maxSteps: number): number {
+  if (steps === maxSteps) return 0.35;
+  if (steps === 1) return 0.25;
+  return 0.15;
+}
+
 export default function ValidMoveHighlights() {
   const map = useMap();
   const currentPlayer = useCurrentPlayer();
@@ -24,6 +36,7 @@ export default function ValidMoveHighlights() {
     playerStartGridKey,
     setPlayerStartGridKey,
     currentPlayerName,
+    reachableGrids,
   } = useGameStore();
 
   useEffect(() => {
@@ -53,7 +66,18 @@ export default function ValidMoveHighlights() {
         layerGroupRef.current.addLayer(startPolygon);
       }
     }
-  }, [map, gameTurnState, diceResult, movementPath, playerStartGridKey]);
+
+    if (reachableGrids) {
+      reachableGrids.forEach((steps, gridKey) => {
+        const color = colorForDistance(steps, diceResult);
+        const opacity = opacityForDistance(steps, diceResult);
+        const polygon = createGridPolygon(map, gridKey, color, opacity);
+        if (polygon) {
+          layerGroupRef.current!.addLayer(polygon);
+        }
+      });
+    }
+  }, [map, gameTurnState, diceResult, movementPath, playerStartGridKey, reachableGrids]);
 
   useEffect(() => {
     return () => {
