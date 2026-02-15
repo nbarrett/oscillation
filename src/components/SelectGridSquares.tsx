@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useMap } from "react-leaflet";
 import L from "leaflet";
 import { useGameStore } from "@/stores/game-store";
-import { latLngToGridKey } from "@/lib/road-data";
+import { latLngToGridKey, shortestPath } from "@/lib/road-data";
 import { gridKeyToLatLngs } from "@/lib/grid-polygon";
 import { colours } from "@/lib/utils";
 
@@ -29,47 +29,34 @@ export default function SelectGridSquares() {
     mapClickPosition,
     selectedGridSquares,
     gridClearRequest,
-    movementPath,
     setSelectedGridSquares,
-    addSelectedGridSquare,
-    removeSelectedGridSquare,
-    addToMovementPath,
-    removeFromMovementPath,
     canSelectGrid,
     setMovementPath,
+    playerStartGridKey,
+    diceResult,
+    selectedEndpoint,
+    setSelectedEndpoint,
   } = useGameStore();
 
-  function findExistingGridSquareIndex(gridKey: string): number {
-    return selectedGridSquares.findIndex((item) => item.gridKey === gridKey);
-  }
-
-  function deselectGridSquare(gridKey: string, existingIndex: number) {
-    const pathIndex = movementPath.indexOf(gridKey);
-    if (pathIndex !== movementPath.length - 1) return;
-
+  function clearPathPolygons() {
     map.eachLayer((layer) => {
-      if (isIdentifiedPolygon(layer) && layer.gridKey === gridKey) {
+      if (isIdentifiedPolygon(layer)) {
         layer.remove();
       }
     });
-    removeSelectedGridSquare(existingIndex);
-    removeFromMovementPath(gridKey);
   }
 
-  function selectGridSquare(gridSquareLatLongs: L.LatLng[], gridKey: string) {
-    const gridSquare = new IdentifiedPolygon(gridSquareLatLongs, gridKey, {
-      interactive: true,
-      color: colours.osMapsPurple,
-      weight: 2,
-      fillOpacity: 0.3,
-    });
-
-    gridSquare.addTo(map);
-    addSelectedGridSquare({
-      gridSquareLatLongs: gridSquareLatLongs.map((ll) => ({ lat: ll.lat, lng: ll.lng })),
-      gridKey,
-    });
-    addToMovementPath(gridKey);
+  function drawPath(pathKeys: string[]) {
+    for (const key of pathKeys) {
+      const latLngs = gridKeyToLatLngs(map, key);
+      const polygon = new IdentifiedPolygon(latLngs, key, {
+        interactive: true,
+        color: colours.osMapsPurple,
+        weight: 2,
+        fillOpacity: 0.3,
+      });
+      polygon.addTo(map);
+    }
   }
 
   useEffect(() => {
@@ -80,14 +67,34 @@ export default function SelectGridSquares() {
       mapClickPosition.latLng.lng
     );
 
-    const gridSquareLatLongs = gridKeyToLatLngs(map, gridKey);
-    const existingIndex = findExistingGridSquareIndex(gridKey);
-
-    if (existingIndex !== -1) {
-      deselectGridSquare(gridKey, existingIndex);
-    } else if (canSelectGrid(gridKey)) {
-      selectGridSquare(gridSquareLatLongs, gridKey);
+    if (selectedEndpoint === gridKey) {
+      clearPathPolygons();
+      setSelectedGridSquares([]);
+      setMovementPath([]);
+      setSelectedEndpoint(null);
+      return;
     }
+
+    if (!canSelectGrid(gridKey)) return;
+    if (!playerStartGridKey || !diceResult) return;
+
+    const path = shortestPath(playerStartGridKey, gridKey, diceResult);
+    if (!path) return;
+
+    clearPathPolygons();
+
+    const grids = path.map((key) => {
+      const latLngs = gridKeyToLatLngs(map, key);
+      return {
+        gridSquareLatLongs: latLngs.map((ll) => ({ lat: ll.lat, lng: ll.lng })),
+        gridKey: key,
+      };
+    });
+
+    drawPath(path);
+    setSelectedGridSquares(grids);
+    setMovementPath(path);
+    setSelectedEndpoint(gridKey);
   }, [mapClickPosition]);
 
   useEffect(() => {

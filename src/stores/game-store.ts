@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import { log } from "@/lib/utils"
-import { latLngToGridKey, gridKeyToLatLng, gridHasRoad, isRoadDataLoaded, nearestRoadPosition } from "@/lib/road-data"
+import { latLngToGridKey, gridKeyToLatLng, gridHasRoad, isRoadDataLoaded, nearestRoadPosition, reachableRoadGrids } from "@/lib/road-data"
 import { CAR_STYLES } from "@/stores/car-store"
 import { type AreaSize, type GameBounds, DEFAULT_AREA_SIZE, gridKeyWithinBounds } from "@/lib/area-size"
 
@@ -92,8 +92,12 @@ interface GameState {
   playerId: string | null;
   sessionCode: string | null;
   localPlayerName: string | null;
+  reachableGrids: Map<string, number> | null;
+  selectedEndpoint: string | null;
   pendingServerUpdate: boolean;
 
+  setReachableGrids: (grids: Map<string, number> | null) => void;
+  setSelectedEndpoint: (endpoint: string | null) => void;
   setAreaSize: (areaSize: AreaSize) => void;
   setGameBounds: (bounds: GameBounds | null) => void;
   setPlayers: (players: Player[]) => void;
@@ -151,7 +155,13 @@ export const useGameStore = create<GameState>()(
       playerId: null,
       sessionCode: null,
       localPlayerName: null,
+      reachableGrids: null,
+      selectedEndpoint: null,
       pendingServerUpdate: false,
+
+      setReachableGrids: (reachableGrids) => set({ reachableGrids }),
+
+      setSelectedEndpoint: (selectedEndpoint) => set({ selectedEndpoint }),
 
       setAreaSize: (areaSize) => set({ areaSize }),
 
@@ -201,24 +211,11 @@ export const useGameStore = create<GameState>()(
       canSelectGrid: (gridKey) => {
         const state = get();
         if (!state.diceResult) return false;
-        if (state.movementPath.length >= state.diceResult) return false;
-
-        const occupied = occupiedGridKeys(state.players, state.currentPlayerName ?? "");
-        if (occupied.has(gridKey)) return false;
-
-        if (!gridHasRoad(gridKey)) return false;
-
-        if (state.gameBounds && !gridKeyWithinBounds(gridKey, state.gameBounds)) return false;
-
-        const lastKey = state.movementPath.length > 0
-          ? state.movementPath[state.movementPath.length - 1]
-          : state.playerStartGridKey;
-        if (lastKey) {
-          if (gridKey === lastKey) return false;
-          const adjacent = getAdjacentGridKeys(lastKey);
-          if (!adjacent.includes(gridKey)) return false;
-        }
-
+        if (!state.reachableGrids) return false;
+        if (gridKey === state.playerStartGridKey) return false;
+        const steps = state.reachableGrids.get(gridKey);
+        if (steps === undefined) return false;
+        if (steps !== state.diceResult) return false;
         return true;
       },
 
@@ -236,6 +233,7 @@ export const useGameStore = create<GameState>()(
         selectedGridSquares: [],
         movementPath: [],
         gridClearRequest: state.gridClearRequest + 1,
+        selectedEndpoint: null,
       })),
 
       updatePlayerPosition: (playerName, position) => {
@@ -272,11 +270,16 @@ export const useGameStore = create<GameState>()(
         const position = snapped ?? currentPlayer.position;
         const startGridKey = latLngToGridKey(position[0], position[1]);
 
+        const occupied = occupiedGridKeys(state.players, state.currentPlayerName ?? "");
+        const reachable = reachableRoadGrids(startGridKey, result, occupied);
+
         const updates: Partial<GameState> = {
           diceResult: result,
           gameTurnState: GameTurnState.DICE_ROLLED,
           playerStartGridKey: startGridKey,
           playerZoomRequest: state.currentPlayerName,
+          reachableGrids: reachable,
+          selectedEndpoint: null,
         };
 
         if (snapped) {
@@ -337,6 +340,8 @@ export const useGameStore = create<GameState>()(
           movementPath: [],
           playerStartGridKey: null,
           gridClearRequest: updatedState.gridClearRequest + 1,
+          reachableGrids: null,
+          selectedEndpoint: null,
         });
       },
 
@@ -395,6 +400,8 @@ export const useGameStore = create<GameState>()(
         players: [],
         currentPlayerName: null,
         gameTurnState: GameTurnState.ROLL_DICE,
+        reachableGrids: null,
+        selectedEndpoint: null,
       }),
     }),
     {
