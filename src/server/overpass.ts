@@ -73,10 +73,10 @@ export async function queryOverpass(query: string): Promise<OverpassResponse> {
   throw lastError ?? new Error("Overpass API: all retries exhausted");
 }
 
-function classifyElement(tags: Record<string, string>): PoiCategory | null {
+function classifyElement(tags: Record<string, string>, elementId: number): PoiCategory | null {
   if (tags["amenity"] === "pub") return "pub";
   if (tags["amenity"] === "place_of_worship" && tags["religion"] === "christian") {
-    return classifyChurch(tags);
+    return classifyChurch(tags, elementId);
   }
   if (tags["building"] === "cathedral") return "spire";
   if (tags["amenity"] === "telephone" || tags["emergency"] === "phone") return "phone";
@@ -114,7 +114,7 @@ export async function validatePoiCoverage(
   const counts: Record<PoiCategory, number> = { pub: 0, spire: 0, tower: 0, phone: 0, school: 0 };
 
   for (const el of data.elements) {
-    const category = classifyElement(el.tags ?? {});
+    const category = classifyElement(el.tags ?? {}, el.id);
     if (category) counts[category]++;
   }
 
