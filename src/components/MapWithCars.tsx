@@ -22,6 +22,7 @@ import SpireMarkers from "./ChurchMarkers";
 import TowerMarkers from "./TowerMarkers";
 import PhoneMarkers from "./PhoneMarkers";
 import SchoolMarkers from "./SchoolMarkers";
+import MapSearch from "./MapSearch";
 
 function createBritishNationalGridCRS(): L.Proj.CRS | null {
   if (typeof window === "undefined") return null;
@@ -156,6 +157,7 @@ export default function MapWithCars() {
         <TowerMarkers />
         <PhoneMarkers />
         <SchoolMarkers />
+        <MapSearch />
       </MapContainer>
     </div>
   );

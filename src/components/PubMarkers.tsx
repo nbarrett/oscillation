@@ -9,7 +9,7 @@ import { PUB_ICON_OPTIONS, POI_COLOURS } from "@/stores/poi-icons";
 import { usePoiSettingsStore } from "@/stores/poi-settings-store";
 import { useCurrentPlayer } from "@/stores/game-store";
 import { api } from "@/lib/trpc/client";
-import { latLngToGridKey, gridHasRoad } from "@/lib/road-data";
+import { latLngToGridKey, gridHasABRoad } from "@/lib/road-data";
 
 const MAX_VISIBLE_MARKERS = 200;
 const BOUNDS_EXPANSION = 0.3;
@@ -75,7 +75,7 @@ export default function PubMarkers() {
     const visible = pubs
       .filter((pub) => {
         if (!mapBounds.contains([pub.lat, pub.lng])) return false;
-        if (!gridHasRoad(latLngToGridKey(pub.lat, pub.lng))) return false;
+        if (!gridHasABRoad(latLngToGridKey(pub.lat, pub.lng))) return false;
         if (playerLatLng) {
           return playerLatLng.distanceTo(L.latLng(pub.lat, pub.lng)) <= POI_RADIUS_METRES;
         }

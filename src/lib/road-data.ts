@@ -6,6 +6,7 @@ const BNG = "+proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-1
 export interface RoadSegment {
   id: number;
   type: 'A' | 'B';
+  highway: string;
   ref?: string;
   coordinates: [number, number][];
 }
@@ -19,6 +20,7 @@ export interface RoadDataCache {
   };
   roads: RoadSegment[];
   gridSquaresWithRoads: Set<string>;
+  gridSquaresWithABRoads: Set<string>;
   timestamp: number;
 }
 
@@ -33,6 +35,7 @@ function saveToStorage(cache: RoadDataCache): void {
       bounds: cache.bounds,
       roads: cache.roads,
       gridSquaresWithRoads: Array.from(cache.gridSquaresWithRoads),
+      gridSquaresWithABRoads: Array.from(cache.gridSquaresWithABRoads),
       timestamp: cache.timestamp,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(serializable));
@@ -54,6 +57,7 @@ function loadFromStorage(): RoadDataCache | null {
       bounds: parsed.bounds,
       roads: parsed.roads,
       gridSquaresWithRoads: new Set(parsed.gridSquaresWithRoads),
+      gridSquaresWithABRoads: new Set(parsed.gridSquaresWithABRoads ?? []),
       timestamp: parsed.timestamp,
     };
   } catch (e) {
@@ -149,6 +153,7 @@ async function queryOverpassForRoads(
           roads.push({
             id: element.id,
             type: roadType,
+            highway,
             ref: element.tags.ref,
             coordinates,
           });
@@ -279,18 +284,21 @@ export async function loadRoadData(
   try {
     const roads = await queryOverpassForRoads(south, west, north, east);
     const gridSquaresWithRoads = calculateGridSquaresWithRoads(roads);
+    const abRoads = roads.filter((r) => r.highway === "primary" || r.highway === "secondary");
+    const gridSquaresWithABRoads = calculateGridSquaresWithRoads(abRoads);
 
     roadDataCache = {
       bounds: { south, west, north, east },
       roads,
       gridSquaresWithRoads,
+      gridSquaresWithABRoads,
       timestamp: Date.now(),
     };
 
     saveToStorage(roadDataCache);
 
     log.info(
-      `Loaded ${roads.length} road segments, ${gridSquaresWithRoads.size} grid squares with roads`
+      `Loaded ${roads.length} road segments, ${gridSquaresWithRoads.size} grid squares with roads, ${gridSquaresWithABRoads.size} with A/B roads`
     );
   } catch (error) {
     log.error("Failed to load road data:", error);
@@ -302,6 +310,13 @@ export function gridHasRoad(gridKey: string): boolean {
     return true;
   }
   return roadDataCache.gridSquaresWithRoads.has(gridKey);
+}
+
+export function gridHasABRoad(gridKey: string): boolean {
+  if (!roadDataCache) {
+    return true;
+  }
+  return roadDataCache.gridSquaresWithABRoads.has(gridKey);
 }
 
 export function getAdjacentRoadGrids(gridKey: string): string[] {

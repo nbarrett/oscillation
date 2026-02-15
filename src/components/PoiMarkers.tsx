@@ -8,7 +8,7 @@ import { useErrorStore } from "@/stores/error-store";
 import { usePoiSettingsStore } from "@/stores/poi-settings-store";
 import { useCurrentPlayer } from "@/stores/game-store";
 import { type PoiItem, type PoiIconOption, type FetchedBounds } from "@/stores/poi-types";
-import { latLngToGridKey, gridHasRoad } from "@/lib/road-data";
+import { latLngToGridKey, gridHasABRoad } from "@/lib/road-data";
 
 const MAX_VISIBLE_MARKERS = 200;
 const BOUNDS_EXPANSION = 0.3;
@@ -97,7 +97,7 @@ export default function PoiMarkers<T extends string>({
     const visible = items
       .filter((item) => {
         if (!mapBounds.contains([item.lat, item.lng])) return false;
-        if (!gridHasRoad(latLngToGridKey(item.lat, item.lng))) return false;
+        if (!gridHasABRoad(latLngToGridKey(item.lat, item.lng))) return false;
         if (playerLatLng) {
           return playerLatLng.distanceTo(L.latLng(item.lat, item.lng)) <= POI_RADIUS_METRES;
         }
