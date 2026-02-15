@@ -66,20 +66,35 @@ function loadFromStorage(): RoadDataCache | null {
   }
 }
 
+const OVERPASS_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+];
+
 async function queryOverpassWithRetry(
-  url: string,
   options: RequestInit,
   maxRetries: number = 3
 ): Promise<Response> {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const response = await fetch(url, options);
-    if (response.status === 429 && attempt < maxRetries) {
-      const delay = Math.pow(2, attempt + 1) * 1000;
-      log.info(`Overpass API rate limited, retrying in ${delay / 1000}s (attempt ${attempt + 1}/${maxRetries})`);
-      await new Promise((resolve) => setTimeout(resolve, delay));
-      continue;
+    const url = OVERPASS_ENDPOINTS[attempt % OVERPASS_ENDPOINTS.length]!;
+    try {
+      const response = await fetch(url, options);
+      if ((response.status === 429 || response.status === 504) && attempt < maxRetries) {
+        const delay = Math.pow(2, attempt + 1) * 1000;
+        log.info(`Overpass API rate limited, retrying in ${delay / 1000}s (attempt ${attempt + 1}/${maxRetries})`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        continue;
+      }
+      return response;
+    } catch (err) {
+      if (attempt < maxRetries) {
+        const delay = Math.pow(2, attempt + 1) * 1000;
+        log.info(`Overpass API fetch failed, retrying in ${delay / 1000}s`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        continue;
+      }
+      throw err;
     }
-    return response;
   }
   throw new Error("Overpass API: max retries exceeded");
 }
@@ -102,7 +117,7 @@ async function queryOverpassForRoads(
     out skel qt;
   `;
 
-  const response = await queryOverpassWithRetry('https://overpass-api.de/api/interpreter', {
+  const response = await queryOverpassWithRetry({
     method: 'POST',
     body: `data=${encodeURIComponent(query)}`,
     headers: {
@@ -114,12 +129,12 @@ async function queryOverpassForRoads(
     throw new Error(`Overpass API error: ${response.status}`);
   }
 
-  const contentType = response.headers.get("content-type") ?? "";
-  if (!contentType.includes("json")) {
-    throw new Error(`Overpass API returned non-JSON response: ${contentType}`);
+  const text = await response.text();
+  if (text.trimStart().startsWith("<")) {
+    throw new Error("Overpass API returned XML instead of JSON");
   }
 
-  const data = await response.json();
+  const data = JSON.parse(text);
 
   const nodes: Map<number, [number, number]> = new Map();
   for (const element of data.elements) {
@@ -191,6 +206,61 @@ export function nearestRoadPosition(lat: number, lng: number): [number, number] 
   }
 
   return bestCoord;
+}
+
+export function roadPathBetween(
+  startLat: number,
+  startLng: number,
+  endLat: number,
+  endLng: number
+): [number, number][] {
+  if (!roadDataCache) return [[startLat, startLng], [endLat, endLng]];
+
+  let bestRoad: RoadSegment | null = null;
+  let bestStartIdx = 0;
+  let bestEndIdx = 0;
+  let bestScore = Infinity;
+
+  for (const road of roadDataCache.roads) {
+    let closestStartIdx = 0;
+    let closestStartDist = Infinity;
+    let closestEndIdx = 0;
+    let closestEndDist = Infinity;
+
+    for (let i = 0; i < road.coordinates.length; i++) {
+      const [rLat, rLng] = road.coordinates[i];
+      const dStart = (rLat - startLat) ** 2 + (rLng - startLng) ** 2;
+      const dEnd = (rLat - endLat) ** 2 + (rLng - endLng) ** 2;
+      if (dStart < closestStartDist) {
+        closestStartDist = dStart;
+        closestStartIdx = i;
+      }
+      if (dEnd < closestEndDist) {
+        closestEndDist = dEnd;
+        closestEndIdx = i;
+      }
+    }
+
+    const score = closestStartDist + closestEndDist;
+    if (score < bestScore) {
+      bestScore = score;
+      bestRoad = road;
+      bestStartIdx = closestStartIdx;
+      bestEndIdx = closestEndIdx;
+    }
+  }
+
+  if (!bestRoad) return [[startLat, startLng], [endLat, endLng]];
+
+  const from = Math.min(bestStartIdx, bestEndIdx);
+  const to = Math.max(bestStartIdx, bestEndIdx);
+  const segment = bestRoad.coordinates.slice(from, to + 1);
+
+  if (bestStartIdx > bestEndIdx) {
+    segment.reverse();
+  }
+
+  return segment.length > 0 ? segment : [[startLat, startLng], [endLat, endLng]];
 }
 
 export function latLngToGridKey(lat: number, lng: number): string {

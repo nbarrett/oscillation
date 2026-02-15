@@ -40,7 +40,7 @@ function parseChurches(data: OverpassResponse) {
       lat: el.lat ?? el.center?.lat,
       lng: el.lon ?? el.center?.lon,
       name: el.tags?.name ?? null,
-      churchType: classifyChurch(el.tags ?? {}),
+      churchType: classifyChurch(el.tags ?? {}, el.id),
     }))
     .filter((el): el is { id: number; lat: number; lng: number; name: string | null; churchType: "spire" | "tower" } =>
       el.lat != null && el.lng != null
