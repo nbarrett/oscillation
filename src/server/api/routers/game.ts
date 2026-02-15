@@ -1,7 +1,10 @@
 import { z } from "zod"
+import { TRPCError } from "@trpc/server"
 import { createTRPCRouter, publicProcedure } from "../trpc"
 import { CAR_STYLES } from "@/stores/car-store"
 import { AREA_SIZES, DEFAULT_AREA_SIZE, areaSizeBounds, isWithinBounds, type AreaSize } from "@/lib/area-size"
+import { validatePoiCoverage } from "@/server/overpass"
+import { POI_CATEGORY_LABELS } from "@/lib/poi-categories"
 
 function generateSessionCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -40,6 +43,17 @@ export const gameRouter = createTRPCRouter({
       }))
     }),
 
+  validateArea: publicProcedure
+    .input(z.object({
+      lat: z.number(),
+      lng: z.number(),
+      areaSize: z.enum(AREA_SIZES as [string, ...string[]]).default(DEFAULT_AREA_SIZE),
+    }))
+    .query(async ({ input }) => {
+      const bounds = areaSizeBounds(input.lat, input.lng, input.areaSize as AreaSize)
+      return validatePoiCoverage(bounds.south, bounds.west, bounds.north, bounds.east)
+    }),
+
   create: publicProcedure
     .input(z.object({
       playerName: z.string().min(1),
@@ -49,6 +63,16 @@ export const gameRouter = createTRPCRouter({
       areaSize: z.enum(AREA_SIZES as [string, ...string[]]).default(DEFAULT_AREA_SIZE),
     }))
     .mutation(async ({ ctx, input }) => {
+      const bounds = areaSizeBounds(input.startLat, input.startLng, input.areaSize as AreaSize)
+      const validation = await validatePoiCoverage(bounds.south, bounds.west, bounds.north, bounds.east)
+      if (!validation.valid) {
+        const missingNames = validation.missing.map((cat) => POI_CATEGORY_LABELS[cat]).join(", ")
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Area is missing required POI types: ${missingNames}. Choose a different location or larger area.`,
+        })
+      }
+
       let code = generateSessionCode()
       let attempts = 0
       while (attempts < 10) {
