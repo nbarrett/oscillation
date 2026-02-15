@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { log } from "@/lib/utils";
 import { queryOverpass, type OverpassResponse } from "@/server/overpass";
+import { classifyChurch } from "@/lib/poi-categories";
 
 const boundsInput = z.object({
   south: z.number(),
@@ -39,9 +40,9 @@ function parseChurches(data: OverpassResponse) {
       lat: el.lat ?? el.center?.lat,
       lng: el.lon ?? el.center?.lon,
       name: el.tags?.name ?? null,
-      towerType: el.tags?.["tower:type"] ?? null,
+      churchType: classifyChurch(el.tags ?? {}),
     }))
-    .filter((el): el is { id: number; lat: number; lng: number; name: string | null; towerType: string | null } =>
+    .filter((el): el is { id: number; lat: number; lng: number; name: string | null; churchType: "spire" | "tower" } =>
       el.lat != null && el.lng != null
     );
 }
@@ -53,7 +54,7 @@ export const churchesRouter = createTRPCRouter({
       const bbox = `${input.south},${input.west},${input.north},${input.east}`;
       const data = await fetchAllChurches(bbox);
       const all = parseChurches(data);
-      const spires = all.filter((c) => c.towerType === "spire");
+      const spires = all.filter((c) => c.churchType === "spire");
       log.debug("Churches with spires:", spires.length, "of", all.length, "total churches");
       return spires;
     }),
@@ -64,7 +65,7 @@ export const churchesRouter = createTRPCRouter({
       const bbox = `${input.south},${input.west},${input.north},${input.east}`;
       const data = await fetchAllChurches(bbox);
       const all = parseChurches(data);
-      const towers = all.filter((c) => c.towerType !== "spire");
+      const towers = all.filter((c) => c.churchType === "tower");
       log.debug("Churches with towers:", towers.length, "of", all.length, "total churches");
       return towers;
     }),

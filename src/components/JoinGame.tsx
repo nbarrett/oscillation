@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useSession, signIn } from "next-auth/react"
-import { Users, Plus, LogIn, Copy, Check, Loader2, UserPlus, ChevronLeft } from "lucide-react"
+import { Users, Plus, LogIn, Copy, Check, Loader2, UserPlus, ChevronLeft, X } from "lucide-react"
 import { trpc } from "@/lib/trpc/client"
 import { useGameStore } from "@/stores/game-store"
 import { useCarStore } from "@/stores/car-store"
@@ -29,6 +29,7 @@ import {
 import AddStartingPointDialog from "./AddStartingPointDialog"
 import { asTitle } from "@/lib/utils"
 import { type AreaSize, AREA_SIZES, AREA_SIZE_PRESETS, DEFAULT_AREA_SIZE } from "@/lib/area-size"
+import { POI_CATEGORIES, POI_CATEGORY_LABELS } from "@/lib/poi-categories"
 
 interface JoinGameProps {
   startingPosition: [number, number] | null
@@ -102,6 +103,11 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
 
   const pinMismatch = confirmPin.length > 0 && registerPin !== confirmPin
   const selectedLocation = locations?.find(l => l.id === selectedLocationId)
+
+  const validation = trpc.game.validateArea.useQuery(
+    { lat: selectedLocation?.lat ?? 0, lng: selectedLocation?.lng ?? 0, areaSize },
+    { enabled: mode === "create" && !!selectedLocation, staleTime: 5 * 60 * 1000 },
+  )
 
   function setAuthTab(tab: AuthTab) {
     setAuthTabState(tab)
@@ -399,6 +405,44 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
             </>
           )}
 
+          {mode === "create" && selectedLocation && (
+            <div className="space-y-2">
+              <Label>POI Coverage</Label>
+              {validation.isLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Checking area...
+                </div>
+              ) : validation.data ? (
+                <div className="space-y-1">
+                  <div className="grid grid-cols-2 gap-1">
+                    {POI_CATEGORIES.map((cat) => {
+                      const count = validation.data!.counts[cat];
+                      const present = count > 0;
+                      return (
+                        <div key={cat} className="flex items-center gap-1.5 text-sm">
+                          {present ? (
+                            <Check className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                          ) : (
+                            <X className="h-3.5 w-3.5 text-destructive shrink-0" />
+                          )}
+                          <span className={present ? "text-foreground" : "text-destructive"}>
+                            {POI_CATEGORY_LABELS[cat]} ({count})
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {!validation.data.valid && (
+                    <p className="text-xs text-destructive mt-1">
+                      Missing POI types — choose a different location or larger area
+                    </p>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          )}
+
           {mode === "join" && (
             <div className="space-y-4">
               {availableGames && availableGames.length > 0 && (
@@ -455,7 +499,10 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
             <Button
               className="flex-1 gap-2"
               onClick={mode === "create" ? handleCreate : handleJoin}
-              disabled={createGame.isPending || joinGame.isPending}
+              disabled={
+                createGame.isPending || joinGame.isPending ||
+                (mode === "create" && (validation.isLoading || validation.data?.valid === false))
+              }
             >
               {(createGame.isPending || joinGame.isPending) && <Loader2 className="h-4 w-4 animate-spin" />}
               {mode === "create" ? "Create Game" : "Join Game"}

@@ -1,4 +1,5 @@
 import { log } from "@/lib/utils";
+import { POI_CATEGORIES, classifyChurch, type PoiCategory, type PoiValidationResult } from "@/lib/poi-categories";
 
 const OVERPASS_ENDPOINTS = [
   "https://overpass-api.de/api/interpreter",
@@ -50,7 +51,13 @@ export async function queryOverpass(query: string): Promise<OverpassResponse> {
         throw new Error(`Overpass API error: ${response.statusText}`);
       }
 
-      return (await response.json()) as OverpassResponse;
+      const text = await response.text();
+      if (text.trimStart().startsWith("<")) {
+        lastError = new Error("Overpass API returned XML instead of JSON");
+        continue;
+      }
+
+      return JSON.parse(text) as OverpassResponse;
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
       if (err instanceof TypeError || (err as { code?: string }).code === "ECONNREFUSED") {
@@ -64,4 +71,56 @@ export async function queryOverpass(query: string): Promise<OverpassResponse> {
   }
 
   throw lastError ?? new Error("Overpass API: all retries exhausted");
+}
+
+function classifyElement(tags: Record<string, string>): PoiCategory | null {
+  if (tags["amenity"] === "pub") return "pub";
+  if (tags["amenity"] === "place_of_worship" && tags["religion"] === "christian") {
+    return classifyChurch(tags);
+  }
+  if (tags["building"] === "cathedral") return "spire";
+  if (tags["amenity"] === "telephone" || tags["emergency"] === "phone") return "phone";
+  if (tags["amenity"] === "school" || tags["amenity"] === "college") return "school";
+  return null;
+}
+
+export async function validatePoiCoverage(
+  south: number,
+  west: number,
+  north: number,
+  east: number,
+): Promise<PoiValidationResult> {
+  const bbox = `${south},${west},${north},${east}`;
+
+  const query = [
+    "[out:json][timeout:25];",
+    "(",
+    `node["amenity"="pub"](${bbox});`,
+    `node["amenity"="place_of_worship"]["religion"="christian"](${bbox});`,
+    `way["amenity"="place_of_worship"]["religion"="christian"](${bbox});`,
+    `way["building"="cathedral"](${bbox});`,
+    `node["amenity"="telephone"](${bbox});`,
+    `node["emergency"="phone"](${bbox});`,
+    `node["amenity"="school"](${bbox});`,
+    `way["amenity"="school"](${bbox});`,
+    `node["amenity"="college"](${bbox});`,
+    `way["amenity"="college"](${bbox});`,
+    ");",
+    "out center tags;",
+  ].join("");
+
+  const data = await queryOverpass(query);
+
+  const counts: Record<PoiCategory, number> = { pub: 0, spire: 0, tower: 0, phone: 0, school: 0 };
+
+  for (const el of data.elements) {
+    const category = classifyElement(el.tags ?? {});
+    if (category) counts[category]++;
+  }
+
+  const missing = POI_CATEGORIES.filter((cat) => counts[cat] === 0);
+
+  log.debug("POI validation:", counts, "missing:", missing);
+
+  return { valid: missing.length === 0, counts, missing };
 }
