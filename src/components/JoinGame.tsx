@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/select"
 import AddStartingPointDialog from "./AddStartingPointDialog"
 import { asTitle } from "@/lib/utils"
+import { type AreaSize, AREA_SIZES, AREA_SIZE_PRESETS, DEFAULT_AREA_SIZE } from "@/lib/area-size"
 
 interface JoinGameProps {
   startingPosition: [number, number] | null
@@ -90,6 +91,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
   const [registerPin, setRegisterPin] = useState("")
   const [confirmPin, setConfirmPin] = useState("")
   const [selectedLocationId, setSelectedLocationId] = useState<string>("")
+  const [areaSize, setAreaSize] = useState<AreaSize>(DEFAULT_AREA_SIZE)
 
   const { setSessionId, setPlayerId, setSessionCode } = useGameStore()
   const { preferredCar } = useCarStore()
@@ -247,6 +249,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
       startLat: selectedLocation.lat,
       startLng: selectedLocation.lng,
       iconType: preferredCar,
+      areaSize,
     })
   }
 
@@ -344,25 +347,56 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
           <CarIconSelector />
 
           {mode === "create" && (
-            <div className="space-y-2">
-              <Label>Starting Point</Label>
-              <p className="text-xs text-muted-foreground">Must be on an A road (pink roads on the map)</p>
-              <div className="flex items-center gap-2">
-                <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Select starting point" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {locations?.map((location) => (
-                      <SelectItem key={location.id} value={location.id}>
-                        {asTitle(location.name)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <AddStartingPointDialog onSuccess={refetchLocations} />
+            <>
+              <div className="space-y-2">
+                <Label>Starting Point</Label>
+                <p className="text-xs text-muted-foreground">Must be on an A road (pink roads on the map)</p>
+                <div className="flex items-center gap-2">
+                  <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Select starting point" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locations?.map((location) => (
+                        <SelectItem key={location.id} value={location.id}>
+                          {asTitle(location.name)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <AddStartingPointDialog onSuccess={refetchLocations} />
+                </div>
               </div>
-            </div>
+
+              <div className="space-y-2">
+                <Label>Game Area Size</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {AREA_SIZES.map((size) => {
+                    const preset = AREA_SIZE_PRESETS[size];
+                    return (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => setAreaSize(size)}
+                        className={`p-3 rounded-lg border text-left transition-colors ${
+                          areaSize === size
+                            ? "border-primary bg-primary/5"
+                            : "border-input hover:bg-muted"
+                        }`}
+                      >
+                        <div className="font-semibold text-sm">{preset.label}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {preset.widthKm}x{preset.heightKm} km
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {preset.recommendedPlayers}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
           )}
 
           {mode === "join" && (
