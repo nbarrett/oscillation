@@ -4,9 +4,10 @@ import { useEffect, useRef } from "react"
 import { trpc } from "@/lib/trpc/client"
 import { useGameStore, GameTurnState, Player } from "@/stores/game-store"
 import { useNotificationStore } from "@/stores/notification-store"
+import { areaSizeBounds, type AreaSize } from "@/lib/area-size"
 
 export default function GameSync() {
-  const { sessionId, playerId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName, leaveSession } = useGameStore()
+  const { sessionId, playerId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, leaveSession } = useGameStore()
   const { addNotification } = useNotificationStore()
   const hasCheckedSession = useRef(false)
   const previousPlayerNamesRef = useRef<string[]>([])
@@ -50,6 +51,7 @@ export default function GameSync() {
             iconType: p.iconType,
             position: localPlayer.position,
             previousPosition: localPlayer.previousPosition,
+            completedRoute: localPlayer.completedRoute,
           }
         }
         return {
@@ -57,6 +59,7 @@ export default function GameSync() {
           iconType: p.iconType,
           position: p.position,
           previousPosition: null,
+          completedRoute: null,
         }
       })
 
@@ -65,6 +68,13 @@ export default function GameSync() {
       const myPlayer = gameState.players.find(p => p.id === playerId)
       if (myPlayer) {
         setLocalPlayerName(myPlayer.name)
+      }
+
+      if (gameState.areaSize) {
+        setAreaSize(gameState.areaSize)
+        if (gameState.startLat != null && gameState.startLng != null) {
+          setGameBounds(areaSizeBounds(gameState.startLat, gameState.startLng, gameState.areaSize))
+        }
       }
 
       const { pendingServerUpdate } = useGameStore.getState()
@@ -91,7 +101,7 @@ export default function GameSync() {
         }
       }
     }
-  }, [gameState, playerId, addNotification, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName])
+  }, [gameState, playerId, addNotification, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds])
 
   return null
 }

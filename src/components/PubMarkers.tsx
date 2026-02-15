@@ -7,9 +7,10 @@ import { log } from "@/lib/utils";
 import { usePubStore } from "@/stores/pub-store";
 import { PUB_ICON_OPTIONS, POI_COLOURS } from "@/stores/poi-icons";
 import { usePoiSettingsStore } from "@/stores/poi-settings-store";
-import { useCurrentPlayer } from "@/stores/game-store";
+import { useCurrentPlayer, useGameStore } from "@/stores/game-store";
 import { api } from "@/lib/trpc/client";
 import { latLngToGridKey, gridHasABRoad } from "@/lib/road-data";
+import { isWithinBounds } from "@/lib/area-size";
 
 const MAX_VISIBLE_MARKERS = 200;
 const BOUNDS_EXPANSION = 0.3;
@@ -53,6 +54,7 @@ export default function PubMarkers() {
   const { pubs, showPubs, pubIconStyle, setPubs, setFetchedBounds, boundsContainedByFetched } = usePubStore();
   const iconDetailMode = usePoiSettingsStore((s) => s.iconDetailMode);
   const currentPlayer = useCurrentPlayer();
+  const gameBounds = useGameStore((s) => s.gameBounds);
 
   const icon = useMemo(() => {
     const option = PUB_ICON_OPTIONS.find((o) => o.style === pubIconStyle) ?? PUB_ICON_OPTIONS[0]!;
@@ -75,6 +77,7 @@ export default function PubMarkers() {
     const visible = pubs
       .filter((pub) => {
         if (!mapBounds.contains([pub.lat, pub.lng])) return false;
+        if (gameBounds && !isWithinBounds(pub.lat, pub.lng, gameBounds)) return false;
         if (!gridHasABRoad(latLngToGridKey(pub.lat, pub.lng))) return false;
         if (playerLatLng) {
           return playerLatLng.distanceTo(L.latLng(pub.lat, pub.lng)) <= POI_RADIUS_METRES;
@@ -92,7 +95,7 @@ export default function PubMarkers() {
     }
 
     log.debug("PubMarkers: rendered", visible.length, "of", pubs.length, "pubs");
-  }, [map, pubs, showPubs, icon, currentPlayer]);
+  }, [map, pubs, showPubs, icon, currentPlayer, gameBounds]);
 
   const fetchPubs = useCallback(async () => {
     if (!map || fetchingRef.current) return;

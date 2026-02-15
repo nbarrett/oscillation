@@ -6,9 +6,10 @@ import L from "leaflet";
 import { log } from "@/lib/utils";
 import { useErrorStore } from "@/stores/error-store";
 import { usePoiSettingsStore } from "@/stores/poi-settings-store";
-import { useCurrentPlayer } from "@/stores/game-store";
+import { useCurrentPlayer, useGameStore } from "@/stores/game-store";
 import { type PoiItem, type PoiIconOption, type FetchedBounds } from "@/stores/poi-types";
 import { latLngToGridKey, gridHasABRoad } from "@/lib/road-data";
+import { isWithinBounds } from "@/lib/area-size";
 
 const MAX_VISIBLE_MARKERS = 200;
 const BOUNDS_EXPANSION = 0.3;
@@ -75,6 +76,7 @@ export default function PoiMarkers<T extends string>({
   const addError = useErrorStore((s) => s.addError);
   const iconDetailMode = usePoiSettingsStore((s) => s.iconDetailMode);
   const currentPlayer = useCurrentPlayer();
+  const gameBounds = useGameStore((s) => s.gameBounds);
 
   const icon = useMemo(() => {
     const option = iconOptions.find((o) => o.style === iconStyle) ?? iconOptions[0]!;
@@ -97,6 +99,7 @@ export default function PoiMarkers<T extends string>({
     const visible = items
       .filter((item) => {
         if (!mapBounds.contains([item.lat, item.lng])) return false;
+        if (gameBounds && !isWithinBounds(item.lat, item.lng, gameBounds)) return false;
         if (!gridHasABRoad(latLngToGridKey(item.lat, item.lng))) return false;
         if (playerLatLng) {
           return playerLatLng.distanceTo(L.latLng(item.lat, item.lng)) <= POI_RADIUS_METRES;
@@ -114,7 +117,7 @@ export default function PoiMarkers<T extends string>({
     }
 
     log.debug(`${label}: rendered`, visible.length, "of", items.length);
-  }, [map, items, show, icon, label, currentPlayer]);
+  }, [map, items, show, icon, label, currentPlayer, gameBounds]);
 
   const fetchData = useCallback(async () => {
     if (!map || fetchingRef.current) return;

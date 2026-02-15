@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { createTRPCRouter, publicProcedure } from "../trpc"
 import { CAR_STYLES } from "@/stores/car-store"
+import { AREA_SIZES, DEFAULT_AREA_SIZE, areaSizeBounds, isWithinBounds, type AreaSize } from "@/lib/area-size"
 
 function generateSessionCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -45,6 +46,7 @@ export const gameRouter = createTRPCRouter({
       startLat: z.number(),
       startLng: z.number(),
       iconType: z.string().optional(),
+      areaSize: z.enum(AREA_SIZES as [string, ...string[]]).default(DEFAULT_AREA_SIZE),
     }))
     .mutation(async ({ ctx, input }) => {
       let code = generateSessionCode()
@@ -61,6 +63,7 @@ export const gameRouter = createTRPCRouter({
           code,
           startLat: input.startLat,
           startLng: input.startLng,
+          areaSize: input.areaSize,
           players: {
             create: {
               name: input.playerName,
@@ -160,6 +163,7 @@ export const gameRouter = createTRPCRouter({
         dice2: session.dice2,
         startLat: session.startLat,
         startLng: session.startLng,
+        areaSize: session.areaSize as AreaSize,
         players: session.players.map(p => ({
           id: p.id,
           name: p.name,
@@ -227,6 +231,13 @@ export const gameRouter = createTRPCRouter({
       }
 
       if (input.newLat != null && input.newLng != null) {
+        if (session.startLat != null && session.startLng != null) {
+          const bounds = areaSizeBounds(session.startLat, session.startLng, session.areaSize as AreaSize);
+          if (!isWithinBounds(input.newLat, input.newLng, bounds)) {
+            throw new Error("Move is outside the game boundary.")
+          }
+        }
+
         await ctx.db.gamePlayer.update({
           where: { id: input.playerId },
           data: {

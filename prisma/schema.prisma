@@ -36,6 +36,7 @@ model GameSession {
   dice2         Int?
   startLat      Float?
   startLng      Float?
+  areaSize      String   @default("standard")
   mapZoom       Int      @default(7)
   mapCentreLat  Float?
   mapCentreLng  Float?

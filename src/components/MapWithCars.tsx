@@ -8,6 +8,7 @@ import { useGameStore } from "@/stores/game-store";
 import { useMapStore, MapLayers, MappingProvider, ProjectionValue } from "@/stores/map-store";
 import { useRouteStore } from "@/stores/route-store";
 import { log } from "@/lib/utils";
+import { loadRoadData } from "@/lib/road-data";
 import "proj4leaflet";
 import PlayerCar from "./PlayerCar";
 import RecordMapCentreAndZoom from "./RecordMapCentreAndZoom";
@@ -23,6 +24,8 @@ import TowerMarkers from "./TowerMarkers";
 import PhoneMarkers from "./PhoneMarkers";
 import SchoolMarkers from "./SchoolMarkers";
 import MapSearch from "./MapSearch";
+import GameBoundary from "./GameBoundary";
+import { AREA_SIZE_PRESETS } from "@/lib/area-size";
 
 function createBritishNationalGridCRS(): L.Proj.CRS | null {
   if (typeof window === "undefined") return null;
@@ -37,7 +40,7 @@ function createBritishNationalGridCRS(): L.Proj.CRS | null {
 }
 
 export default function MapWithCars() {
-  const { players, mapZoom, mapCentre, setMapZoom, playerZoomRequest, setPlayerZoomRequest } = useGameStore();
+  const { players, mapZoom, mapCentre, setMapZoom, playerZoomRequest, setPlayerZoomRequest, areaSize } = useGameStore();
   const { accessToken, mapLayer, mappingProvider } = useMapStore();
   const { startingPosition } = useRouteStore();
 
@@ -70,6 +73,12 @@ export default function MapWithCars() {
       }, 100);
     }
   }, [map]);
+
+  useEffect(() => {
+    if (map && startingPosition) {
+      void loadRoadData(startingPosition.lat, startingPosition.lng, AREA_SIZE_PRESETS[areaSize].roadRadiusKm);
+    }
+  }, [map, startingPosition, areaSize]);
 
   useEffect(() => {
     if (playerToZoom && map) {
@@ -158,6 +167,7 @@ export default function MapWithCars() {
         <PhoneMarkers />
         <SchoolMarkers />
         <MapSearch />
+        <GameBoundary />
       </MapContainer>
     </div>
   );

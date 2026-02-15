@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware"
 import { log } from "@/lib/utils"
 import { latLngToGridKey, gridKeyToLatLng, gridHasRoad, isRoadDataLoaded, nearestRoadPosition } from "@/lib/road-data"
 import { CAR_STYLES } from "@/stores/car-store"
+import { type AreaSize, type GameBounds, DEFAULT_AREA_SIZE, gridKeyWithinBounds } from "@/lib/area-size"
 
 export enum GameTurnState {
   ROLL_DICE = "ROLL_DICE",
@@ -14,6 +15,7 @@ export enum GameTurnState {
 export interface Player {
   position: [number, number];
   previousPosition: [number, number] | null;
+  completedRoute: [number, number][] | null;
   name: string;
   iconType: string
 }
@@ -84,12 +86,16 @@ interface GameState {
   playerStartGridKey: string | null;
   playerZoomRequest: string | null;
   gridClearRequest: number;
+  areaSize: AreaSize;
+  gameBounds: GameBounds | null;
   sessionId: string | null;
   playerId: string | null;
   sessionCode: string | null;
   localPlayerName: string | null;
   pendingServerUpdate: boolean;
 
+  setAreaSize: (areaSize: AreaSize) => void;
+  setGameBounds: (bounds: GameBounds | null) => void;
   setPlayers: (players: Player[]) => void;
   setGameTurnState: (state: GameTurnState) => void;
   setCurrentPlayer: (name: string) => void;
@@ -139,11 +145,17 @@ export const useGameStore = create<GameState>()(
       playerStartGridKey: null,
       playerZoomRequest: null,
       gridClearRequest: 0,
+      areaSize: DEFAULT_AREA_SIZE,
+      gameBounds: null,
       sessionId: null,
       playerId: null,
       sessionCode: null,
       localPlayerName: null,
       pendingServerUpdate: false,
+
+      setAreaSize: (areaSize) => set({ areaSize }),
+
+      setGameBounds: (gameBounds) => set({ gameBounds }),
 
       setPlayers: (players) => set({ players }),
 
@@ -190,12 +202,22 @@ export const useGameStore = create<GameState>()(
         const state = get();
         if (!state.diceResult) return false;
         if (state.movementPath.length >= state.diceResult) return false;
-        if (state.movementPath.includes(gridKey)) return false;
 
         const occupied = occupiedGridKeys(state.players, state.currentPlayerName ?? "");
         if (occupied.has(gridKey)) return false;
 
-        if (gridKey === state.playerStartGridKey) return false;
+        if (!gridHasRoad(gridKey)) return false;
+
+        if (state.gameBounds && !gridKeyWithinBounds(gridKey, state.gameBounds)) return false;
+
+        const lastKey = state.movementPath.length > 0
+          ? state.movementPath[state.movementPath.length - 1]
+          : state.playerStartGridKey;
+        if (lastKey) {
+          if (gridKey === lastKey) return false;
+          const adjacent = getAdjacentGridKeys(lastKey);
+          if (!adjacent.includes(gridKey)) return false;
+        }
 
         return true;
       },
@@ -271,10 +293,33 @@ export const useGameStore = create<GameState>()(
       handleEndTurn: () => {
         const state = get();
 
+        let routeCoords: [number, number][] | null = null;
+
         if (state.movementPath.length > 0 && state.currentPlayerName) {
+          const currentPlayer = state.players.find((p) => p.name === state.currentPlayerName);
+          const startCoord: [number, number] = currentPlayer
+            ? [currentPlayer.position[0], currentPlayer.position[1]]
+            : gridKeyToLatLng(state.playerStartGridKey!);
+          routeCoords = [
+            startCoord,
+            ...state.movementPath.map((key) => gridKeyToLatLng(key)),
+          ];
+
           const lastGridKey = state.movementPath[state.movementPath.length - 1];
           const destination = gridKeyToLatLng(lastGridKey);
-          get().movePlayerTo(state.currentPlayerName, destination);
+
+          set({
+            players: state.players.map((player) =>
+              player.name === state.currentPlayerName
+                ? {
+                    ...player,
+                    previousPosition: player.position,
+                    position: destination,
+                    completedRoute: routeCoords,
+                  }
+                : player
+            ),
+          });
         }
 
         const updatedState = get();
@@ -297,15 +342,13 @@ export const useGameStore = create<GameState>()(
 
       playerRouteReceived: () => {
         const state = get();
-        const currentPlayer = state.players.find(
-          (p) => p.name === state.currentPlayerName
-        );
-        log.debug("playerRouteReceived: currentPlayer:", currentPlayer?.name, "previousPosition:", currentPlayer?.previousPosition);
-        if (currentPlayer?.previousPosition) {
+        const movedPlayer = state.players.find((p) => p.completedRoute !== null);
+        log.debug("playerRouteReceived: movedPlayer:", movedPlayer?.name);
+        if (movedPlayer) {
           set({
             players: state.players.map((player) =>
-              player.name === state.currentPlayerName
-                ? { ...player, previousPosition: null }
+              player.name === movedPlayer.name
+                ? { ...player, previousPosition: null, completedRoute: null }
                 : player
             ),
           });
@@ -321,6 +364,7 @@ export const useGameStore = create<GameState>()(
             startingPosition[1] + -0.0002467632293701172 * index,
           ] as [number, number],
           previousPosition: null,
+          completedRoute: null,
         }))
 
         set({
@@ -346,6 +390,8 @@ export const useGameStore = create<GameState>()(
         playerId: null,
         sessionCode: null,
         localPlayerName: null,
+        areaSize: DEFAULT_AREA_SIZE,
+        gameBounds: null,
         players: [],
         currentPlayerName: null,
         gameTurnState: GameTurnState.ROLL_DICE,
@@ -360,6 +406,7 @@ export const useGameStore = create<GameState>()(
         playerId: state.playerId,
         sessionCode: state.sessionCode,
         localPlayerName: state.localPlayerName,
+        areaSize: state.areaSize,
       }),
     }
   )
