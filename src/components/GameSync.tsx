@@ -2,15 +2,16 @@
 
 import { useEffect, useRef } from "react"
 import { trpc } from "@/lib/trpc/client"
-import { useGameStore, GameTurnState, Player } from "@/stores/game-store"
+import { useGameStore, GameTurnState, type Player, type GamePhase } from "@/stores/game-store"
 import { useNotificationStore } from "@/stores/notification-store"
 import { areaSizeBounds, type AreaSize } from "@/lib/area-size"
 
 export default function GameSync() {
-  const { sessionId, playerId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, leaveSession } = useGameStore()
+  const { sessionId, playerId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setWinnerName, leaveSession } = useGameStore()
   const { addNotification } = useNotificationStore()
   const hasCheckedSession = useRef(false)
   const previousPlayerNamesRef = useRef<string[]>([])
+  const previousPhaseRef = useRef<string | null>(null)
 
   const { data: gameState, isFetched } = trpc.game.state.useQuery(
     { sessionId: sessionId! },
@@ -43,6 +44,21 @@ export default function GameSync() {
       }
       previousPlayerNamesRef.current = currentPlayerNames
 
+      const serverPhase = gameState.phase as GamePhase
+      const prevPhase = previousPhaseRef.current
+      if (prevPhase && prevPhase !== serverPhase) {
+        if (serverPhase === "playing") {
+          addNotification("Game started!", "success")
+        } else if (serverPhase === "ended") {
+          addNotification("Game over!", "info")
+        }
+      }
+      previousPhaseRef.current = serverPhase
+
+      setPhase(serverPhase)
+      setCreatorPlayerId(gameState.creatorPlayerId ?? null)
+      setSelectedPois(gameState.selectedPois ?? null)
+
       const players: Player[] = gameState.players.map(p => {
         const localPlayer = localPlayers.find(lp => lp.name === p.name)
         if (localPlayer?.previousPosition) {
@@ -52,6 +68,8 @@ export default function GameSync() {
             position: localPlayer.position,
             previousPosition: localPlayer.previousPosition,
             completedRoute: localPlayer.completedRoute,
+            visitedPois: p.visitedPois,
+            hasReturnedToStart: p.hasReturnedToStart,
           }
         }
         return {
@@ -60,6 +78,8 @@ export default function GameSync() {
           position: p.position,
           previousPosition: null,
           completedRoute: null,
+          visitedPois: p.visitedPois,
+          hasReturnedToStart: p.hasReturnedToStart,
         }
       })
 
@@ -100,8 +120,13 @@ export default function GameSync() {
           setGameTurnState(GameTurnState.ROLL_DICE)
         }
       }
+
+      if (serverPhase === "ended") {
+        const winningPlayer = gameState.players.find(p => p.hasReturnedToStart)
+        setWinnerName(winningPlayer?.name ?? null)
+      }
     }
-  }, [gameState, playerId, addNotification, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds])
+  }, [gameState, playerId, addNotification, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setWinnerName])
 
   return null
 }

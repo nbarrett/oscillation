@@ -12,12 +12,24 @@ export enum GameTurnState {
   END_TURN = "END_TURN",
 }
 
+export type GamePhase = "lobby" | "playing" | "ended"
+
+export interface SelectedPoi {
+  category: string;
+  osmId: number;
+  name: string | null;
+  lat: number;
+  lng: number;
+}
+
 export interface Player {
   position: [number, number];
   previousPosition: [number, number] | null;
   completedRoute: [number, number][] | null;
   name: string;
-  iconType: string
+  iconType: string;
+  visitedPois: string[];
+  hasReturnedToStart: boolean;
 }
 
 export interface GridReferenceData {
@@ -95,6 +107,10 @@ interface GameState {
   reachableGrids: Map<string, number> | null;
   selectedEndpoint: string | null;
   pendingServerUpdate: boolean;
+  phase: GamePhase;
+  creatorPlayerId: string | null;
+  selectedPois: SelectedPoi[] | null;
+  winnerName: string | null;
 
   setReachableGrids: (grids: Map<string, number> | null) => void;
   setSelectedEndpoint: (endpoint: string | null) => void;
@@ -129,6 +145,11 @@ interface GameState {
   setSessionCode: (code: string | null) => void;
   setLocalPlayerName: (name: string | null) => void;
   setPendingServerUpdate: (pending: boolean) => void;
+  setPhase: (phase: GamePhase) => void;
+  setCreatorPlayerId: (id: string | null) => void;
+  setSelectedPois: (pois: SelectedPoi[] | null) => void;
+  setWinnerName: (name: string | null) => void;
+  isCreator: () => boolean;
   leaveSession: () => void;
 }
 
@@ -158,6 +179,10 @@ export const useGameStore = create<GameState>()(
       reachableGrids: null,
       selectedEndpoint: null,
       pendingServerUpdate: false,
+      phase: "lobby" as GamePhase,
+      creatorPlayerId: null,
+      selectedPois: null,
+      winnerName: null,
 
       setReachableGrids: (reachableGrids) => set({ reachableGrids }),
 
@@ -370,6 +395,8 @@ export const useGameStore = create<GameState>()(
           ] as [number, number],
           previousPosition: null,
           completedRoute: null,
+          visitedPois: [],
+          hasReturnedToStart: false,
         }))
 
         set({
@@ -390,6 +417,19 @@ export const useGameStore = create<GameState>()(
 
       setPendingServerUpdate: (pendingServerUpdate) => set({ pendingServerUpdate }),
 
+      setPhase: (phase) => set({ phase }),
+
+      setCreatorPlayerId: (creatorPlayerId) => set({ creatorPlayerId }),
+
+      setSelectedPois: (selectedPois) => set({ selectedPois }),
+
+      setWinnerName: (winnerName) => set({ winnerName }),
+
+      isCreator: () => {
+        const state = get();
+        return state.playerId !== null && state.playerId === state.creatorPlayerId;
+      },
+
       leaveSession: () => set({
         sessionId: null,
         playerId: null,
@@ -402,6 +442,10 @@ export const useGameStore = create<GameState>()(
         gameTurnState: GameTurnState.ROLL_DICE,
         reachableGrids: null,
         selectedEndpoint: null,
+        phase: "lobby" as GamePhase,
+        creatorPlayerId: null,
+        selectedPois: null,
+        winnerName: null,
       }),
     }),
     {
@@ -414,6 +458,8 @@ export const useGameStore = create<GameState>()(
         sessionCode: state.sessionCode,
         localPlayerName: state.localPlayerName,
         areaSize: state.areaSize,
+        phase: state.phase,
+        creatorPlayerId: state.creatorPlayerId,
       }),
     }
   )

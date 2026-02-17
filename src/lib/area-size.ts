@@ -15,10 +15,10 @@ export interface AreaSizePreset {
 }
 
 export const AREA_SIZE_PRESETS: Record<AreaSize, AreaSizePreset> = {
-  tutorial: { label: "Tutorial", widthKm: 8, heightKm: 8, roadRadiusKm: 6, recommendedPlayers: "1 player" },
-  small: { label: "Small", widthKm: 10, heightKm: 10, roadRadiusKm: 8, recommendedPlayers: "2-4 players" },
-  standard: { label: "Standard", widthKm: 17, heightKm: 14, roadRadiusKm: 15, recommendedPlayers: "2-4 players" },
-  large: { label: "Large", widthKm: 25, heightKm: 20, roadRadiusKm: 20, recommendedPlayers: "4+ players" },
+  tutorial: { label: "Tutorial", widthKm: 16, heightKm: 16, roadRadiusKm: 12, recommendedPlayers: "1 player" },
+  small: { label: "Small", widthKm: 20, heightKm: 20, roadRadiusKm: 16, recommendedPlayers: "2-4 players" },
+  standard: { label: "Standard", widthKm: 34, heightKm: 28, roadRadiusKm: 30, recommendedPlayers: "2-4 players" },
+  large: { label: "Large", widthKm: 50, heightKm: 40, roadRadiusKm: 40, recommendedPlayers: "4+ players" },
 };
 
 export const DEFAULT_AREA_SIZE: AreaSize = "standard";

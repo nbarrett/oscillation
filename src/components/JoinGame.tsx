@@ -94,7 +94,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
   const [selectedLocationId, setSelectedLocationId] = useState<string>("")
   const [areaSize, setAreaSize] = useState<AreaSize>(DEFAULT_AREA_SIZE)
 
-  const { setSessionId, setPlayerId, setSessionCode } = useGameStore()
+  const { setSessionId, setPlayerId, setSessionCode, setCreatorPlayerId } = useGameStore()
   const { preferredCar } = useCarStore()
   const { data: locations, refetch: refetchLocations } = trpc.locations.getAll.useQuery()
   const { data: availableGames } = trpc.game.list.useQuery()
@@ -162,6 +162,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
       setSessionId(data.sessionId)
       setPlayerId(data.playerId)
       setSessionCode(data.code)
+      setCreatorPlayerId(data.creatorPlayerId)
       setCreatedCode(data.code)
     },
     onError: (err) => setError(err.message),
@@ -290,29 +291,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
   }
 
   if (createdCode) {
-    return (
-      <div className="w-full max-w-2xl mx-auto overflow-hidden rounded-lg border bg-card">
-        <MapPreviewHeader height="h-80" />
-        <div className="p-6 text-center space-y-4">
-          <div>
-            <h2 className="text-xl font-semibold flex items-center justify-center gap-2">
-              <Users className="h-5 w-5" />
-              Game Created!
-            </h2>
-            <p className="text-sm text-muted-foreground mt-1">Share this code with other players to join</p>
-          </div>
-          <div className="flex items-center justify-center gap-2">
-            <div className="text-4xl font-mono font-bold tracking-widest bg-muted px-4 py-2 rounded-lg">
-              {createdCode}
-            </div>
-            <Button variant="outline" size="icon" onClick={copyCode}>
-              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            </Button>
-          </div>
-          <p className="text-sm text-muted-foreground">Waiting for other players to join...</p>
-        </div>
-      </div>
-    )
+    return null
   }
 
   if (mode === "create" || mode === "join") {
@@ -445,11 +424,11 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
 
           {mode === "join" && (
             <div className="space-y-4">
-              {availableGames && availableGames.length > 0 && (
+              {availableGames && availableGames.filter(g => g.phase === "lobby").length > 0 && (
                 <div className="space-y-2">
                   <Label>Available Games</Label>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {availableGames.map((game) => (
+                    {availableGames.filter(g => g.phase === "lobby").map((game) => (
                       <button
                         key={game.id}
                         type="button"
@@ -476,7 +455,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
               )}
               <div className="space-y-2">
                 <Label htmlFor="game-code">
-                  {availableGames && availableGames.length > 0 ? "Or enter code manually" : "Game Code"}
+                  {availableGames && availableGames.filter(g => g.phase === "lobby").length > 0 ? "Or enter code manually" : "Game Code"}
                 </Label>
                 <Input
                   id="game-code"

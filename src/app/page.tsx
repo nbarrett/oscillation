@@ -2,20 +2,23 @@
 
 import dynamic from "next/dynamic"
 import { useEffect, useState } from "react"
-import { Loader2, Gamepad2, ChevronDown, Settings, Users, LogOut, Copy, Check } from "lucide-react"
+import { Loader2, Gamepad2, ChevronDown, Settings, Users, LogOut, Copy, Check, Trophy } from "lucide-react"
 import { AuthDialog } from "@/components/auth/auth-dialog"
 import { UserMenu } from "@/components/auth/user-menu"
 import { useMapStore } from "@/stores/map-store"
 import { useGameStore } from "@/stores/game-store"
+import { carImageForStyle } from "@/stores/car-store"
 import { trpc } from "@/lib/trpc/client"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { cn } from "@/lib/cn"
 
 const DiceRoller = dynamic(() => import("@/components/DiceRoller"), { ssr: false })
 const PlayerPositions = dynamic(() => import("@/components/PlayerPositions"), { ssr: false })
+const GameObjectives = dynamic(() => import("@/components/GameObjectives"), { ssr: false })
 const MapWithCars = dynamic(
   () => import("@/components/MapWithCars"),
   {
@@ -41,14 +44,16 @@ const IconDetailToggle = dynamic(() => import("@/components/IconDetailToggle"), 
 const MapPositions = dynamic(() => import("@/components/MapPositions"), { ssr: false })
 const JoinGame = dynamic(() => import("@/components/JoinGame"), { ssr: false })
 const GameSync = dynamic(() => import("@/components/GameSync"), { ssr: false })
+const GameLobby = dynamic(() => import("@/components/GameLobby"), { ssr: false })
 
 export default function GamePage() {
   const setAccessToken = useMapStore((state) => state.setAccessToken)
-  const { sessionId, sessionCode, playerId, leaveSession } = useGameStore()
+  const { sessionId, sessionCode, playerId, phase, winnerName, leaveSession } = useGameStore()
   const { data: tokenData } = trpc.token.getRawToken.useQuery()
   const { data: locations } = trpc.locations.getAll.useQuery()
   const [settingsExpanded, setSettingsExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [showVictory, setShowVictory] = useState(false)
 
   const utils = trpc.useUtils()
   const leaveMutation = trpc.game.leave.useMutation({
@@ -68,6 +73,12 @@ export default function GamePage() {
     }
   }, [tokenData, setAccessToken])
 
+  useEffect(() => {
+    if (phase === "ended" && winnerName) {
+      setShowVictory(true)
+    }
+  }, [phase, winnerName])
+
   function handleLeaveGame() {
     if (sessionId && playerId) {
       leaveMutation.mutate({ sessionId, playerId })
@@ -82,7 +93,13 @@ export default function GamePage() {
     }
   }
 
+  function handleVictoryClose() {
+    setShowVictory(false)
+    handleLeaveGame()
+  }
+
   const inSession = !!sessionId
+  const winningPlayer = useGameStore.getState().players.find(p => p.name === winnerName)
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -112,7 +129,7 @@ export default function GamePage() {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            {inSession && sessionCode && (
+            {inSession && sessionCode && phase === "playing" && (
               <div className="hidden sm:flex items-center gap-2 mr-2">
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -155,6 +172,8 @@ export default function GamePage() {
           <div className="flex-1 flex items-center justify-center py-8">
             <JoinGame startingPosition={startingPosition} />
           </div>
+        ) : phase === "lobby" ? (
+          <GameLobby />
         ) : (
           <>
             <Card>
@@ -191,6 +210,10 @@ export default function GamePage() {
                   </button>
                 </div>
 
+                <div className="mt-3 pt-3 border-t">
+                  <GameObjectives />
+                </div>
+
             <div
               className={cn(
                 "grid transition-all duration-300 ease-in-out",
@@ -220,7 +243,7 @@ export default function GamePage() {
 
             <Card className="overflow-hidden">
               <CardContent className="p-0">
-                <div className="h-[calc(100vh-220px)] min-h-[400px] relative">
+                <div className="h-[calc(100vh-280px)] min-h-[400px] relative">
                   <MapWithCars />
                   <MapPositions />
                 </div>
@@ -229,18 +252,52 @@ export default function GamePage() {
           </>
         )}
 
+        <Dialog open={showVictory} onOpenChange={setShowVictory}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-2xl">
+                <Trophy className="h-7 w-7 text-yellow-500" />
+                Game Over!
+              </DialogTitle>
+              <DialogDescription>
+                The game has ended
+              </DialogDescription>
+            </DialogHeader>
+            <div className="text-center space-y-4 py-4">
+              {winningPlayer && (
+                <div className="flex flex-col items-center gap-3">
+                  <img
+                    src={carImageForStyle(winningPlayer.iconType)}
+                    alt="winner car"
+                    className="h-16 w-28 object-contain"
+                  />
+                  <div className="text-xl font-bold text-primary">
+                    {winnerName} wins!
+                  </div>
+                </div>
+              )}
+              <p className="text-sm text-muted-foreground">
+                All objectives completed and returned to start
+              </p>
+            </div>
+            <Button className="w-full" onClick={handleVictoryClose}>
+              Back to Menu
+            </Button>
+          </DialogContent>
+        </Dialog>
+
         <footer className="flex flex-col sm:flex-row items-center justify-between gap-2 py-3 text-xs text-muted-foreground">
           <p>
             Built with{" "}
             <a href="https://create.t3.gg" className="font-medium underline underline-offset-4 hover:text-primary">
               T3 Stack
             </a>
-            {" "}•{" "}
+            {" "}&bull;{" "}
             <a href="https://osdatahub.os.uk" className="font-medium underline underline-offset-4 hover:text-primary">
               OS Maps API
             </a>
           </p>
-          <p>© {new Date().getFullYear()} Oscillation. In memory of Kerry Barrett.</p>
+          <p>&copy; {new Date().getFullYear()} Oscillation. In memory of Kerry Barrett.</p>
         </footer>
       </main>
     </div>

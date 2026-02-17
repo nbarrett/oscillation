@@ -28,36 +28,70 @@ model NamedLocation {
 }
 
 model GameSession {
-  id            String   @id @default(cuid())
-  code          String   @unique
-  players       GamePlayer[]
-  currentTurn   Int      @default(0)
-  dice1         Int?
-  dice2         Int?
-  startLat      Float?
-  startLng      Float?
-  areaSize      String   @default("standard")
-  mapZoom       Int      @default(7)
-  mapCentreLat  Float?
-  mapCentreLng  Float?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                 String       @id @default(cuid())
+  code               String       @unique
+  players            GamePlayer[]
+  cardDraws          CardDraw[]
+  currentTurn        Int          @default(0)
+  dice1              Int?
+  dice2              Int?
+  startLat           Float?
+  startLng           Float?
+  areaSize           String       @default("standard")
+  phase              String       @default("lobby")
+  creatorPlayerId    String?
+  selectedPois       Json?
+  motorwayJunctions  Json         @default("[]")
+  railwayStations    Json         @default("[]")
+  mapZoom            Int          @default(7)
+  mapCentreLat       Float?
+  mapCentreLng       Float?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
   @@map("game_sessions")
 }
 
 model GamePlayer {
-  id          String      @id @default(cuid())
-  name        String
-  iconType    String
-  positionLat Float
-  positionLng Float
-  turnOrder   Int
-  session     GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  sessionId   String
-  user        User?       @relation(fields: [userId], references: [id])
-  userId      String?
-  joinedAt    DateTime    @default(now())
+  id                 String      @id @default(cuid())
+  name               String
+  iconType           String
+  positionLat        Float
+  positionLng        Float
+  turnOrder          Int
+  visitedPois        Json        @default("[]")
+  hasReturnedToStart Boolean     @default(false)
+  session            GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId          String
+  user               User?       @relation(fields: [userId], references: [id])
+  userId             String?
+  cardDraws          CardDraw[]
+  joinedAt           DateTime    @default(now())
 
   @@map("game_players")
+}
+
+model Card {
+  id        String     @id @default(cuid())
+  type      String
+  title     String
+  body      String
+  draws     CardDraw[]
+  createdAt DateTime   @default(now())
+
+  @@map("cards")
+}
+
+model CardDraw {
+  id        String      @id @default(cuid())
+  card      Card        @relation(fields: [cardId], references: [id])
+  cardId    String
+  player    GamePlayer  @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  playerId  String
+  session   GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+  gridKey   String
+  drawnAt   DateTime    @default(now())
+
+  @@map("card_draws")
 }
