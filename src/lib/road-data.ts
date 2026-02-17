@@ -270,26 +270,6 @@ export function latLngToGridKey(lat: number, lng: number): string {
   return `${e}-${n}`;
 }
 
-function lineIntersectsGrid(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number,
-  gridKey: string
-): boolean {
-  const steps = 10;
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    const lat = lat1 + t * (lat2 - lat1);
-    const lng = lng1 + t * (lng2 - lng1);
-    const key = latLngToGridKey(lat, lng);
-    if (key === gridKey) {
-      return true;
-    }
-  }
-  return false;
-}
-
 function calculateGridSquaresWithRoads(roads: RoadSegment[]): Set<string> {
   const gridSquares = new Set<string>();
 
@@ -484,6 +464,3 @@ export function isRoadDataLoaded(): boolean {
   return roadDataCache !== null;
 }
 
-export function getRoadDataCache(): RoadDataCache | null {
-  return roadDataCache;
-}

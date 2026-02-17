@@ -250,8 +250,7 @@ export const useGameStore = create<GameState>()(
           log.debug("canSelectGrid: clicked start grid");
           return false;
         }
-        const steps = state.reachableGrids.get(gridKey);
-        if (steps === undefined) {
+        if (!state.reachableGrids.has(gridKey)) {
           log.debug("canSelectGrid: grid", gridKey, "not in reachableGrids (size:", state.reachableGrids.size, ")");
           return false;
         }
@@ -325,11 +324,11 @@ export const useGameStore = create<GameState>()(
 
         let routeCoords: [number, number][] | null = null;
 
-        if (state.movementPath.length > 0 && state.currentPlayerName) {
+        if (state.movementPath.length > 0 && state.currentPlayerName && state.playerStartGridKey) {
           const currentPlayer = state.players.find((p) => p.name === state.currentPlayerName);
           const startCoord: [number, number] = currentPlayer
             ? [currentPlayer.position[0], currentPlayer.position[1]]
-            : gridKeyToLatLng(state.playerStartGridKey!);
+            : gridKeyToLatLng(state.playerStartGridKey);
           routeCoords = [
             startCoord,
             ...state.movementPath.map((key) => gridKeyToLatLng(key)),

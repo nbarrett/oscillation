@@ -37,12 +37,6 @@ function ErrorMessage({ message }: { message: string }) {
   )
 }
 
-function PinMismatchWarning() {
-  return (
-    <p className="text-xs text-destructive">PINs do not match</p>
-  )
-}
-
 function PinInput({ id, name, value, onChange, placeholder, disabled, error }: {
   id: string
   name: string

@@ -111,8 +111,7 @@ export const adminRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input }) => {
-      // TODO: Persist settings to database
-      console.log("Admin settings update (not persisted):", input)
+      void input
       return { success: true, settings: input }
     }),
 })
