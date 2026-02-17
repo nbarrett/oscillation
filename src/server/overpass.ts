@@ -2,12 +2,16 @@ import { log } from "@/lib/utils";
 import { POI_CATEGORIES, classifyChurch, type PoiCategory, type PoiValidationResult } from "@/lib/poi-categories";
 
 const OVERPASS_ENDPOINTS = [
-  "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass-api.de/api/interpreter",
 ];
 
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 1000;
+const FETCH_TIMEOUT_MS = 10000;
+
+const poiCache = new Map<string, { result: PoiValidationResult; expiresAt: number }>();
+const POI_CACHE_TTL_MS = 10 * 60 * 1000;
 
 export interface OverpassElement {
   type: string;
@@ -40,6 +44,7 @@ export async function queryOverpass(query: string): Promise<OverpassResponse> {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: `data=${encodeURIComponent(query)}`,
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
 
       if (response.status === 429 || response.status === 504) {
@@ -60,7 +65,7 @@ export async function queryOverpass(query: string): Promise<OverpassResponse> {
       return JSON.parse(text) as OverpassResponse;
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
-      if (err instanceof TypeError || (err as { code?: string }).code === "ECONNREFUSED") {
+      if (err instanceof TypeError || (err as { code?: string }).code === "ECONNREFUSED" || err instanceof DOMException) {
         continue;
       }
       if (attempt < MAX_RETRIES - 1 && lastError.message.includes("Overpass API")) {
@@ -84,15 +89,16 @@ function classifyElement(tags: Record<string, string>, elementId: number): PoiCa
   return null;
 }
 
-export async function validatePoiCoverage(
-  south: number,
-  west: number,
-  north: number,
-  east: number,
-): Promise<PoiValidationResult> {
-  const bbox = `${south},${west},${north},${east}`;
+export interface PoiCandidate {
+  category: PoiCategory;
+  osmId: number;
+  name: string | null;
+  lat: number;
+  lng: number;
+}
 
-  const query = [
+function buildPoiQuery(bbox: string): string {
+  return [
     "[out:json][timeout:25];",
     "(",
     `node["amenity"="pub"](${bbox});`,
@@ -108,19 +114,79 @@ export async function validatePoiCoverage(
     ");",
     "out center tags;",
   ].join("");
+}
 
-  const data = await queryOverpass(query);
-
+function classifyElements(data: OverpassResponse): { counts: Record<PoiCategory, number>; candidates: PoiCandidate[] } {
   const counts: Record<PoiCategory, number> = { pub: 0, spire: 0, tower: 0, phone: 0, school: 0 };
+  const candidates: PoiCandidate[] = [];
 
   for (const el of data.elements) {
     const category = classifyElement(el.tags ?? {}, el.id);
-    if (category) counts[category]++;
+    if (!category) continue;
+    counts[category]++;
+    const lat = el.lat ?? el.center?.lat;
+    const lng = el.lon ?? el.center?.lon;
+    if (lat != null && lng != null) {
+      candidates.push({
+        category,
+        osmId: el.id,
+        name: el.tags?.["name"] ?? null,
+        lat,
+        lng,
+      });
+    }
   }
 
+  return { counts, candidates };
+}
+
+export async function validatePoiCoverage(
+  south: number,
+  west: number,
+  north: number,
+  east: number,
+): Promise<PoiValidationResult> {
+  const bbox = `${south},${west},${north},${east}`;
+
+  const cached = poiCache.get(bbox);
+  if (cached && cached.expiresAt > Date.now()) {
+    log.debug("POI validation (cached):", cached.result.counts);
+    return cached.result;
+  }
+
+  const data = await queryOverpass(buildPoiQuery(bbox));
+  const { counts } = classifyElements(data);
   const missing = POI_CATEGORIES.filter((cat) => counts[cat] === 0);
 
   log.debug("POI validation:", counts, "missing:", missing);
 
-  return { valid: missing.length === 0, counts, missing };
+  const result: PoiValidationResult = { valid: missing.length === 0, counts, missing };
+  poiCache.set(bbox, { result, expiresAt: Date.now() + POI_CACHE_TTL_MS });
+
+  return result;
+}
+
+const poiCandidateCache = new Map<string, { candidates: PoiCandidate[]; expiresAt: number }>();
+
+export async function fetchPoiCandidates(
+  south: number,
+  west: number,
+  north: number,
+  east: number,
+): Promise<PoiCandidate[]> {
+  const bbox = `${south},${west},${north},${east}`;
+
+  const cached = poiCandidateCache.get(bbox);
+  if (cached && cached.expiresAt > Date.now()) {
+    log.debug("POI candidates (cached):", cached.candidates.length);
+    return cached.candidates;
+  }
+
+  const data = await queryOverpass(buildPoiQuery(bbox));
+  const { candidates } = classifyElements(data);
+
+  log.debug("POI candidates fetched:", candidates.length);
+  poiCandidateCache.set(bbox, { candidates, expiresAt: Date.now() + POI_CACHE_TTL_MS });
+
+  return candidates;
 }

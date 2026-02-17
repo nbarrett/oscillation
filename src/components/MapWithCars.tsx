@@ -25,6 +25,7 @@ import PhoneMarkers from "./PhoneMarkers";
 import SchoolMarkers from "./SchoolMarkers";
 import MapSearch from "./MapSearch";
 import GameBoundary from "./GameBoundary";
+import PoiCandidateMarkers from "./PoiCandidateMarkers";
 import { AREA_SIZE_PRESETS } from "@/lib/area-size";
 
 function createBritishNationalGridCRS(): L.Proj.CRS | null {
@@ -40,7 +41,7 @@ function createBritishNationalGridCRS(): L.Proj.CRS | null {
 }
 
 export default function MapWithCars() {
-  const { players, mapZoom, mapCentre, setMapZoom, playerZoomRequest, setPlayerZoomRequest, areaSize } = useGameStore();
+  const { players, mapZoom, mapCentre, setMapZoom, playerZoomRequest, setPlayerZoomRequest, areaSize, phase } = useGameStore();
   const { accessToken, mapLayer, mappingProvider } = useMapStore();
   const { startingPosition } = useRouteStore();
 
@@ -161,11 +162,17 @@ export default function MapWithCars() {
         <MapContextMenu />
         <ClickPositionMarker />
         <GridOverlay />
-        <PubMarkers />
-        <SpireMarkers />
-        <TowerMarkers />
-        <PhoneMarkers />
-        <SchoolMarkers />
+        {phase === "picking" ? (
+          <PoiCandidateMarkers />
+        ) : (
+          <>
+            <PubMarkers />
+            <SpireMarkers />
+            <TowerMarkers />
+            <PhoneMarkers />
+            <SchoolMarkers />
+          </>
+        )}
         <MapSearch />
         <GameBoundary />
       </MapContainer>

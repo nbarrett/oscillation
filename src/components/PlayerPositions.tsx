@@ -65,6 +65,7 @@ export default function PlayerPositions() {
       </span>
       {players.map((player) => {
         const isCurrentPlayer = currentPlayer?.name === player.name
+        const isBot = player.name.startsWith("Bot ")
 
         return (
           <button
@@ -87,6 +88,11 @@ export default function PlayerPositions() {
             )}>
               {player.name}
             </span>
+            {isBot && (
+              <span className="text-[10px] bg-muted-foreground/20 text-muted-foreground px-1.5 py-0.5 rounded-full">
+                Bot
+              </span>
+            )}
             {isCurrentPlayer && (
               <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full">
                 Turn

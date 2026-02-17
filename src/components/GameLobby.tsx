@@ -5,10 +5,6 @@ import { Users, Copy, Check, Play, LogOut, Loader2, Crown } from "lucide-react"
 import { trpc } from "@/lib/trpc/client"
 import { useGameStore } from "@/stores/game-store"
 import { useNotificationStore } from "@/stores/notification-store"
-import { usePubStore } from "@/stores/pub-store"
-import { useSpireStore, useTowerStore } from "@/stores/church-store"
-import { usePhoneStore } from "@/stores/phone-store"
-import { useSchoolStore } from "@/stores/school-store"
 import { carImageForStyle } from "@/stores/car-store"
 import { AREA_SIZE_PRESETS, type AreaSize } from "@/lib/area-size"
 import { Button } from "@/components/ui/button"
@@ -19,12 +15,6 @@ export default function GameLobby() {
   const isCreator = useGameStore(s => s.isCreator())
   const { addNotification } = useNotificationStore()
   const [copied, setCopied] = useState(false)
-
-  const pubs = usePubStore(s => s.pubs)
-  const spires = useSpireStore(s => s.spires)
-  const towers = useTowerStore(s => s.towers)
-  const phones = usePhoneStore(s => s.phones)
-  const schools = useSchoolStore(s => s.schools)
 
   const utils = trpc.useUtils()
 
@@ -55,20 +45,7 @@ export default function GameLobby() {
 
   function handleStartGame() {
     if (!sessionId || !playerId) return
-
-    const poiCandidates = [
-      ...pubs.map(p => ({ category: "pub" as const, osmId: p.id, name: p.name, lat: p.lat, lng: p.lng })),
-      ...spires.map(p => ({ category: "spire" as const, osmId: p.id, name: p.name, lat: p.lat, lng: p.lng })),
-      ...towers.map(p => ({ category: "tower" as const, osmId: p.id, name: p.name, lat: p.lat, lng: p.lng })),
-      ...phones.map(p => ({ category: "phone" as const, osmId: p.id, name: p.name, lat: p.lat, lng: p.lng })),
-      ...schools.map(p => ({ category: "school" as const, osmId: p.id, name: p.name, lat: p.lat, lng: p.lng })),
-    ]
-
-    startGameMutation.mutate({
-      sessionId,
-      playerId,
-      poiCandidates,
-    })
+    startGameMutation.mutate({ sessionId, playerId })
   }
 
   function handleLeave() {

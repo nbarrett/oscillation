@@ -12,7 +12,7 @@ export enum GameTurnState {
   END_TURN = "END_TURN",
 }
 
-export type GamePhase = "lobby" | "playing" | "ended"
+export type GamePhase = "lobby" | "picking" | "playing" | "ended"
 
 export interface SelectedPoi {
   category: string;
@@ -110,6 +110,7 @@ interface GameState {
   phase: GamePhase;
   creatorPlayerId: string | null;
   selectedPois: SelectedPoi[] | null;
+  poiCandidates: SelectedPoi[] | null;
   winnerName: string | null;
 
   setReachableGrids: (grids: Map<string, number> | null) => void;
@@ -148,6 +149,7 @@ interface GameState {
   setPhase: (phase: GamePhase) => void;
   setCreatorPlayerId: (id: string | null) => void;
   setSelectedPois: (pois: SelectedPoi[] | null) => void;
+  setPoiCandidates: (candidates: SelectedPoi[] | null) => void;
   setWinnerName: (name: string | null) => void;
   isCreator: () => boolean;
   leaveSession: () => void;
@@ -182,6 +184,7 @@ export const useGameStore = create<GameState>()(
       phase: "lobby" as GamePhase,
       creatorPlayerId: null,
       selectedPois: null,
+      poiCandidates: null,
       winnerName: null,
 
       setReachableGrids: (reachableGrids) => set({ reachableGrids }),
@@ -423,6 +426,8 @@ export const useGameStore = create<GameState>()(
 
       setSelectedPois: (selectedPois) => set({ selectedPois }),
 
+      setPoiCandidates: (poiCandidates) => set({ poiCandidates }),
+
       setWinnerName: (winnerName) => set({ winnerName }),
 
       isCreator: () => {
@@ -445,6 +450,7 @@ export const useGameStore = create<GameState>()(
         phase: "lobby" as GamePhase,
         creatorPlayerId: null,
         selectedPois: null,
+        poiCandidates: null,
         winnerName: null,
       }),
     }),

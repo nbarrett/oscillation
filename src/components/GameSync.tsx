@@ -7,7 +7,7 @@ import { useNotificationStore } from "@/stores/notification-store"
 import { areaSizeBounds, type AreaSize } from "@/lib/area-size"
 
 export default function GameSync() {
-  const { sessionId, playerId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setWinnerName, leaveSession } = useGameStore()
+  const { sessionId, playerId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setPoiCandidates, setWinnerName, leaveSession } = useGameStore()
   const { addNotification } = useNotificationStore()
   const hasCheckedSession = useRef(false)
   const previousPlayerNamesRef = useRef<string[]>([])
@@ -47,7 +47,9 @@ export default function GameSync() {
       const serverPhase = gameState.phase as GamePhase
       const prevPhase = previousPhaseRef.current
       if (prevPhase && prevPhase !== serverPhase) {
-        if (serverPhase === "playing") {
+        if (serverPhase === "picking") {
+          addNotification("Select objectives on the map!", "info")
+        } else if (serverPhase === "playing") {
           addNotification("Game started!", "success")
         } else if (serverPhase === "ended") {
           addNotification("Game over!", "info")
@@ -58,6 +60,7 @@ export default function GameSync() {
       setPhase(serverPhase)
       setCreatorPlayerId(gameState.creatorPlayerId ?? null)
       setSelectedPois(gameState.selectedPois ?? null)
+      setPoiCandidates(gameState.poiCandidates ?? null)
 
       const players: Player[] = gameState.players.map(p => {
         const localPlayer = localPlayers.find(lp => lp.name === p.name)
@@ -126,7 +129,7 @@ export default function GameSync() {
         setWinnerName(winningPlayer?.name ?? null)
       }
     }
-  }, [gameState, playerId, addNotification, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setWinnerName])
+  }, [gameState, playerId, addNotification, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setPoiCandidates, setWinnerName])
 
   return null
 }
