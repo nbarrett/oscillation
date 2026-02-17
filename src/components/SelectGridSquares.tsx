@@ -3,10 +3,10 @@
 import { useEffect } from "react";
 import { useMap } from "react-leaflet";
 import L from "leaflet";
-import { useGameStore } from "@/stores/game-store";
+import { useGameStore, occupiedGridKeys } from "@/stores/game-store";
 import { latLngToGridKey, shortestPath } from "@/lib/road-data";
 import { gridKeyToLatLngs } from "@/lib/grid-polygon";
-import { colours } from "@/lib/utils";
+import { colours, log } from "@/lib/utils";
 
 class IdentifiedPolygon extends L.Polygon {
   firstLatLong: L.LatLng;
@@ -36,6 +36,8 @@ export default function SelectGridSquares() {
     diceResult,
     selectedEndpoint,
     setSelectedEndpoint,
+    players,
+    currentPlayerName,
   } = useGameStore();
 
   function clearPathPolygons() {
@@ -67,6 +69,8 @@ export default function SelectGridSquares() {
       mapClickPosition.latLng.lng
     );
 
+    log.debug("SelectGridSquares: clicked grid", gridKey, "diceResult:", diceResult, "playerStart:", playerStartGridKey);
+
     if (selectedEndpoint === gridKey) {
       clearPathPolygons();
       setSelectedGridSquares([]);
@@ -75,11 +79,20 @@ export default function SelectGridSquares() {
       return;
     }
 
-    if (!canSelectGrid(gridKey)) return;
+    if (!canSelectGrid(gridKey)) {
+      log.debug("SelectGridSquares: canSelectGrid returned false for", gridKey);
+      return;
+    }
     if (!playerStartGridKey || !diceResult) return;
 
-    const path = shortestPath(playerStartGridKey, gridKey, diceResult);
-    if (!path) return;
+    const excluded = occupiedGridKeys(players, currentPlayerName ?? "");
+    const path = shortestPath(playerStartGridKey, gridKey, diceResult, excluded);
+    if (!path) {
+      log.debug("SelectGridSquares: shortestPath returned null from", playerStartGridKey, "to", gridKey);
+      return;
+    }
+
+    log.debug("SelectGridSquares: drawing path of", path.length, "steps");
 
     clearPathPolygons();
 

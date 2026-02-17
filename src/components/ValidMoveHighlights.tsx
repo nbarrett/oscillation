@@ -10,18 +10,21 @@ import {
 } from "@/stores/game-store";
 import { latLngToGridKey } from "@/lib/road-data";
 import { createGridPolygon } from "@/lib/grid-polygon";
-import { colours } from "@/lib/utils";
+import { colours, log } from "@/lib/utils";
 
 function colorForDistance(steps: number, maxSteps: number): string {
-  if (steps === 1) return colours.immediateMove;
   if (steps === maxSteps) return colours.exactEndpoint;
   return colours.reachableMove;
 }
 
 function opacityForDistance(steps: number, maxSteps: number): number {
-  if (steps === maxSteps) return 0.35;
-  if (steps === 1) return 0.25;
+  if (steps === maxSteps) return 0.5;
   return 0.15;
+}
+
+function weightForDistance(steps: number, maxSteps: number): number {
+  if (steps === maxSteps) return 3;
+  return 1;
 }
 
 export default function ValidMoveHighlights() {
@@ -68,14 +71,18 @@ export default function ValidMoveHighlights() {
     }
 
     if (reachableGrids) {
+      let endpointCount = 0;
       reachableGrids.forEach((steps, gridKey) => {
         const color = colorForDistance(steps, diceResult);
         const opacity = opacityForDistance(steps, diceResult);
-        const polygon = createGridPolygon(map, gridKey, color, opacity);
+        const weight = weightForDistance(steps, diceResult);
+        const polygon = createGridPolygon(map, gridKey, color, opacity, weight);
         if (polygon) {
           layerGroupRef.current!.addLayer(polygon);
         }
+        if (steps === diceResult) endpointCount++;
       });
+      log.debug("ValidMoveHighlights: drew", reachableGrids.size, "reachable grids,", endpointCount, "clickable endpoints");
     }
   }, [map, gameTurnState, diceResult, movementPath, playerStartGridKey, reachableGrids]);
 

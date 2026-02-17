@@ -36,6 +36,7 @@ function createBritishNationalGridCRS(): L.Proj.CRS | null {
     {
       resolutions: [896.0, 448.0, 224.0, 112.0, 56.0, 28.0, 14.0, 7.0, 3.5, 1.75],
       origin: [-238375.0, 1376256.0],
+      bounds: L.bounds([-238375, -83151], [900000, 1376256]),
     }
   );
 }

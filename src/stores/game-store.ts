@@ -238,12 +238,27 @@ export const useGameStore = create<GameState>()(
 
       canSelectGrid: (gridKey) => {
         const state = get();
-        if (!state.diceResult) return false;
-        if (!state.reachableGrids) return false;
-        if (gridKey === state.playerStartGridKey) return false;
+        if (!state.diceResult) {
+          log.debug("canSelectGrid: no diceResult");
+          return false;
+        }
+        if (!state.reachableGrids) {
+          log.debug("canSelectGrid: no reachableGrids");
+          return false;
+        }
+        if (gridKey === state.playerStartGridKey) {
+          log.debug("canSelectGrid: clicked start grid");
+          return false;
+        }
         const steps = state.reachableGrids.get(gridKey);
-        if (steps === undefined) return false;
-        if (steps !== state.diceResult) return false;
+        if (steps === undefined) {
+          log.debug("canSelectGrid: grid", gridKey, "not in reachableGrids (size:", state.reachableGrids.size, ")");
+          return false;
+        }
+        if (steps !== state.diceResult) {
+          log.debug("canSelectGrid: grid", gridKey, "is", steps, "steps away, need exactly", state.diceResult);
+          return false;
+        }
         return true;
       },
 
@@ -301,24 +316,14 @@ export const useGameStore = create<GameState>()(
         const occupied = occupiedGridKeys(state.players, state.currentPlayerName ?? "");
         const reachable = reachableRoadGrids(startGridKey, result, occupied);
 
-        const updates: Partial<GameState> = {
+        set({
           diceResult: result,
           gameTurnState: GameTurnState.DICE_ROLLED,
           playerStartGridKey: startGridKey,
           playerZoomRequest: state.currentPlayerName,
           reachableGrids: reachable,
           selectedEndpoint: null,
-        };
-
-        if (snapped) {
-          updates.players = state.players.map((player) =>
-            player.name === currentPlayer.name
-              ? { ...player, position: snapped }
-              : player
-          );
-        }
-
-        set(updates as GameState);
+        } as Partial<GameState> as GameState);
       },
 
       handleEndTurn: () => {
