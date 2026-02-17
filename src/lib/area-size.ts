@@ -60,8 +60,3 @@ export function isWithinBounds(lat: number, lng: number, bounds: GameBounds): bo
   return lat >= bounds.south && lat <= bounds.north && lng >= bounds.west && lng <= bounds.east;
 }
 
-export function gridKeyWithinBounds(gridKey: string, bounds: GameBounds): boolean {
-  const [e, n] = gridKey.split("-").map(Number);
-  const [lng, lat] = proj4(BNG, "EPSG:4326", [e + 500, n + 500]);
-  return isWithinBounds(lat, lng, bounds);
-}

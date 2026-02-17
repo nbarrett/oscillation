@@ -20,7 +20,7 @@ class IdentifiedPolygon extends L.Polygon {
 }
 
 function isIdentifiedPolygon(layer: L.Layer): layer is IdentifiedPolygon {
-  return (layer as IdentifiedPolygon).firstLatLong !== undefined;
+  return "firstLatLong" in layer;
 }
 
 export default function SelectGridSquares() {

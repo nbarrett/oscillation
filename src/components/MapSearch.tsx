@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import { useMap } from "react-leaflet"
 import L from "leaflet"
 import { Search, X, ChevronLeft, ChevronRight } from "lucide-react"
@@ -49,6 +49,14 @@ export default function MapSearch() {
     if (markerRef.current && map) {
       map.removeLayer(markerRef.current)
       markerRef.current = null
+    }
+  }, [map])
+
+  useEffect(() => {
+    return () => {
+      if (markerRef.current && map) {
+        map.removeLayer(markerRef.current)
+      }
     }
   }, [map])
 

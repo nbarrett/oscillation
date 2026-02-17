@@ -69,11 +69,11 @@ export default function MapWithCars() {
 
   
   useEffect(() => {
-    if (map) {
-      setTimeout(() => {
-        map.invalidateSize();
-      }, 100);
-    }
+    if (!map) return;
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 100);
+    return () => clearTimeout(timer);
   }, [map]);
 
   useEffect(() => {
@@ -154,8 +154,8 @@ export default function MapWithCars() {
         ) : (
           <div>waiting for access token</div>
         )}
-        {players.map((player, key) => (
-          <PlayerCar key={key} player={player} />
+        {players.map((player) => (
+          <PlayerCar key={player.name} player={player} />
         ))}
         <RecordMapCentreAndZoom />
         <RecordMapClick />
