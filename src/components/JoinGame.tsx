@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useSession, signIn } from "next-auth/react"
-import { Users, Plus, LogIn, Copy, Check, Loader2, UserPlus, ChevronLeft, X } from "lucide-react"
+import { Users, Plus, LogIn, Copy, Check, Loader2, UserPlus, ChevronLeft, X, Shuffle, Search } from "lucide-react"
 import { trpc } from "@/lib/trpc/client"
 import { useGameStore } from "@/stores/game-store"
 import { useCarStore } from "@/stores/car-store"
@@ -19,13 +19,7 @@ export enum AuthTab {
   REGISTER = "register",
 }
 
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { cn } from "@/lib/cn"
 import AddStartingPointDialog from "./AddStartingPointDialog"
 import { asTitle } from "@/lib/utils"
 import { type AreaSize, AREA_SIZES, AREA_SIZE_PRESETS, DEFAULT_AREA_SIZE } from "@/lib/area-size"
@@ -92,6 +86,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
   const [registerPin, setRegisterPin] = useState("")
   const [confirmPin, setConfirmPin] = useState("")
   const [selectedLocationId, setSelectedLocationId] = useState<string>("")
+  const [locationSearch, setLocationSearch] = useState("")
   const [areaSize, setAreaSize] = useState<AreaSize>(DEFAULT_AREA_SIZE)
 
   const { setSessionId, setPlayerId, setSessionCode, setCreatorPlayerId } = useGameStore()
@@ -102,6 +97,10 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
   const [authTab, setAuthTabState] = useState<AuthTab>(AuthTab.PLAY)
 
   const pinMismatch = confirmPin.length > 0 && registerPin !== confirmPin
+  const sortedLocations = (locations ?? []).slice().sort((a, b) => a.name.localeCompare(b.name))
+  const filteredLocations = sortedLocations.filter(l =>
+    l.name.toLowerCase().includes(locationSearch.toLowerCase())
+  )
   const selectedLocation = locations?.find(l => l.id === selectedLocationId)
 
   const validation = trpc.game.validateArea.useQuery(
@@ -241,6 +240,14 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
     register.mutate({ nickname: registerNickname, pin: registerPin })
   }
 
+  function pickRandomLocation() {
+    if (sortedLocations.length === 0) return
+    const randomIndex = Math.floor(Math.random() * sortedLocations.length)
+    const picked = sortedLocations[randomIndex]
+    setSelectedLocationId(picked.id)
+    setLocationSearch(asTitle(picked.name))
+  }
+
   function handleCreate() {
     if (!playerName.trim()) {
       setError("Please enter your name")
@@ -337,19 +344,48 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
                 <Label>Starting Point</Label>
                 <p className="text-xs text-muted-foreground">Must be on an A road (pink roads on the map)</p>
                 <div className="flex items-center gap-2">
-                  <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Select starting point" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {locations?.map((location) => (
-                        <SelectItem key={location.id} value={location.id}>
-                          {asTitle(location.name)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search locations..."
+                      value={locationSearch}
+                      onChange={(e) => setLocationSearch(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={pickRandomLocation}
+                    disabled={!locations || locations.length === 0}
+                    title="Random starting point"
+                  >
+                    <Shuffle className="h-4 w-4" />
+                  </Button>
                   <AddStartingPointDialog onSuccess={refetchLocations} />
+                </div>
+                <div className="max-h-48 overflow-y-auto rounded-md border">
+                  {filteredLocations.length === 0 ? (
+                    <div className="p-3 text-sm text-muted-foreground text-center">
+                      No locations found
+                    </div>
+                  ) : (
+                    filteredLocations.map((location) => (
+                      <button
+                        key={location.id}
+                        type="button"
+                        data-location-id={location.id}
+                        onClick={() => setSelectedLocationId(location.id)}
+                        className={cn(
+                          "w-full px-3 py-2 text-sm text-left transition-colors",
+                          "hover:bg-muted border-b last:border-b-0",
+                          selectedLocationId === location.id && "bg-primary/10 text-primary font-medium"
+                        )}
+                      >
+                        {asTitle(location.name)}
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
 

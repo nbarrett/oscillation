@@ -45,6 +45,8 @@ const MapPositions = dynamic(() => import("@/components/MapPositions"), { ssr: f
 const JoinGame = dynamic(() => import("@/components/JoinGame"), { ssr: false })
 const GameSync = dynamic(() => import("@/components/GameSync"), { ssr: false })
 const GameLobby = dynamic(() => import("@/components/GameLobby"), { ssr: false })
+const BotTurnPlayer = dynamic(() => import("@/components/BotTurnPlayer"), { ssr: false })
+const PoiPicker = dynamic(() => import("@/components/PoiPicker"), { ssr: false })
 
 export default function GamePage() {
   const setAccessToken = useMapStore((state) => state.setAccessToken)
@@ -166,6 +168,7 @@ export default function GamePage() {
       </header>
 
       {inSession && <GameSync />}
+      {inSession && phase === "playing" && <BotTurnPlayer />}
 
       <main className="w-full px-4 py-3 flex-1 flex flex-col gap-3">
         {!inSession ? (
@@ -174,6 +177,8 @@ export default function GamePage() {
           </div>
         ) : phase === "lobby" ? (
           <GameLobby />
+        ) : phase === "picking" ? (
+          <PoiPicker />
         ) : (
           <>
             <Card>

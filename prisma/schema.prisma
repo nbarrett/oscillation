@@ -41,6 +41,7 @@ model GameSession {
   phase              String       @default("lobby")
   creatorPlayerId    String?
   selectedPois       Json?
+  poiCandidates      Json?
   motorwayJunctions  Json         @default("[]")
   railwayStations    Json         @default("[]")
   mapZoom            Int          @default(7)

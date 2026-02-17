@@ -1,10 +1,11 @@
 import { z } from "zod"
+import { Prisma } from "@prisma/client"
 import { TRPCError } from "@trpc/server"
 import { createTRPCRouter, publicProcedure } from "../trpc"
 import { CAR_STYLES } from "@/stores/car-store"
 import { AREA_SIZES, DEFAULT_AREA_SIZE, areaSizeBounds, isWithinBounds, type AreaSize } from "@/lib/area-size"
-import { validatePoiCoverage } from "@/server/overpass"
-import { POI_CATEGORY_LABELS, POI_CATEGORIES } from "@/lib/poi-categories"
+import { validatePoiCoverage, fetchPoiCandidates } from "@/server/overpass"
+import { POI_CATEGORIES } from "@/lib/poi-categories"
 
 function generateSessionCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -14,14 +15,6 @@ function generateSessionCode(): string {
   }
   return code
 }
-
-const selectedPoiSchema = z.object({
-  category: z.string(),
-  osmId: z.number(),
-  name: z.string().nullable(),
-  lat: z.number(),
-  lng: z.number(),
-})
 
 export const gameRouter = createTRPCRouter({
   list: publicProcedure
@@ -72,16 +65,6 @@ export const gameRouter = createTRPCRouter({
       areaSize: z.enum(AREA_SIZES as [string, ...string[]]).default(DEFAULT_AREA_SIZE),
     }))
     .mutation(async ({ ctx, input }) => {
-      const bounds = areaSizeBounds(input.startLat, input.startLng, input.areaSize as AreaSize)
-      const validation = await validatePoiCoverage(bounds.south, bounds.west, bounds.north, bounds.east)
-      if (!validation.valid) {
-        const missingNames = validation.missing.map((cat) => POI_CATEGORY_LABELS[cat]).join(", ")
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `Area is missing required POI types: ${missingNames}. Choose a different location or larger area.`,
-        })
-      }
-
       let code = generateSessionCode()
       let attempts = 0
       while (attempts < 10) {
@@ -196,7 +179,6 @@ export const gameRouter = createTRPCRouter({
     .input(z.object({
       sessionId: z.string(),
       playerId: z.string(),
-      poiCandidates: z.array(selectedPoiSchema),
     }))
     .mutation(async ({ ctx, input }) => {
       const session = await ctx.db.gameSession.findUnique({
@@ -220,24 +202,95 @@ export const gameRouter = createTRPCRouter({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Need at least 1 player to start." })
       }
 
-      const selectedPois: z.infer<typeof selectedPoiSchema>[] = []
-      for (const category of POI_CATEGORIES) {
-        const candidates = input.poiCandidates.filter(p => p.category === category)
-        if (candidates.length > 0) {
-          const picked = candidates[Math.floor(Math.random() * candidates.length)]
-          selectedPois.push(picked)
+      if (session.players.length === 1) {
+        const botNames = ["Bot Alice", "Bot Bob", "Bot Charlie"]
+        for (let i = 0; i < 3; i++) {
+          const turnOrder = session.players.length + i
+          const iconType = CAR_STYLES[turnOrder % CAR_STYLES.length]
+          const offsetLat = (session.startLat || 0) + 0.00014 * turnOrder
+          const offsetLng = (session.startLng || 0) - 0.00025 * turnOrder
+          await ctx.db.gamePlayer.create({
+            data: {
+              name: botNames[i],
+              iconType,
+              positionLat: offsetLat,
+              positionLng: offsetLng,
+              turnOrder,
+              sessionId: session.id,
+            },
+          })
         }
       }
+
+      const bounds = areaSizeBounds(session.startLat!, session.startLng!, session.areaSize as AreaSize)
+      const allCandidates = await fetchPoiCandidates(bounds.south, bounds.west, bounds.north, bounds.east)
+
+      const startLat = session.startLat!
+      const startLng = session.startLng!
+      const filteredCandidates = allCandidates.filter(
+        (poi) => haversineKm(poi.lat, poi.lng, startLat, startLng) >= 10
+      )
 
       await ctx.db.gameSession.update({
         where: { id: input.sessionId },
         data: {
-          phase: "playing",
-          selectedPois: JSON.parse(JSON.stringify(selectedPois)),
+          phase: "picking",
+          selectedPois: JSON.parse(JSON.stringify([])),
+          poiCandidates: JSON.parse(JSON.stringify(filteredCandidates)),
         },
       })
 
-      return { success: true, selectedPois }
+      return { success: true }
+    }),
+
+  pickPoi: publicProcedure
+    .input(z.object({
+      sessionId: z.string(),
+      playerId: z.string(),
+      osmId: z.number(),
+      category: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const session = await ctx.db.gameSession.findUnique({
+        where: { id: input.sessionId },
+      })
+
+      if (!session) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Game not found." })
+      }
+
+      if (session.phase !== "picking") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Game is not in picking phase." })
+      }
+
+      if (session.creatorPlayerId !== input.playerId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Only the game creator can pick POIs." })
+      }
+
+      const candidates = (session.poiCandidates as Array<{ category: string; osmId: number; name: string | null; lat: number; lng: number }>) ?? []
+      const candidate = candidates.find(c => c.osmId === input.osmId && c.category === input.category)
+      if (!candidate) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "POI not found in candidates." })
+      }
+
+      const selectedPois = (session.selectedPois as Array<{ category: string; osmId: number; name: string | null; lat: number; lng: number }>) ?? []
+      const alreadyPicked = selectedPois.some(p => p.category === input.category)
+      if (alreadyPicked) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Category already picked." })
+      }
+
+      const updatedPois = [...selectedPois, candidate]
+      const allPicked = POI_CATEGORIES.every(cat => updatedPois.some(p => p.category === cat))
+
+      await ctx.db.gameSession.update({
+        where: { id: input.sessionId },
+        data: {
+          selectedPois: JSON.parse(JSON.stringify(updatedPois)),
+          ...(allPicked ? { phase: "playing", poiCandidates: Prisma.DbNull } : {}),
+        },
+      })
+
+      return { success: true, allPicked }
     }),
 
   state: publicProcedure
@@ -268,6 +321,7 @@ export const gameRouter = createTRPCRouter({
         phase: session.phase,
         creatorPlayerId: session.creatorPlayerId,
         selectedPois: session.selectedPois as Array<{ category: string; osmId: number; name: string | null; lat: number; lng: number }> | null,
+        poiCandidates: session.poiCandidates as Array<{ category: string; osmId: number; name: string | null; lat: number; lng: number }> | null,
         players: session.players.map(p => ({
           id: p.id,
           name: p.name,
@@ -303,7 +357,8 @@ export const gameRouter = createTRPCRouter({
       }
 
       const currentPlayer = session.players[session.currentTurn]
-      if (currentPlayer?.id !== input.playerId) {
+      const isBot = currentPlayer?.name.startsWith("Bot ")
+      if (!isBot && currentPlayer?.id !== input.playerId) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "It's not your turn!" })
       }
 
@@ -341,9 +396,12 @@ export const gameRouter = createTRPCRouter({
       }
 
       const currentPlayer = session.players[session.currentTurn]
-      if (currentPlayer?.id !== input.playerId) {
+      const isBotTurn = currentPlayer?.name.startsWith("Bot ")
+      if (!isBotTurn && currentPlayer?.id !== input.playerId) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "It's not your turn!" })
       }
+
+      const turnPlayerId = isBotTurn ? currentPlayer!.id : input.playerId
 
       if (input.newLat != null && input.newLng != null) {
         if (session.startLat != null && session.startLng != null) {
@@ -354,7 +412,7 @@ export const gameRouter = createTRPCRouter({
         }
 
         await ctx.db.gamePlayer.update({
-          where: { id: input.playerId },
+          where: { id: turnPlayerId },
           data: {
             positionLat: input.newLat,
             positionLng: input.newLng,
@@ -367,7 +425,7 @@ export const gameRouter = createTRPCRouter({
         const deduped = new Set([...updatedVisitedPois, ...input.visitedPoiIds])
         updatedVisitedPois = [...deduped]
         await ctx.db.gamePlayer.update({
-          where: { id: input.playerId },
+          where: { id: turnPlayerId },
           data: { visitedPois: updatedVisitedPois },
         })
       }
@@ -384,7 +442,7 @@ export const gameRouter = createTRPCRouter({
         const distKm = haversineKm(playerLat, playerLng, session.startLat, session.startLng)
         if (distKm < 1.5) {
           await ctx.db.gamePlayer.update({
-            where: { id: input.playerId },
+            where: { id: turnPlayerId },
             data: { hasReturnedToStart: true },
           })
           await ctx.db.gameSession.update({
