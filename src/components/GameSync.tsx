@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react"
 import { trpc } from "@/lib/trpc/client"
 import { useGameStore, GameTurnState, type Player, type GamePhase } from "@/stores/game-store"
 import { useNotificationStore } from "@/stores/notification-store"
-import { areaSizeBounds, type AreaSize } from "@/lib/area-size"
+import { areaSizeBounds, isWithinBounds, type AreaSize } from "@/lib/area-size"
 
 export default function GameSync() {
   const { sessionId, playerId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setPoiCandidates, setWinnerName, leaveSession } = useGameStore()
@@ -62,6 +62,14 @@ export default function GameSync() {
       setSelectedPois(gameState.selectedPois ?? null)
       setPoiCandidates(gameState.poiCandidates ?? null)
 
+      const startPos: [number, number] | null =
+        gameState.startLat != null && gameState.startLng != null
+          ? [gameState.startLat, gameState.startLng]
+          : null
+      const bounds = startPos && gameState.areaSize
+        ? areaSizeBounds(startPos[0], startPos[1], gameState.areaSize)
+        : null
+
       const players: Player[] = gameState.players.map(p => {
         const localPlayer = localPlayers.find(lp => lp.name === p.name)
         if (localPlayer?.previousPosition) {
@@ -75,10 +83,13 @@ export default function GameSync() {
             hasReturnedToStart: p.hasReturnedToStart,
           }
         }
+        const position: [number, number] = bounds && startPos && !isWithinBounds(p.position[0], p.position[1], bounds)
+          ? startPos
+          : p.position
         return {
           name: p.name,
           iconType: p.iconType,
-          position: p.position,
+          position,
           previousPosition: null,
           completedRoute: null,
           visitedPois: p.visitedPois,

@@ -317,7 +317,7 @@ export const gameRouter = createTRPCRouter({
         dice2: session.dice2,
         startLat: session.startLat,
         startLng: session.startLng,
-        areaSize: session.areaSize as AreaSize,
+        areaSize: ((session as Record<string, unknown>).areaSize as AreaSize) ?? DEFAULT_AREA_SIZE,
         phase: session.phase,
         creatorPlayerId: session.creatorPlayerId,
         selectedPois: session.selectedPois as Array<{ category: string; osmId: number; name: string | null; lat: number; lng: number }> | null,
@@ -405,7 +405,7 @@ export const gameRouter = createTRPCRouter({
 
       if (input.newLat != null && input.newLng != null) {
         if (session.startLat != null && session.startLng != null) {
-          const bounds = areaSizeBounds(session.startLat, session.startLng, session.areaSize as AreaSize);
+          const bounds = areaSizeBounds(session.startLat, session.startLng, (session as Record<string, unknown>).areaSize as AreaSize ?? DEFAULT_AREA_SIZE);
           if (!isWithinBounds(input.newLat, input.newLng, bounds)) {
             throw new TRPCError({ code: "BAD_REQUEST", message: "Move is outside the game boundary." })
           }
