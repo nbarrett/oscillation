@@ -32,14 +32,27 @@ export interface GameBounds {
 
 export function areaSizeBounds(startLat: number, startLng: number, areaSize: AreaSize): GameBounds {
   const preset = AREA_SIZE_PRESETS[areaSize];
-  const latDelta = preset.heightKm / 2 / 111;
-  const lngDelta = preset.widthKm / 2 / (111 * Math.cos((startLat * Math.PI) / 180));
+  const [easting, northing] = proj4("EPSG:4326", BNG, [startLng, startLat]);
+
+  const gridE = Math.floor(easting / 1000) * 1000;
+  const gridN = Math.floor(northing / 1000) * 1000;
+
+  const halfW = Math.floor(preset.widthKm / 2) * 1000;
+  const halfH = Math.floor(preset.heightKm / 2) * 1000;
+
+  const westE = gridE - halfW;
+  const eastE = gridE + halfW + 1000;
+  const southN = gridN - halfH;
+  const northN = gridN + halfH + 1000;
+
+  const [swLng, swLat] = proj4(BNG, "EPSG:4326", [westE, southN]);
+  const [neLng, neLat] = proj4(BNG, "EPSG:4326", [eastE, northN]);
 
   return {
-    south: startLat - latDelta,
-    north: startLat + latDelta,
-    west: startLng - lngDelta,
-    east: startLng + lngDelta,
+    south: swLat,
+    north: neLat,
+    west: swLng,
+    east: neLng,
   };
 }
 

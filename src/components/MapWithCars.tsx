@@ -142,6 +142,7 @@ export default function MapWithCars() {
         zoom={mapZoom}
         center={mapCentre || [startingPosition.lat, startingPosition.lng]}
         scrollWheelZoom={true}
+        doubleClickZoom={false}
         ref={(mapRef) => setMap(mapRef)}
         style={{ height: "100%" }}
       >

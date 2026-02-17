@@ -1,9 +1,9 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import { log } from "@/lib/utils"
-import { latLngToGridKey, gridKeyToLatLng, gridHasRoad, isRoadDataLoaded, nearestRoadPosition, reachableRoadGrids } from "@/lib/road-data"
+import { latLngToGridKey, gridKeyToLatLng, gridHasRoad, isRoadDataLoaded, reachableRoadGrids } from "@/lib/road-data"
 import { CAR_STYLES } from "@/stores/car-store"
-import { type AreaSize, type GameBounds, DEFAULT_AREA_SIZE, gridKeyWithinBounds } from "@/lib/area-size"
+import { type AreaSize, type GameBounds, DEFAULT_AREA_SIZE } from "@/lib/area-size"
 
 export enum GameTurnState {
   ROLL_DICE = "ROLL_DICE",
@@ -255,10 +255,6 @@ export const useGameStore = create<GameState>()(
           log.debug("canSelectGrid: grid", gridKey, "not in reachableGrids (size:", state.reachableGrids.size, ")");
           return false;
         }
-        if (steps !== state.diceResult) {
-          log.debug("canSelectGrid: grid", gridKey, "is", steps, "steps away, need exactly", state.diceResult);
-          return false;
-        }
         return true;
       },
 
@@ -309,9 +305,7 @@ export const useGameStore = create<GameState>()(
           return;
         }
 
-        const snapped = nearestRoadPosition(currentPlayer.position[0], currentPlayer.position[1]);
-        const position = snapped ?? currentPlayer.position;
-        const startGridKey = latLngToGridKey(position[0], position[1]);
+        const startGridKey = latLngToGridKey(currentPlayer.position[0], currentPlayer.position[1]);
 
         const occupied = occupiedGridKeys(state.players, state.currentPlayerName ?? "");
         const reachable = reachableRoadGrids(startGridKey, result, occupied);
