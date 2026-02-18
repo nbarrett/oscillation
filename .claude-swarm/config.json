@@ -1,0 +1,15 @@
+{
+  "name": "oscillation",
+  "start": {
+    "mac": "./run-dev.sh",
+    "windows": ".\\run-dev.ps1"
+  },
+  "stop": {
+    "mac": "./kill-dev.sh",
+    "windows": ".\\kill-dev.ps1"
+  },
+  "port": 3002,
+  "health": "http://localhost:3002/api/health",
+  "log": ".claude-swarm/logs/dev.log",
+  "registry": ".claude-swarm/registry.json"
+}

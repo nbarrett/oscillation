@@ -9,6 +9,10 @@ $ErrorActionPreference = "Stop"
 
 $RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 
+$AppName = "oscillation"
+$SwarmLog = Join-Path $RepoRoot ".claude-swarm\logs\dev.log"
+$SwarmRegistry = Join-Path $RepoRoot ".claude-swarm\registry.json"
+
 function Write-Info {
     param([string]$Message)
     Write-Host "[run-dev] $Message" -ForegroundColor Green
@@ -103,6 +107,39 @@ function Check-Port {
     }
 }
 
+function Register-Swarm {
+    param([int]$Pid_)
+    $port = if ($env:DEV_PORT) { [int]$env:DEV_PORT } else { 3002 }
+    $null = New-Item -ItemType Directory -Force -Path (Split-Path $SwarmLog) -ErrorAction SilentlyContinue
+    $null = New-Item -ItemType Directory -Force -Path (Split-Path $SwarmRegistry) -ErrorAction SilentlyContinue
+    $reg = if (Test-Path $SwarmRegistry) { Get-Content $SwarmRegistry -Raw | ConvertFrom-Json -AsHashtable } else { @{} }
+    $reg[$AppName] = @{
+        status    = "running"
+        pid       = $Pid_
+        port      = $port
+        log       = $SwarmLog
+        project   = $RepoRoot
+        health    = "http://localhost:$port/api/health"
+        startedAt = (Get-Date -Format "o")
+        stoppedAt = $null
+    }
+    $reg | ConvertTo-Json -Depth 5 | Set-Content $SwarmRegistry -Encoding UTF8
+    Write-Info "Registered in swarm registry"
+}
+
+function Deregister-Swarm {
+    if (-not (Test-Path $SwarmRegistry)) { return }
+    try {
+        $reg = Get-Content $SwarmRegistry -Raw | ConvertFrom-Json -AsHashtable
+        if ($reg.ContainsKey($AppName)) {
+            $reg[$AppName].status = "stopped"
+            $reg[$AppName].stoppedAt = (Get-Date -Format "o")
+            $reg[$AppName].pid = $null
+        }
+        $reg | ConvertTo-Json -Depth 5 | Set-Content $SwarmRegistry -Encoding UTF8
+    } catch {}
+}
+
 function Install-Dependencies {
     Push-Location $RepoRoot
     try {
@@ -137,25 +174,32 @@ function Start-DevServer {
     if (Test-Path $nextDir) { Remove-Item -Recurse -Force $nextDir }
     if (Test-Path $cacheDir) { Remove-Item -Recurse -Force $cacheDir }
 
+    $null = New-Item -ItemType Directory -Force -Path (Split-Path $SwarmLog) -ErrorAction SilentlyContinue
     if (Test-Path $logPath) { Remove-Item $logPath }
+    if (Test-Path $SwarmLog) { Remove-Item $SwarmLog }
+
+    $env:NEXT_IGNORE_INCORRECT_LOCKFILE = "1"
 
     $job = Start-Job -Name "oscillation-dev" -ScriptBlock {
         param($WorkingDir)
         Set-StrictMode -Version Latest
         Set-Location $WorkingDir
+        $env:NEXT_IGNORE_INCORRECT_LOCKFILE = "1"
         pnpm dev
     } -ArgumentList $RepoRoot
 
+    Register-Swarm -Pid_ $job.Id
+
     $port = if ($env:DEV_PORT) { $env:DEV_PORT } else { "3002" }
     Write-Info "Oscillation dev server -> http://localhost:$port"
-    Write-Info "Logs -> $logPath"
+    Write-Info "Logs -> $logPath | $SwarmLog"
     Write-Info "Press Ctrl+C to stop."
 
     try {
         while ($true) {
             $output = Receive-Job -Job $job -ErrorAction SilentlyContinue
             if ($output) {
-                $output | Tee-Object -FilePath $logPath -Append
+                $output | Tee-Object -FilePath $logPath -Append | Tee-Object -FilePath $SwarmLog -Append
             }
 
             if ($job.State -ne 'Running') { break }
@@ -170,6 +214,7 @@ function Start-DevServer {
             Stop-Job -Job $job -Force
         }
         Remove-Job -Job $job -Force
+        Deregister-Swarm
     }
 }
 
