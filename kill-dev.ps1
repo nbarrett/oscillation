@@ -1,5 +1,8 @@
 # Kill Oscillation development processes (Windows PowerShell)
 
+$AppName = "oscillation"
+$SwarmRegistry = Join-Path $PSScriptRoot ".claude-swarm\registry.json"
+
 Write-Host "Stopping Oscillation development server..." -ForegroundColor Yellow
 
 # Kill processes on the dev port (default 3000)
@@ -27,6 +30,18 @@ $nextDir = Join-Path $PSScriptRoot ".next"
 if (Test-Path $nextDir) {
     Write-Host "  Clearing .next cache..." -ForegroundColor Gray
     Remove-Item -Recurse -Force $nextDir -ErrorAction SilentlyContinue
+}
+
+if (Test-Path $SwarmRegistry) {
+    try {
+        $reg = Get-Content $SwarmRegistry -Raw | ConvertFrom-Json -AsHashtable
+        if ($reg.ContainsKey($AppName)) {
+            $reg[$AppName].status = "stopped"
+            $reg[$AppName].stoppedAt = (Get-Date -Format "o")
+            $reg[$AppName].pid = $null
+        }
+        $reg | ConvertTo-Json -Depth 5 | Set-Content $SwarmRegistry -Encoding UTF8
+    } catch {}
 }
 
 Write-Host "All development processes stopped" -ForegroundColor Green

@@ -34,6 +34,10 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Swarm runtime (config.json is committed, these are not)
+.claude-swarm/registry.json
+.claude-swarm/logs/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

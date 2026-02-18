@@ -5,6 +5,10 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEV_LOG="${DEV_LOG:-$ROOT_DIR/dev.log}"
 NODE_VERSION="${NODE_VERSION:-22.21.1}"
 
+APP_NAME="oscillation"
+SWARM_LOG="$ROOT_DIR/.claude-swarm/logs/dev.log"
+SWARM_REGISTRY="$ROOT_DIR/.claude-swarm/registry.json"
+
 info() {
   printf '\033[32m[run-dev]\033[0m %s\n' "$*"
 }
@@ -132,17 +136,23 @@ push_schema() {
 }
 
 start_dev() {
+  mkdir -p "$(dirname "$SWARM_LOG")"
   : >"$DEV_LOG"
+  : >"$SWARM_LOG"
 
   info "Clearing Next.js cache..."
   rm -rf "$ROOT_DIR/.next" "$ROOT_DIR/node_modules/.cache"
 
-  info "Starting Next.js dev server with Turbopack (logs: $DEV_LOG)..."
+  export NEXT_IGNORE_INCORRECT_LOCKFILE=1
+
+  info "Starting Next.js dev server (logs: $DEV_LOG | $SWARM_LOG)..."
   (
     cd "$ROOT_DIR"
     pnpm dev --port "${DEV_PORT:-3002}"
-  ) | tee -a "$DEV_LOG" &
+  ) | tee -a "$DEV_LOG" "$SWARM_LOG" &
   DEV_PID=$!
+
+  swarm_register "$DEV_PID"
 }
 
 cleanup() {
@@ -151,6 +161,43 @@ cleanup() {
     kill "$DEV_PID" >/dev/null 2>&1 || true
     wait "$DEV_PID" >/dev/null 2>&1 || true
   fi
+  swarm_deregister
+}
+
+swarm_register() {
+  local pid="$1"
+  local port="${DEV_PORT:-3002}"
+  mkdir -p "$(dirname "$SWARM_LOG")" "$(dirname "$SWARM_REGISTRY")"
+  node -e "
+    const fs = require('fs');
+    const reg = fs.existsSync('$SWARM_REGISTRY') ? JSON.parse(fs.readFileSync('$SWARM_REGISTRY', 'utf8')) : {};
+    reg['$APP_NAME'] = {
+      status: 'running',
+      pid: $pid,
+      port: $port,
+      log: '$SWARM_LOG',
+      project: '$ROOT_DIR',
+      health: 'http://localhost:$port/api/health',
+      startedAt: new Date().toISOString(),
+      stoppedAt: null
+    };
+    fs.writeFileSync('$SWARM_REGISTRY', JSON.stringify(reg, null, 2) + '\n');
+  "
+  info "Registered in swarm registry"
+}
+
+swarm_deregister() {
+  [ -f "$SWARM_REGISTRY" ] || return 0
+  node -e "
+    const fs = require('fs');
+    const reg = JSON.parse(fs.readFileSync('$SWARM_REGISTRY', 'utf8'));
+    if (reg['$APP_NAME']) {
+      reg['$APP_NAME'].status = 'stopped';
+      reg['$APP_NAME'].stoppedAt = new Date().toISOString();
+      reg['$APP_NAME'].pid = null;
+    }
+    fs.writeFileSync('$SWARM_REGISTRY', JSON.stringify(reg, null, 2) + '\n');
+  " 2>/dev/null || true
 }
 
 kill_existing() {
