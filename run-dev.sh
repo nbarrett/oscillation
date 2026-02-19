@@ -6,7 +6,7 @@ DEV_LOG="${DEV_LOG:-$ROOT_DIR/dev.log}"
 NODE_VERSION="${NODE_VERSION:-22.21.1}"
 
 APP_NAME="oscillation"
-SWARM_LOG="$ROOT_DIR/.claude-swarm/logs/dev.log"
+SWARM_LOG="$ROOT_DIR/logs/dev.log"
 SWARM_REGISTRY="$ROOT_DIR/.claude-swarm/registry.json"
 
 info() {
@@ -148,7 +148,7 @@ start_dev() {
   info "Starting Next.js dev server (logs: $DEV_LOG | $SWARM_LOG)..."
   (
     cd "$ROOT_DIR"
-    pnpm dev --port "${DEV_PORT:-3002}"
+    pnpm dev:direct --port "${DEV_PORT:-3002}"
   ) | tee -a "$DEV_LOG" "$SWARM_LOG" &
   DEV_PID=$!
 

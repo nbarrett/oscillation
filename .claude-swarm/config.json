@@ -1,15 +1,11 @@
 {
-  "name": "oscillation",
-  "start": {
-    "mac": "./run-dev.sh",
-    "windows": ".\\run-dev.ps1"
-  },
-  "stop": {
-    "mac": "./kill-dev.sh",
-    "windows": ".\\kill-dev.ps1"
-  },
-  "port": 3002,
-  "health": "http://localhost:3002/api/health",
-  "log": ".claude-swarm/logs/dev.log",
-  "registry": ".claude-swarm/registry.json"
+  "apps": [
+    {
+      "name": "oscillation",
+      "start": { "mac": "./run-dev.sh", "windows": ".\\run-dev.ps1" },
+      "port": 3002,
+      "health": "http://localhost:3002/api/trpc/health.check?batch=1&input=%7B%220%22%3A%7B%22json%22%3Anull%7D%7D",
+      "readyPattern": "Ready in"
+    }
+  ]
 }
