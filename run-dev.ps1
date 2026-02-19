@@ -10,7 +10,7 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 $AppName = "oscillation"
-$SwarmLog = Join-Path $RepoRoot ".claude-swarm\logs\dev.log"
+$SwarmLog = Join-Path $RepoRoot "logs\dev.log"
 $SwarmRegistry = Join-Path $RepoRoot ".claude-swarm\registry.json"
 
 function Write-Info {
