@@ -1,0 +1,50 @@
+#!/bin/bash
+
+set -e
+
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+source "${ROOT_DIR}/node_modules/@annix/claude-swarm/timer.sh"
+
+echo "Running pre-push checks..."
+
+pull_rebase() {
+  git fetch origin main 2>&1
+  local behind ahead
+  behind=$(git rev-list --count HEAD..origin/main)
+  ahead=$(git rev-list --count origin/main..HEAD)
+
+  if [ "$behind" -eq 0 ]; then
+    echo "Already up to date with remote."
+    return 0
+  fi
+
+  if [ "$ahead" -gt 0 ]; then
+    echo "Branch has diverged (${ahead} ahead, ${behind} behind) — skipping auto-rebase."
+    echo "If this is an intended force push, push will be rejected unless you use --force-with-lease."
+    return 0
+  fi
+
+  echo "Integrating ${behind} new remote commit(s)..."
+  if ! git rebase origin/main; then
+    git rebase --abort 2>/dev/null || true
+    echo ""
+    echo "Rebase conflict: resolve the conflict below, then push again."
+    return 1
+  fi
+}
+
+type_check() {
+  rm -rf "$ROOT_DIR/.next/dev"
+  pnpm exec tsc --noEmit
+}
+
+cd "$ROOT_DIR"
+timed_step "git pull --rebase" pull_rebase
+timed_step "type check" type_check
+timed_step "db migrate" pnpm run db:migrate
+timed_step "build" pnpm run build
+
+print_timing_summary
+
+echo "Pre-push checks passed!"
