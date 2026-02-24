@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { log } from "@/lib/utils";
-import { queryOverpass } from "@/server/overpass";
+import { queryOverpass, type OverpassElement } from "@/server/overpass";
+import { isNearMotorway, motorwayOverpassClause } from "@/server/motorway-filter";
 
 export const schoolsRouter = createTRPCRouter({
   inBounds: publicProcedure
@@ -23,13 +24,26 @@ export const schoolsRouter = createTRPCRouter({
         `way["amenity"="school"](${bbox});`,
         `node["amenity"="college"](${bbox});`,
         `way["amenity"="college"](${bbox});`,
+        motorwayOverpassClause(bbox),
         ");",
-        "out center body;",
+        "out center body geom;",
       ].join("");
 
       const data = await queryOverpass(query);
 
-      const schools = data.elements
+      const motorways: OverpassElement[] = [];
+      const schoolElements: OverpassElement[] = [];
+
+      for (const el of data.elements) {
+        const hw = el.tags?.highway;
+        if (el.type === "way" && (hw === "motorway" || hw === "motorway_link")) {
+          motorways.push(el);
+        } else {
+          schoolElements.push(el);
+        }
+      }
+
+      const schools = schoolElements
         .map((el) => ({
           id: el.id,
           lat: el.lat ?? el.center?.lat,
@@ -37,7 +51,7 @@ export const schoolsRouter = createTRPCRouter({
           name: el.tags?.name ?? null,
         }))
         .filter((el): el is { id: number; lat: number; lng: number; name: string | null } =>
-          el.lat != null && el.lng != null
+          el.lat != null && el.lng != null && !isNearMotorway(el.lat!, el.lng!, motorways)
         );
 
       log.debug("Schools/colleges:", schools.length);

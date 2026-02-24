@@ -18,14 +18,10 @@ import ValidMoveHighlights from "./ValidMoveHighlights";
 import MapContextMenu from "./MapContextMenu";
 import ClickPositionMarker from "./ClickPositionMarker";
 import GridOverlay from "./GridOverlay";
-import PubMarkers from "./PubMarkers";
-import SpireMarkers from "./ChurchMarkers";
-import TowerMarkers from "./TowerMarkers";
-import PhoneMarkers from "./PhoneMarkers";
-import SchoolMarkers from "./SchoolMarkers";
 import MapSearch from "./MapSearch";
 import GameBoundary from "./GameBoundary";
 import PoiCandidateMarkers from "./PoiCandidateMarkers";
+import SelectedPoiMarkers from "./SelectedPoiMarkers";
 import { AREA_SIZE_PRESETS } from "@/lib/area-size";
 
 function createBritishNationalGridCRS(): L.Proj.CRS | null {
@@ -167,13 +163,7 @@ export default function MapWithCars() {
         {phase === "picking" ? (
           <PoiCandidateMarkers />
         ) : (
-          <>
-            <PubMarkers />
-            <SpireMarkers />
-            <TowerMarkers />
-            <PhoneMarkers />
-            <SchoolMarkers />
-          </>
+          <SelectedPoiMarkers />
         )}
         <MapSearch />
         <GameBoundary />

@@ -23,7 +23,7 @@ import { cn } from "@/lib/cn"
 import AddStartingPointDialog from "./AddStartingPointDialog"
 import { asTitle } from "@/lib/utils"
 import { type AreaSize, AREA_SIZES, AREA_SIZE_PRESETS, DEFAULT_AREA_SIZE } from "@/lib/area-size"
-import { POI_CATEGORIES, POI_CATEGORY_LABELS } from "@/lib/poi-categories"
+import { POI_CATEGORIES, POI_CATEGORY_LABELS, MIN_POIS_PER_CATEGORY } from "@/lib/poi-categories"
 
 interface JoinGameProps {
   startingPosition: [number, number] | null
@@ -427,7 +427,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
                   <div className="grid grid-cols-2 gap-1">
                     {POI_CATEGORIES.map((cat) => {
                       const count = validation.data!.counts[cat];
-                      const present = count > 0;
+                      const present = count >= MIN_POIS_PER_CATEGORY;
                       return (
                         <div key={cat} className="flex items-center gap-1.5 text-sm">
                           {present ? (
@@ -441,10 +441,30 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
                         </div>
                       );
                     })}
+                    <div className="flex items-center gap-1.5 text-sm">
+                      {validation.data.hasMotorway ? (
+                        <Check className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                      ) : (
+                        <X className="h-3.5 w-3.5 text-destructive shrink-0" />
+                      )}
+                      <span className={validation.data.hasMotorway ? "text-foreground" : "text-destructive"}>
+                        Motorway
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-sm">
+                      {validation.data.hasRailway ? (
+                        <Check className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                      ) : (
+                        <X className="h-3.5 w-3.5 text-destructive shrink-0" />
+                      )}
+                      <span className={validation.data.hasRailway ? "text-foreground" : "text-destructive"}>
+                        Railway
+                      </span>
+                    </div>
                   </div>
                   {!validation.data.valid && (
                     <p className="text-xs text-destructive mt-1">
-                      Missing POI types — choose a different location or larger area
+                      Missing requirements — choose a different location or larger area
                     </p>
                   )}
                 </div>

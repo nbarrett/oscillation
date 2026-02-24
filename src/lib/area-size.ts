@@ -23,11 +23,17 @@ export const AREA_SIZE_PRESETS: Record<AreaSize, AreaSizePreset> = {
 
 export const DEFAULT_AREA_SIZE: AreaSize = "standard";
 
+export interface LatLngPoint {
+  lat: number;
+  lng: number;
+}
+
 export interface GameBounds {
   south: number;
   north: number;
   west: number;
   east: number;
+  corners: [LatLngPoint, LatLngPoint, LatLngPoint, LatLngPoint];
 }
 
 export function areaSizeBounds(startLat: number, startLng: number, areaSize: AreaSize): GameBounds {
@@ -46,13 +52,21 @@ export function areaSizeBounds(startLat: number, startLng: number, areaSize: Are
   const northN = gridN + halfH + 1000;
 
   const [swLng, swLat] = proj4(BNG, "EPSG:4326", [westE, southN]);
+  const [seLng, seLat] = proj4(BNG, "EPSG:4326", [eastE, southN]);
   const [neLng, neLat] = proj4(BNG, "EPSG:4326", [eastE, northN]);
+  const [nwLng, nwLat] = proj4(BNG, "EPSG:4326", [westE, northN]);
 
   return {
     south: swLat,
     north: neLat,
     west: swLng,
     east: neLng,
+    corners: [
+      { lat: swLat, lng: swLng },
+      { lat: seLat, lng: seLng },
+      { lat: neLat, lng: neLng },
+      { lat: nwLat, lng: nwLng },
+    ],
   };
 }
 

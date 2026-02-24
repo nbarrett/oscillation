@@ -6,6 +6,7 @@ import L from "leaflet"
 import { useGameStore } from "@/stores/game-store"
 import { POI_COLOURS } from "@/stores/poi-icons"
 import { trpc } from "@/lib/trpc/client"
+import { isNearMotorway } from "@/lib/road-data"
 
 const ICON_SIZE = 40
 const SELECTED_ICON_SIZE = 52
@@ -40,8 +41,11 @@ export default function PoiCandidateMarkers() {
 
     if (!poiCandidates) return
 
+    const selectedOsmIds = new Set((selectedPois ?? []).map(p => p.osmId))
     const pickedCategories = new Set((selectedPois ?? []).map(p => p.category))
-    const visibleCandidates = poiCandidates.filter(c => !pickedCategories.has(c.category))
+    const visibleCandidates = poiCandidates.filter(c =>
+      !isNearMotorway(c.lat, c.lng) && (selectedOsmIds.has(c.osmId) || !pickedCategories.has(c.category))
+    )
 
     for (const candidate of visibleCandidates) {
       const colour = POI_COLOURS[candidate.category as keyof typeof POI_COLOURS] ?? "#666"
