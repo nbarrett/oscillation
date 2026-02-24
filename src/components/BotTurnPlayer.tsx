@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react"
 import { useGameStore, GameTurnState } from "@/stores/game-store"
 import { useNotificationStore } from "@/stores/notification-store"
+import { useDeckStore } from "@/stores/deck-store"
 import { trpc } from "@/lib/trpc/client"
 import { latLngToGridKey, nearestRoadPosition, reachableRoadGrids, gridKeyToLatLng } from "@/lib/road-data"
 
@@ -23,10 +24,12 @@ export default function BotTurnPlayer() {
     updatePlayerPosition,
   } = useGameStore()
   const { addNotification } = useNotificationStore()
+  const { missedTurns, decrementMissedTurns, obstructions } = useDeckStore()
   const botTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const rollDiceMutation = trpc.game.rollDice.useMutation()
   const endTurnMutation = trpc.game.endTurn.useMutation()
+  const skipMissedTurnMutation = trpc.game.skipMissedTurn.useMutation()
 
   const isBotTurn = phase === "playing"
     && currentPlayerName?.startsWith("Bot ")
@@ -49,6 +52,27 @@ export default function BotTurnPlayer() {
   function playBotTurn() {
     if (!sessionId || !playerId || !currentPlayerName) return
 
+    const botMissed = missedTurns[currentPlayerName] ?? 0
+    if (botMissed > 0) {
+      addNotification(`${currentPlayerName} misses this turn!`, "info")
+      decrementMissedTurns(currentPlayerName)
+      skipMissedTurnMutation.mutate({ sessionId, playerId })
+
+      const state = useGameStore.getState()
+      const currentIndex = state.players.findIndex(p => p.name === currentPlayerName)
+      const nextIndex = (currentIndex + 1) % state.players.length
+      const nextPlayer = state.players[nextIndex]
+
+      clearGridSelections()
+      setPlayerStartGridKey(null)
+      setDiceResult(null)
+      setGameTurnState(GameTurnState.ROLL_DICE)
+      if (nextPlayer) {
+        setCurrentPlayer(nextPlayer.name)
+      }
+      return
+    }
+
     const botPlayer = players.find(p => p.name === currentPlayerName)
     if (!botPlayer) return
 
@@ -61,7 +85,13 @@ export default function BotTurnPlayer() {
     const snapped = nearestRoadPosition(botPlayer.position[0], botPlayer.position[1])
     const pos = snapped ?? botPlayer.position
     const startGridKey = latLngToGridKey(pos[0], pos[1])
-    const reachable = reachableRoadGrids(startGridKey, total, new Set())
+
+    const excluded = new Set<string>()
+    for (const o of obstructions) {
+      excluded.add(o.gridKey)
+    }
+
+    const reachable = reachableRoadGrids(startGridKey, total, excluded)
 
     let destination: [number, number] | null = null
     if (reachable && reachable.size > 0) {

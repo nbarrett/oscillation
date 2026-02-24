@@ -6,6 +6,7 @@ import { CAR_STYLES } from "@/stores/car-store"
 import { AREA_SIZES, DEFAULT_AREA_SIZE, areaSizeBounds, isWithinBounds, type AreaSize } from "@/lib/area-size"
 import { validatePoiCoverage, fetchPoiCandidates } from "@/server/overpass"
 import { POI_CATEGORIES } from "@/lib/poi-categories"
+import { EDGE_DECK, MOTORWAY_DECK, CHANCE_DECK, shuffleDeck, cardById, type ObstructionToken } from "@/lib/card-decks"
 
 function generateSessionCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -231,12 +232,23 @@ export const gameRouter = createTRPCRouter({
         (poi) => haversineKm(poi.lat, poi.lng, startLat, startLng) >= 10
       )
 
+      const deckState = {
+        edgeDeck: shuffleDeck(EDGE_DECK.map((c) => c.id)),
+        motorwayDeck: shuffleDeck(MOTORWAY_DECK.map((c) => c.id)),
+        chanceDeck: shuffleDeck(CHANCE_DECK.map((c) => c.id)),
+        edgeDrawIndex: 0,
+        motorwayDrawIndex: 0,
+        chanceDrawIndex: 0,
+      }
+
       await ctx.db.gameSession.update({
         where: { id: input.sessionId },
         data: {
           phase: "picking",
           selectedPois: JSON.parse(JSON.stringify([])),
           poiCandidates: JSON.parse(JSON.stringify(filteredCandidates)),
+          deckState: JSON.parse(JSON.stringify(deckState)),
+          obstructions: JSON.parse(JSON.stringify([])),
         },
       })
 
@@ -322,6 +334,8 @@ export const gameRouter = createTRPCRouter({
         creatorPlayerId: session.creatorPlayerId,
         selectedPois: session.selectedPois as Array<{ category: string; osmId: number; name: string | null; lat: number; lng: number }> | null,
         poiCandidates: session.poiCandidates as Array<{ category: string; osmId: number; name: string | null; lat: number; lng: number }> | null,
+        deckState: session.deckState as { edgeDeck: string[]; motorwayDeck: string[]; chanceDeck: string[]; edgeDrawIndex: number; motorwayDrawIndex: number; chanceDrawIndex: number } | null,
+        obstructions: (session.obstructions as unknown as ObstructionToken[]) ?? [],
         players: session.players.map(p => ({
           id: p.id,
           name: p.name,
@@ -330,6 +344,7 @@ export const gameRouter = createTRPCRouter({
           turnOrder: p.turnOrder,
           visitedPois: (p.visitedPois as string[]) ?? [],
           hasReturnedToStart: p.hasReturnedToStart,
+          missedTurns: p.missedTurns,
         })),
         updatedAt: session.updatedAt,
       }
@@ -496,6 +511,234 @@ export const gameRouter = createTRPCRouter({
       })
 
       return { title: card.title, body: card.body, type: card.type }
+    }),
+
+  drawDeckCard: publicProcedure
+    .input(z.object({
+      sessionId: z.string(),
+      playerId: z.string(),
+      deckType: z.enum(["edge", "motorway", "chance"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const session = await ctx.db.gameSession.findUnique({
+        where: { id: input.sessionId },
+      })
+
+      if (!session) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Game not found." })
+      }
+
+      const deckState = session.deckState as {
+        edgeDeck: string[]
+        motorwayDeck: string[]
+        chanceDeck: string[]
+        edgeDrawIndex: number
+        motorwayDrawIndex: number
+        chanceDrawIndex: number
+      } | null
+
+      if (!deckState) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Deck state not initialised." })
+      }
+
+      let deck: string[]
+      let drawIndex: number
+      let deckKey: string
+      let indexKey: string
+
+      switch (input.deckType) {
+        case "edge":
+          deck = deckState.edgeDeck
+          drawIndex = deckState.edgeDrawIndex
+          deckKey = "edgeDeck"
+          indexKey = "edgeDrawIndex"
+          break
+        case "motorway":
+          deck = deckState.motorwayDeck
+          drawIndex = deckState.motorwayDrawIndex
+          deckKey = "motorwayDeck"
+          indexKey = "motorwayDrawIndex"
+          break
+        case "chance":
+          deck = deckState.chanceDeck
+          drawIndex = deckState.chanceDrawIndex
+          deckKey = "chanceDeck"
+          indexKey = "chanceDrawIndex"
+          break
+      }
+
+      let cardId: string
+      if (drawIndex >= deck.length) {
+        const sourceCards = input.deckType === "edge"
+          ? EDGE_DECK
+          : input.deckType === "motorway"
+            ? MOTORWAY_DECK
+            : CHANCE_DECK
+        const reshuffled = shuffleDeck(sourceCards.map((c) => c.id))
+        cardId = reshuffled[0]
+        deckState[deckKey as keyof typeof deckState] = reshuffled as never
+        deckState[indexKey as keyof typeof deckState] = 1 as never
+      } else {
+        cardId = deck[drawIndex]
+        deckState[indexKey as keyof typeof deckState] = (drawIndex + 1) as never
+      }
+
+      await ctx.db.gameSession.update({
+        where: { id: input.sessionId },
+        data: { deckState: JSON.parse(JSON.stringify(deckState)) },
+      })
+
+      const card = cardById(cardId)
+      return card ? { cardId, card } : null
+    }),
+
+  placeObstruction: publicProcedure
+    .input(z.object({
+      sessionId: z.string(),
+      playerId: z.string(),
+      gridKey: z.string(),
+      color: z.enum(["blue", "yellow", "green"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const session = await ctx.db.gameSession.findUnique({
+        where: { id: input.sessionId },
+      })
+
+      if (!session) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Game not found." })
+      }
+
+      const obstructions = (session.obstructions as unknown as ObstructionToken[]) ?? []
+
+      const playerColorCount = obstructions.filter(
+        (o) => o.placedByPlayerId === input.playerId && o.color === input.color
+      ).length
+      if (playerColorCount >= 3) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Maximum 3 obstructions per color per player." })
+      }
+
+      const token: ObstructionToken = {
+        gridKey: input.gridKey,
+        color: input.color,
+        placedByPlayerId: input.playerId,
+      }
+
+      await ctx.db.gameSession.update({
+        where: { id: input.sessionId },
+        data: {
+          obstructions: JSON.parse(JSON.stringify([...obstructions, token])),
+        },
+      })
+
+      return { success: true }
+    }),
+
+  removeObstruction: publicProcedure
+    .input(z.object({
+      sessionId: z.string(),
+      gridKey: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const session = await ctx.db.gameSession.findUnique({
+        where: { id: input.sessionId },
+      })
+
+      if (!session) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Game not found." })
+      }
+
+      const obstructions = (session.obstructions as unknown as ObstructionToken[]) ?? []
+      const filtered = obstructions.filter((o) => o.gridKey !== input.gridKey)
+
+      await ctx.db.gameSession.update({
+        where: { id: input.sessionId },
+        data: {
+          obstructions: JSON.parse(JSON.stringify(filtered)),
+        },
+      })
+
+      return { success: true }
+    }),
+
+  applyChanceEffect: publicProcedure
+    .input(z.object({
+      sessionId: z.string(),
+      playerId: z.string(),
+      effectType: z.enum(["miss_turn", "return_to_start", "extra_throw"]),
+      missedTurns: z.number().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const session = await ctx.db.gameSession.findUnique({
+        where: { id: input.sessionId },
+        include: { players: { orderBy: { turnOrder: "asc" } } },
+      })
+
+      if (!session) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Game not found." })
+      }
+
+      if (input.effectType === "miss_turn" && input.missedTurns) {
+        const currentPlayer = session.players[session.currentTurn]
+        if (currentPlayer) {
+          await ctx.db.gamePlayer.update({
+            where: { id: currentPlayer.id },
+            data: { missedTurns: input.missedTurns },
+          })
+        }
+      }
+
+      if (input.effectType === "return_to_start" && session.startLat != null && session.startLng != null) {
+        const currentPlayer = session.players[session.currentTurn]
+        if (currentPlayer) {
+          await ctx.db.gamePlayer.update({
+            where: { id: currentPlayer.id },
+            data: {
+              positionLat: session.startLat,
+              positionLng: session.startLng,
+            },
+          })
+        }
+      }
+
+      return { success: true }
+    }),
+
+  skipMissedTurn: publicProcedure
+    .input(z.object({
+      sessionId: z.string(),
+      playerId: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const session = await ctx.db.gameSession.findUnique({
+        where: { id: input.sessionId },
+        include: { players: { orderBy: { turnOrder: "asc" } } },
+      })
+
+      if (!session) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Game not found." })
+      }
+
+      const currentPlayer = session.players[session.currentTurn]
+      if (!currentPlayer || currentPlayer.missedTurns <= 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "No missed turns to skip." })
+      }
+
+      await ctx.db.gamePlayer.update({
+        where: { id: currentPlayer.id },
+        data: { missedTurns: currentPlayer.missedTurns - 1 },
+      })
+
+      const nextTurn = (session.currentTurn + 1) % session.players.length
+      await ctx.db.gameSession.update({
+        where: { id: input.sessionId },
+        data: {
+          currentTurn: nextTurn,
+          dice1: null,
+          dice2: null,
+        },
+      })
+
+      return { success: true, skippedPlayer: currentPlayer.name }
     }),
 
   updatePosition: publicProcedure

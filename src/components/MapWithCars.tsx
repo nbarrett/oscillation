@@ -20,6 +20,7 @@ import ClickPositionMarker from "./ClickPositionMarker";
 import GridOverlay from "./GridOverlay";
 import MapSearch from "./MapSearch";
 import GameBoundary from "./GameBoundary";
+import ObstructionMarkers from "./ObstructionMarkers";
 import PoiCandidateMarkers from "./PoiCandidateMarkers";
 import SelectedPoiMarkers from "./SelectedPoiMarkers";
 import { AREA_SIZE_PRESETS } from "@/lib/area-size";
@@ -167,6 +168,7 @@ export default function MapWithCars() {
         )}
         <MapSearch />
         <GameBoundary />
+        <ObstructionMarkers />
       </MapContainer>
     </div>
   );

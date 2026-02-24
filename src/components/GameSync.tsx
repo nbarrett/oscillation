@@ -4,11 +4,13 @@ import { useEffect, useRef } from "react"
 import { trpc } from "@/lib/trpc/client"
 import { useGameStore, GameTurnState, type Player, type GamePhase } from "@/stores/game-store"
 import { useNotificationStore } from "@/stores/notification-store"
+import { useDeckStore } from "@/stores/deck-store"
 import { areaSizeBounds, isWithinBounds, type AreaSize } from "@/lib/area-size"
 
 export default function GameSync() {
   const { sessionId, playerId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setPoiCandidates, setWinnerName, leaveSession } = useGameStore()
   const { addNotification } = useNotificationStore()
+  const { initDecks, setObstructions, setMissedTurns } = useDeckStore()
   const hasCheckedSession = useRef(false)
   const previousPlayerNamesRef = useRef<string[]>([])
   const previousPhaseRef = useRef<string | null>(null)
@@ -99,6 +101,18 @@ export default function GameSync() {
 
       setPlayers(players)
 
+      if (gameState.deckState) {
+        initDecks(gameState.deckState)
+      }
+      if (gameState.obstructions) {
+        setObstructions(gameState.obstructions)
+      }
+      for (const p of gameState.players) {
+        if (p.missedTurns > 0) {
+          setMissedTurns(p.name, p.missedTurns)
+        }
+      }
+
       const myPlayer = gameState.players.find(p => p.id === playerId)
       if (myPlayer) {
         setLocalPlayerName(myPlayer.name)
@@ -140,7 +154,7 @@ export default function GameSync() {
         setWinnerName(winningPlayer?.name ?? null)
       }
     }
-  }, [gameState, playerId, addNotification, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setPoiCandidates, setWinnerName])
+  }, [gameState, playerId, addNotification, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setPoiCandidates, setWinnerName, initDecks, setObstructions, setMissedTurns])
 
   return null
 }

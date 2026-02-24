@@ -4,6 +4,7 @@ import { log } from "@/lib/utils"
 import { latLngToGridKey, gridKeyToLatLng, gridHasRoad, isRoadDataLoaded, reachableRoadGrids } from "@/lib/road-data"
 import { CAR_STYLES } from "@/stores/car-store"
 import { type AreaSize, type GameBounds, DEFAULT_AREA_SIZE } from "@/lib/area-size"
+import { useDeckStore } from "@/stores/deck-store"
 
 export enum GameTurnState {
   ROLL_DICE = "ROLL_DICE",
@@ -311,6 +312,10 @@ export const useGameStore = create<GameState>()(
         const startGridKey = latLngToGridKey(currentPlayer.position[0], currentPlayer.position[1]);
 
         const occupied = occupiedGridKeys(state.players, state.currentPlayerName ?? "");
+        const obstructionKeys = useDeckStore.getState().obstructions.map((o) => o.gridKey)
+        for (const key of obstructionKeys) {
+          occupied.add(key)
+        }
         const reachable = reachableRoadGrids(startGridKey, result, occupied);
 
         set({

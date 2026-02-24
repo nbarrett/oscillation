@@ -10,8 +10,11 @@ import { useSpireStore, useTowerStore } from "@/stores/church-store"
 import { usePhoneStore } from "@/stores/phone-store"
 import { useSchoolStore } from "@/stores/school-store"
 import { useNotificationStore } from "@/stores/notification-store"
+import { useDeckStore } from "@/stores/deck-store"
 import { detectPoiVisits } from "@/lib/poi-detection"
 import { POI_CATEGORY_LABELS, type PoiCategory } from "@/lib/poi-categories"
+import { isNearBoundaryEdge, isOnMotorwayOrRailway, shouldTriggerChance } from "@/lib/deck-triggers"
+import { type DeckType, type GameCard, type ChanceCard } from "@/lib/card-decks"
 import { Button } from "@/components/ui/button"
 import { DiceDisplay } from "@/components/ui/dice"
 import GridSelectionButton from "./GridSelectionButton"
@@ -35,6 +38,7 @@ export default function DiceRoller() {
     setPendingServerUpdate,
     phase,
     selectedPois,
+    gameBounds,
   } = useGameStore()
 
   const pubs = usePubStore(s => s.pubs)
@@ -43,6 +47,18 @@ export default function DiceRoller() {
   const phones = usePhoneStore(s => s.phones)
   const schools = useSchoolStore(s => s.schools)
   const { addNotification } = useNotificationStore()
+  const {
+    missedTurns,
+    decrementMissedTurns,
+    pendingDraws,
+    drawnDeckCard,
+    drawFromDeck,
+    queueDraw,
+    processNextDraw,
+    clearDrawnCard,
+    extraThrow,
+    setExtraThrow,
+  } = useDeckStore()
 
   const [isRolling, setRolling] = useState(false)
   const [hasSettled, setHasSettled] = useState(false)
@@ -50,6 +66,7 @@ export default function DiceRoller() {
   const [dice1Value, setDice1Value] = useState(1)
   const [dice2Value, setDice2Value] = useState(1)
   const [drawnCard, setDrawnCard] = useState<{ title: string; body: string; type: string } | null>(null)
+  const [processingDeckDraws, setProcessingDeckDraws] = useState(false)
   const total = dice1Value + dice2Value
   const playerName = player?.name || ""
   const isMyTurn = localPlayerName !== null && localPlayerName === currentPlayerName
@@ -58,6 +75,9 @@ export default function DiceRoller() {
   const rollDiceMutation = trpc.game.rollDice.useMutation()
   const endTurnMutation = trpc.game.endTurn.useMutation()
   const drawCardMutation = trpc.game.drawCard.useMutation()
+  const drawDeckCardMutation = trpc.game.drawDeckCard.useMutation()
+  const applyChanceEffectMutation = trpc.game.applyChanceEffect.useMutation()
+  const skipMissedTurnMutation = trpc.game.skipMissedTurn.useMutation()
 
   useEffect(() => {
     if (hasSettled && !isRolling) {
@@ -80,18 +100,30 @@ export default function DiceRoller() {
   }, [hasSettled, isRolling, total, handleDiceRoll, sessionId, playerId, dice1Value, dice2Value, rollDiceMutation, setPendingServerUpdate])
 
   function rollDice() {
-    if (!isRolling) {
-      setRolling(true)
-      setHasSettled(false)
-      setHasRolled(true)
+    if (isRolling) return
 
-      setTimeout(() => {
-        setDice1Value(Math.floor(Math.random() * 6) + 1)
-        setDice2Value(Math.floor(Math.random() * 6) + 1)
-        setRolling(false)
-        setHasSettled(true)
-      }, 2000)
+    if (currentPlayerName && (missedTurns[currentPlayerName] ?? 0) > 0) {
+      addNotification(`${currentPlayerName} must miss this turn!`, "info")
+      decrementMissedTurns(currentPlayerName)
+      if (sessionId && playerId) {
+        skipMissedTurnMutation.mutate({ sessionId, playerId })
+      }
+      setPendingServerUpdate(true)
+      handleEndTurn()
+      setPendingServerUpdate(false)
+      return
     }
+
+    setRolling(true)
+    setHasSettled(false)
+    setHasRolled(true)
+
+    setTimeout(() => {
+      setDice1Value(Math.floor(Math.random() * 6) + 1)
+      setDice2Value(Math.floor(Math.random() * 6) + 1)
+      setRolling(false)
+      setHasSettled(true)
+    }, 2000)
   }
 
   function handleEndTurnClick() {
@@ -131,6 +163,79 @@ export default function DiceRoller() {
       }
     }
 
+    const triggeredDecks: DeckType[] = []
+
+    if (isNearBoundaryEdge(movementPath, gameBounds)) {
+      triggeredDecks.push("edge")
+    }
+
+    if (lastGridKey) {
+      const mwResult = isOnMotorwayOrRailway(lastGridKey)
+      if (mwResult.triggered) {
+        triggeredDecks.push("motorway")
+      }
+    }
+
+    if (shouldTriggerChance(dice1Value, dice2Value)) {
+      triggeredDecks.push("chance")
+    }
+
+    if (triggeredDecks.length > 0) {
+      triggeredDecks.forEach((deck) => queueDraw(deck))
+      setProcessingDeckDraws(true)
+      processNextDraw()
+      return
+    }
+
+    finishEndTurn(destination, visitedPoiIds)
+  }
+
+  function handleDeckCardClose() {
+    const card = drawnDeckCard
+    clearDrawnCard()
+
+    if (card && card.deck === "chance") {
+      const chance = card as ChanceCard
+      if (sessionId && playerId) {
+        if (chance.effect.type === "miss_turn") {
+          applyChanceEffectMutation.mutate({
+            sessionId,
+            playerId,
+            effectType: "miss_turn",
+            missedTurns: chance.effect.turns,
+          })
+        } else if (chance.effect.type === "return_to_start") {
+          applyChanceEffectMutation.mutate({
+            sessionId,
+            playerId,
+            effectType: "return_to_start",
+          })
+        }
+      }
+    }
+
+    const nextCard = processNextDraw()
+    if (!nextCard) {
+      setProcessingDeckDraws(false)
+      if (extraThrow) {
+        setExtraThrow(false)
+        addNotification("Extra throw! Roll again!", "success")
+        useGameStore.getState().setGameTurnState(GameTurnState.ROLL_DICE)
+        useGameStore.getState().setDiceResult(null)
+        setHasRolled(false)
+        return
+      }
+      const lastGridKey = movementPath.length > 0
+        ? movementPath[movementPath.length - 1]
+        : null
+      const destination = lastGridKey
+        ? gridKeyToLatLng(lastGridKey)
+        : null
+      finishEndTurn(destination, [])
+    }
+  }
+
+  function finishEndTurn(destination: [number, number] | null, visitedPoiIds: string[]) {
     setPendingServerUpdate(true)
     handleEndTurn()
     if (sessionId && playerId) {
@@ -215,7 +320,12 @@ export default function DiceRoller() {
         </div>
       </div>
 
-      <CardDrawDialog card={drawnCard} onClose={() => setDrawnCard(null)} />
+      <CardDrawDialog
+        card={drawnCard}
+        deckCard={drawnDeckCard}
+        onClose={() => setDrawnCard(null)}
+        onDeckCardClose={handleDeckCardClose}
+      />
     </>
   )
 }
