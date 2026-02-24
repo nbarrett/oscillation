@@ -1,10 +1,11 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import { CheckCircle2, Circle, Loader2 } from "lucide-react"
-import { useGameStore } from "@/stores/game-store"
+import { CheckCircle2, Circle, Loader2, LocateFixed } from "lucide-react"
+import { useCurrentPlayer, useGameStore } from "@/stores/game-store"
 import { POI_CATEGORIES, POI_CATEGORY_LABELS, type PoiCategory } from "@/lib/poi-categories"
 import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/cn"
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -28,7 +29,8 @@ const MapWithCars = dynamic(
 )
 
 export default function PoiPicker() {
-  const { selectedPois, playerId, creatorPlayerId } = useGameStore()
+  const { selectedPois, playerId, creatorPlayerId, setPlayerZoomRequest } = useGameStore()
+  const player = useCurrentPlayer()
   const isCreator = playerId !== null && playerId === creatorPlayerId
   const pickedCategories = new Set((selectedPois ?? []).map(p => p.category))
 
@@ -41,9 +43,21 @@ export default function PoiPicker() {
               <span className="text-sm font-medium">
                 {isCreator ? "Select one objective for each category" : "Waiting for host to select objectives..."}
               </span>
-              <span className="text-xs text-muted-foreground">
-                {pickedCategories.size} / {POI_CATEGORIES.length} selected
-              </span>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => setPlayerZoomRequest(player?.name ?? "")}
+                  disabled={!player?.name}
+                >
+                  <LocateFixed className="h-3.5 w-3.5" />
+                  Find My Car
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {pickedCategories.size} / {POI_CATEGORIES.length} selected
+                </span>
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               {POI_CATEGORIES.map((category) => {

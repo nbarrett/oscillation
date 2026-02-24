@@ -21,6 +21,7 @@ export interface RoadDataCache {
   roads: RoadSegment[];
   gridSquaresWithRoads: Set<string>;
   gridSquaresWithABRoads: Set<string>;
+  gridAdjacency: Map<string, Set<string>>;
   timestamp: number;
 }
 
@@ -29,6 +30,23 @@ const STORAGE_MAX_AGE = 24 * 60 * 60 * 1000;
 
 let roadDataCache: RoadDataCache | null = null;
 
+function serializeAdjacency(adj: Map<string, Set<string>>): Record<string, string[]> {
+  const result: Record<string, string[]> = {};
+  adj.forEach((neighbors, key) => {
+    result[key] = Array.from(neighbors);
+  });
+  return result;
+}
+
+function deserializeAdjacency(obj: Record<string, string[]> | undefined): Map<string, Set<string>> {
+  const result = new Map<string, Set<string>>();
+  if (!obj) return result;
+  for (const [key, neighbors] of Object.entries(obj)) {
+    result.set(key, new Set(neighbors));
+  }
+  return result;
+}
+
 function saveToStorage(cache: RoadDataCache): void {
   try {
     const serializable = {
@@ -36,6 +54,7 @@ function saveToStorage(cache: RoadDataCache): void {
       roads: cache.roads,
       gridSquaresWithRoads: Array.from(cache.gridSquaresWithRoads),
       gridSquaresWithABRoads: Array.from(cache.gridSquaresWithABRoads),
+      gridAdjacency: serializeAdjacency(cache.gridAdjacency),
       timestamp: cache.timestamp,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(serializable));
@@ -49,7 +68,7 @@ function loadFromStorage(): RoadDataCache | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (Date.now() - parsed.timestamp > STORAGE_MAX_AGE) {
+    if (Date.now() - parsed.timestamp > STORAGE_MAX_AGE || !parsed.gridAdjacency) {
       localStorage.removeItem(STORAGE_KEY);
       return null;
     }
@@ -58,6 +77,7 @@ function loadFromStorage(): RoadDataCache | null {
       roads: parsed.roads,
       gridSquaresWithRoads: new Set(parsed.gridSquaresWithRoads),
       gridSquaresWithABRoads: new Set(parsed.gridSquaresWithABRoads ?? []),
+      gridAdjacency: deserializeAdjacency(parsed.gridAdjacency),
       timestamp: parsed.timestamp,
     };
   } catch (e) {
@@ -299,6 +319,50 @@ function calculateGridSquaresWithRoads(roads: RoadSegment[]): Set<string> {
   return gridSquares;
 }
 
+function addAdjacency(adj: Map<string, Set<string>>, gridA: string, gridB: string) {
+  if (gridA === gridB) return;
+  const [eA, nA] = gridA.split("-").map(Number);
+  const [eB, nB] = gridB.split("-").map(Number);
+  const de = Math.abs(eA - eB);
+  const dn = Math.abs(nA - nB);
+  if ((de === 1000 && dn === 0) || (de === 0 && dn === 1000)) {
+    if (!adj.has(gridA)) adj.set(gridA, new Set());
+    if (!adj.has(gridB)) adj.set(gridB, new Set());
+    adj.get(gridA)!.add(gridB);
+    adj.get(gridB)!.add(gridA);
+  }
+}
+
+function calculateGridAdjacency(roads: RoadSegment[]): Map<string, Set<string>> {
+  const adj = new Map<string, Set<string>>();
+
+  for (const road of roads) {
+    for (let i = 0; i < road.coordinates.length - 1; i++) {
+      const [lat1, lng1] = road.coordinates[i];
+      const [lat2, lng2] = road.coordinates[i + 1];
+      const gridA = latLngToGridKey(lat1, lng1);
+      const gridB = latLngToGridKey(lat2, lng2);
+
+      addAdjacency(adj, gridA, gridB);
+
+      const steps = Math.ceil(
+        Math.sqrt(Math.pow(lat2 - lat1, 2) + Math.pow(lng2 - lng1, 2)) * 1000
+      );
+      let prevGrid = gridA;
+      for (let j = 1; j < steps; j++) {
+        const t = j / steps;
+        const lat = lat1 + t * (lat2 - lat1);
+        const lng = lng1 + t * (lng2 - lng1);
+        const curGrid = latLngToGridKey(lat, lng);
+        addAdjacency(adj, prevGrid, curGrid);
+        prevGrid = curGrid;
+      }
+    }
+  }
+
+  return adj;
+}
+
 export async function loadRoadData(
   centerLat: number,
   centerLng: number,
@@ -336,19 +400,21 @@ export async function loadRoadData(
     const gridSquaresWithRoads = calculateGridSquaresWithRoads(roads);
     const abRoads = roads.filter((r) => r.highway === "primary" || r.highway === "secondary");
     const gridSquaresWithABRoads = calculateGridSquaresWithRoads(abRoads);
+    const gridAdjacency = calculateGridAdjacency(roads);
 
     roadDataCache = {
       bounds: { south, west, north, east },
       roads,
       gridSquaresWithRoads,
       gridSquaresWithABRoads,
+      gridAdjacency,
       timestamp: Date.now(),
     };
 
     saveToStorage(roadDataCache);
 
     log.info(
-      `Loaded ${roads.length} road segments, ${gridSquaresWithRoads.size} grid squares with roads, ${gridSquaresWithABRoads.size} with A/B roads`
+      `Loaded ${roads.length} road segments, ${gridSquaresWithRoads.size} grid squares with roads, ${gridSquaresWithABRoads.size} with A/B roads, ${gridAdjacency.size} connected grids`
     );
   } catch (error) {
     log.error("Failed to load road data:", error);
@@ -370,15 +436,10 @@ export function gridHasABRoad(gridKey: string): boolean {
 }
 
 export function getAdjacentRoadGrids(gridKey: string): string[] {
-  const [e, n] = gridKey.split("-").map(Number);
-  const adjacent = [
-    `${e}-${n + 1000}`,
-    `${e}-${n - 1000}`,
-    `${e + 1000}-${n}`,
-    `${e - 1000}-${n}`,
-  ];
-  const roadNeighbors = adjacent.filter((key) => gridHasRoad(key));
-  return roadNeighbors.length > 0 ? roadNeighbors : adjacent;
+  if (roadDataCache?.gridAdjacency.has(gridKey)) {
+    return Array.from(roadDataCache.gridAdjacency.get(gridKey)!);
+  }
+  return allAdjacentGrids(gridKey);
 }
 
 function allAdjacentGrids(gridKey: string): string[] {
@@ -457,6 +518,73 @@ export function shortestPath(
     }
   }
 
+  return null;
+}
+
+export function exactStepEndpoints(
+  startGridKey: string,
+  exactSteps: number,
+  excludeKeys: Set<string> = new Set()
+): Set<string> {
+  const endpoints = new Set<string>();
+  const hasRoads = isRoadDataLoaded();
+  const visited = new Set<string>([startGridKey]);
+
+  function dfs(key: string, depth: number) {
+    if (depth === exactSteps) {
+      endpoints.add(key);
+      return;
+    }
+
+    const neighbors = hasRoads && gridHasRoad(key)
+      ? getAdjacentRoadGrids(key)
+      : allAdjacentGrids(key);
+
+    for (const neighbor of neighbors) {
+      if (visited.has(neighbor) || excludeKeys.has(neighbor)) continue;
+      visited.add(neighbor);
+      dfs(neighbor, depth + 1);
+      visited.delete(neighbor);
+    }
+  }
+
+  dfs(startGridKey, 0);
+  return endpoints;
+}
+
+export function findExactPath(
+  startGridKey: string,
+  targetGridKey: string,
+  exactSteps: number,
+  excludeKeys: Set<string> = new Set()
+): string[] | null {
+  const hasRoads = isRoadDataLoaded();
+  const visited = new Set<string>([startGridKey]);
+  const path: string[] = [];
+
+  function dfs(key: string, depth: number): boolean {
+    if (depth === exactSteps) {
+      return key === targetGridKey;
+    }
+
+    const neighbors = hasRoads && gridHasRoad(key)
+      ? getAdjacentRoadGrids(key)
+      : allAdjacentGrids(key);
+
+    for (const neighbor of neighbors) {
+      if (visited.has(neighbor) || excludeKeys.has(neighbor)) continue;
+      visited.add(neighbor);
+      path.push(neighbor);
+      if (dfs(neighbor, depth + 1)) return true;
+      path.pop();
+      visited.delete(neighbor);
+    }
+    return false;
+  }
+
+  if (dfs(startGridKey, 0)) {
+    return [...path];
+  }
   return null;
 }
 

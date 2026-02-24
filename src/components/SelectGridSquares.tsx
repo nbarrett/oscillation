@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useMap } from "react-leaflet";
 import L from "leaflet";
 import { useGameStore, occupiedGridKeys, GameTurnState } from "@/stores/game-store";
-import { latLngToGridKey, getAdjacentRoadGrids } from "@/lib/road-data";
+import { latLngToGridKey, getAdjacentRoadGrids, shortestPath } from "@/lib/road-data";
 import { gridKeyToLatLngs } from "@/lib/grid-polygon";
 import { colours, log } from "@/lib/utils";
 
@@ -19,18 +19,36 @@ class IdentifiedPolygon extends L.Polygon {
   }
 }
 
+class EndpointPreview extends L.Polygon {
+  gridKey: string;
+
+  constructor(gridSquareLatLongs: L.LatLng[], gridKey: string, options?: L.PolylineOptions) {
+    super(gridSquareLatLongs, options);
+    this.gridKey = gridKey;
+  }
+}
+
 function isIdentifiedPolygon(layer: L.Layer): layer is IdentifiedPolygon {
-  return "firstLatLong" in layer;
+  return layer instanceof IdentifiedPolygon;
+}
+
+function isEndpointPreview(layer: L.Layer): layer is EndpointPreview {
+  return layer instanceof EndpointPreview;
 }
 
 export default function SelectGridSquares() {
   const map = useMap();
+  const endpointsRef = useRef<Set<string> | null>(null);
   const {
     mapClickPosition,
     gridClearRequest,
     setSelectedGridSquares,
     setMovementPath,
     setSelectedEndpoint,
+    gameTurnState,
+    diceResult,
+    movementPath,
+    playerStartGridKey,
   } = useGameStore();
 
   function clearPathPolygons() {
@@ -41,15 +59,45 @@ export default function SelectGridSquares() {
     });
   }
 
-  function drawPath(keys: string[]) {
+  function clearEndpointPreviews() {
+    map.eachLayer((layer) => {
+      if (isEndpointPreview(layer)) {
+        layer.remove();
+      }
+    });
+  }
+
+  function drawEndpointPreviews(endpoints: Set<string>) {
+    clearEndpointPreviews();
+
+    let count = 0;
+    endpoints.forEach((gridKey) => {
+      const latLngs = gridKeyToLatLngs(map, gridKey);
+      const polygon = new EndpointPreview(latLngs, gridKey, {
+        interactive: true,
+        color: colours.exactEndpoint,
+        weight: 4,
+        fillOpacity: 0.7,
+      });
+      polygon.addTo(map);
+      count++;
+    });
+    log.debug("drawEndpointPreviews: drew", count, "endpoints");
+  }
+
+  function drawPath(keys: string[], maxSteps?: number) {
     clearPathPolygons();
-    for (const key of keys) {
+    clearEndpointPreviews();
+    const isComplete = maxSteps !== undefined && keys.length === maxSteps;
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
+      const isLast = i === keys.length - 1 && isComplete;
       const latLngs = gridKeyToLatLngs(map, key);
       const polygon = new IdentifiedPolygon(latLngs, key, {
         interactive: true,
-        color: colours.osMapsPurple,
-        weight: 2,
-        fillOpacity: 0.3,
+        color: isLast ? colours.exactEndpoint : colours.osMapsPurple,
+        weight: isLast ? 3 : 2,
+        fillOpacity: isLast ? 0.5 : 0.3,
       });
       polygon.addTo(map);
     }
@@ -63,6 +111,24 @@ export default function SelectGridSquares() {
     });
     setSelectedGridSquares(grids);
   }
+
+  useEffect(() => {
+    if (!map) return;
+    if (gameTurnState === GameTurnState.DICE_ROLLED && diceResult && playerStartGridKey && movementPath.length === 0) {
+      const { reachableGrids } = useGameStore.getState();
+      const endpoints = new Set<string>();
+      if (reachableGrids) {
+        reachableGrids.forEach((steps, gridKey) => {
+          if (steps === diceResult) endpoints.add(gridKey);
+        });
+      }
+      endpointsRef.current = endpoints;
+      drawEndpointPreviews(endpoints);
+    } else if (gameTurnState !== GameTurnState.DICE_ROLLED) {
+      endpointsRef.current = null;
+      clearEndpointPreviews();
+    }
+  }, [map, gameTurnState, diceResult, playerStartGridKey, movementPath.length]);
 
   useEffect(() => {
     if (!mapClickPosition || !map) return;
@@ -86,15 +152,30 @@ export default function SelectGridSquares() {
 
     if (gridKey === playerStartGridKey) return;
 
+    const occupied = occupiedGridKeys(players, currentPlayerName ?? "");
+
     if (movementPath.length > 0 && movementPath[movementPath.length - 1] === gridKey) {
       const newPath = movementPath.slice(0, -1);
       setMovementPath(newPath);
       setSelectedEndpoint(newPath.length > 0 ? newPath[newPath.length - 1] : null);
-      drawPath(newPath);
+      drawPath(newPath, diceResult);
+      if (newPath.length === 0 && endpointsRef.current) {
+        drawEndpointPreviews(endpointsRef.current);
+      }
       return;
     }
 
     if (movementPath.includes(gridKey)) return;
+
+    if (endpointsRef.current?.has(gridKey) && movementPath.length === 0) {
+      const path = shortestPath(playerStartGridKey, gridKey, diceResult, occupied);
+      if (path) {
+        setMovementPath(path);
+        setSelectedEndpoint(gridKey);
+        drawPath(path, diceResult);
+        return;
+      }
+    }
 
     if (movementPath.length >= diceResult) return;
 
@@ -105,13 +186,12 @@ export default function SelectGridSquares() {
     const validNeighbors = getAdjacentRoadGrids(lastKey);
     if (!validNeighbors.includes(gridKey)) return;
 
-    const occupied = occupiedGridKeys(players, currentPlayerName ?? "");
     if (occupied.has(gridKey)) return;
 
     const newPath = [...movementPath, gridKey];
     setMovementPath(newPath);
     setSelectedEndpoint(gridKey);
-    drawPath(newPath);
+    drawPath(newPath, diceResult);
   }, [mapClickPosition]);
 
   useEffect(() => {
@@ -123,6 +203,7 @@ export default function SelectGridSquares() {
       });
       setSelectedGridSquares([]);
       setMovementPath([]);
+      endpointsRef.current = null;
     }
   }, [gridClearRequest, map, setSelectedGridSquares, setMovementPath]);
 
