@@ -5,7 +5,7 @@ const BNG = "+proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-1
 
 export interface RoadSegment {
   id: number;
-  type: 'A' | 'B';
+  type: 'A' | 'B' | 'M';
   highway: string;
   ref?: string;
   coordinates: [number, number][];
@@ -19,6 +19,7 @@ export interface RoadDataCache {
     east: number;
   };
   roads: RoadSegment[];
+  motorways: RoadSegment[];
   gridSquaresWithRoads: Set<string>;
   gridSquaresWithABRoads: Set<string>;
   gridAdjacency: Map<string, Set<string>>;
@@ -52,6 +53,7 @@ function saveToStorage(cache: RoadDataCache): void {
     const serializable = {
       bounds: cache.bounds,
       roads: cache.roads,
+      motorways: cache.motorways,
       gridSquaresWithRoads: Array.from(cache.gridSquaresWithRoads),
       gridSquaresWithABRoads: Array.from(cache.gridSquaresWithABRoads),
       gridAdjacency: serializeAdjacency(cache.gridAdjacency),
@@ -72,14 +74,24 @@ function loadFromStorage(): RoadDataCache | null {
       localStorage.removeItem(STORAGE_KEY);
       return null;
     }
-    return {
+    const cache: RoadDataCache = {
       bounds: parsed.bounds,
       roads: parsed.roads,
+      motorways: parsed.motorways ?? [],
       gridSquaresWithRoads: new Set(parsed.gridSquaresWithRoads),
       gridSquaresWithABRoads: new Set(parsed.gridSquaresWithABRoads ?? []),
       gridAdjacency: deserializeAdjacency(parsed.gridAdjacency),
       timestamp: parsed.timestamp,
     };
+    if (cache.gridSquaresWithABRoads.size === 0 && cache.roads.length > 0) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+    if (cache.motorways.length === 0) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+    return cache;
   } catch (e) {
     log.error("Failed to load road data from storage:", e);
     return null;
@@ -119,15 +131,22 @@ async function queryOverpassWithRetry(
   throw new Error("Overpass API: max retries exceeded");
 }
 
+interface RoadQueryResult {
+  roads: RoadSegment[];
+  motorways: RoadSegment[];
+}
+
 async function queryOverpassForRoads(
   south: number,
   west: number,
   north: number,
   east: number
-): Promise<RoadSegment[]> {
+): Promise<RoadQueryResult> {
   const query = `
     [out:json][timeout:25];
     (
+      way["highway"="motorway"](${south},${west},${north},${east});
+      way["highway"="motorway_link"](${south},${west},${north},${east});
       way["highway"="trunk"](${south},${west},${north},${east});
       way["highway"="primary"](${south},${west},${north},${east});
       way["highway"="secondary"](${south},${west},${north},${east});
@@ -164,12 +183,15 @@ async function queryOverpassForRoads(
   }
 
   const roads: RoadSegment[] = [];
+  const motorways: RoadSegment[] = [];
   for (const element of data.elements) {
     if (element.type === 'way' && element.tags?.highway) {
       const highway = element.tags.highway;
-      let roadType: 'A' | 'B' | null = null;
+      let roadType: 'A' | 'B' | 'M' | null = null;
 
-      if (highway === 'trunk' || highway === 'primary') {
+      if (highway === 'motorway' || highway === 'motorway_link') {
+        roadType = 'M';
+      } else if (highway === 'trunk' || highway === 'primary') {
         roadType = 'A';
       } else if (highway === 'secondary') {
         roadType = 'B';
@@ -185,19 +207,24 @@ async function queryOverpassForRoads(
         }
 
         if (coordinates.length > 0) {
-          roads.push({
+          const segment: RoadSegment = {
             id: element.id,
             type: roadType,
             highway,
             ref: element.tags.ref,
             coordinates,
-          });
+          };
+          if (roadType === 'M') {
+            motorways.push(segment);
+          } else {
+            roads.push(segment);
+          }
         }
       }
     }
   }
 
-  return roads;
+  return { roads, motorways };
 }
 
 export function gridKeyToLatLng(gridKey: string): [number, number] {
@@ -396,7 +423,7 @@ export async function loadRoadData(
   log.info("Loading road data for area:", { south, west, north, east });
 
   try {
-    const roads = await queryOverpassForRoads(south, west, north, east);
+    const { roads, motorways } = await queryOverpassForRoads(south, west, north, east);
     const gridSquaresWithRoads = calculateGridSquaresWithRoads(roads);
     const abRoads = roads.filter((r) => r.highway === "primary" || r.highway === "secondary");
     const gridSquaresWithABRoads = calculateGridSquaresWithRoads(abRoads);
@@ -405,6 +432,7 @@ export async function loadRoadData(
     roadDataCache = {
       bounds: { south, west, north, east },
       roads,
+      motorways,
       gridSquaresWithRoads,
       gridSquaresWithABRoads,
       gridAdjacency,
@@ -414,7 +442,7 @@ export async function loadRoadData(
     saveToStorage(roadDataCache);
 
     log.info(
-      `Loaded ${roads.length} road segments, ${gridSquaresWithRoads.size} grid squares with roads, ${gridSquaresWithABRoads.size} with A/B roads, ${gridAdjacency.size} connected grids`
+      `Loaded ${roads.length} road segments, ${motorways.length} motorway segments, ${gridSquaresWithRoads.size} grid squares with roads, ${gridSquaresWithABRoads.size} with A/B roads, ${gridAdjacency.size} connected grids`
     );
   } catch (error) {
     log.error("Failed to load road data:", error);
@@ -590,5 +618,45 @@ export function findExactPath(
 
 export function isRoadDataLoaded(): boolean {
   return roadDataCache !== null;
+}
+
+const MOTORWAY_PROXIMITY_METRES = 150;
+
+function haversineMetres(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function distToSegment(
+  px: number, py: number,
+  ax: number, ay: number,
+  bx: number, by: number
+): number {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return haversineMetres(px, py, ax, ay);
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+  return haversineMetres(px, py, ax + t * dx, ay + t * dy);
+}
+
+export function isNearMotorway(lat: number, lng: number): boolean {
+  if (!roadDataCache || roadDataCache.motorways.length === 0) return false;
+  for (const mw of roadDataCache.motorways) {
+    for (let i = 0; i < mw.coordinates.length - 1; i++) {
+      const [aLat, aLng] = mw.coordinates[i];
+      const [bLat, bLng] = mw.coordinates[i + 1];
+      if (distToSegment(lat, lng, aLat, aLng, bLat, bLng) <= MOTORWAY_PROXIMITY_METRES) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 

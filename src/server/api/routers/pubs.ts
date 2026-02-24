@@ -2,30 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { log } from "@/lib/utils";
 import { queryOverpass, type OverpassElement } from "@/server/overpass";
-
-function distanceMetres(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371000;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function distanceToSegment(
-  px: number, py: number,
-  ax: number, ay: number,
-  bx: number, by: number
-): number {
-  const dx = bx - ax;
-  const dy = by - ay;
-  const lenSq = dx * dx + dy * dy;
-  if (lenSq === 0) return distanceMetres(px, py, ax, ay);
-  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
-  return distanceMetres(px, py, ax + t * dx, ay + t * dy);
-}
+import { distanceToSegment, isNearMotorway, motorwayOverpassClause } from "@/server/motorway-filter";
 
 const ROAD_PROXIMITY_METRES = 75;
 
@@ -47,6 +24,7 @@ export const pubsRouter = createTRPCRouter({
         "(",
         `node["amenity"="pub"](${bbox});`,
         `way["highway"~"^(trunk|primary|secondary)$"](${bbox});`,
+        motorwayOverpassClause(bbox),
         ");",
         "out body geom;",
       ].join("");
@@ -55,16 +33,23 @@ export const pubsRouter = createTRPCRouter({
 
       const pubs: (OverpassElement & { lat: number; lon: number })[] = [];
       const roads: OverpassElement[] = [];
+      const motorways: OverpassElement[] = [];
 
       for (const el of data.elements) {
         if (el.type === "node" && el.lat != null && el.lon != null) {
           pubs.push(el as OverpassElement & { lat: number; lon: number });
         } else if (el.type === "way" && el.geometry) {
-          roads.push(el);
+          const hw = el.tags?.highway;
+          if (hw === "motorway" || hw === "motorway_link") {
+            motorways.push(el);
+          } else {
+            roads.push(el);
+          }
         }
       }
 
       const nearRoad = pubs.filter((pub) => {
+        if (isNearMotorway(pub.lat, pub.lon, motorways)) return false;
         for (const road of roads) {
           if (!road.geometry) continue;
           for (let i = 0; i < road.geometry.length - 1; i++) {

@@ -2,6 +2,8 @@ export type PoiCategory = "pub" | "spire" | "tower" | "phone" | "school";
 
 export const POI_CATEGORIES: PoiCategory[] = ["pub", "spire", "tower", "phone", "school"];
 
+export const MIN_POIS_PER_CATEGORY = 5;
+
 export const POI_CATEGORY_LABELS: Record<PoiCategory, string> = {
   pub: "Pubs",
   spire: "Spires",
@@ -14,6 +16,9 @@ export interface PoiValidationResult {
   valid: boolean;
   counts: Record<PoiCategory, number>;
   missing: PoiCategory[];
+  insufficient: PoiCategory[];
+  hasMotorway: boolean;
+  hasRailway: boolean;
 }
 
 const SPIRE_TOWER_TYPES = new Set(["spire", "steeple"]);
