@@ -9,7 +9,7 @@ const OVERPASS_ENDPOINTS = [
 
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 1000;
-const FETCH_TIMEOUT_MS = 10000;
+const FETCH_TIMEOUT_MS = 30000;
 
 const poiCache = new Map<string, { result: PoiValidationResult; expiresAt: number }>();
 const POI_CACHE_TTL_MS = 10 * 60 * 1000;
@@ -100,7 +100,7 @@ export interface PoiCandidate {
 
 function buildPoiQuery(bbox: string): string {
   return [
-    "[out:json][timeout:25];",
+    "[out:json][timeout:30];",
     "(",
     `node["amenity"="pub"](${bbox});`,
     `node["amenity"="place_of_worship"]["religion"="christian"](${bbox});`,
@@ -112,10 +112,19 @@ function buildPoiQuery(bbox: string): string {
     `way["amenity"="school"](${bbox});`,
     `node["amenity"="college"](${bbox});`,
     `way["amenity"="college"](${bbox});`,
+    ");",
+    "out center tags;",
+  ].join("");
+}
+
+function buildMotorwayQuery(bbox: string): string {
+  return [
+    "[out:json][timeout:30];",
+    "(",
     motorwayOverpassClause(bbox),
     `way["railway"="rail"](${bbox});`,
     ");",
-    "out center tags geom;",
+    "out geom;",
   ].join("");
 }
 
@@ -126,14 +135,14 @@ interface ClassifyResult {
   hasRailway: boolean;
 }
 
-function classifyElements(data: OverpassResponse): ClassifyResult {
+function classifyElements(poiData: OverpassResponse, roadData: OverpassResponse): ClassifyResult {
   const counts: Record<PoiCategory, number> = { pub: 0, spire: 0, tower: 0, phone: 0, school: 0 };
   const candidates: PoiCandidate[] = [];
   let hasMotorway = false;
   let hasRailway = false;
 
   const motorways: OverpassElement[] = [];
-  for (const el of data.elements) {
+  for (const el of roadData.elements) {
     if (el.type !== "way") continue;
     const hw = el.tags?.highway;
     if (hw === "motorway" || hw === "motorway_link") {
@@ -145,7 +154,7 @@ function classifyElements(data: OverpassResponse): ClassifyResult {
     }
   }
 
-  for (const el of data.elements) {
+  for (const el of poiData.elements) {
     const category = classifyElement(el.tags ?? {}, el.id);
     if (!category) continue;
     const lat = el.lat ?? el.center?.lat;
@@ -179,8 +188,11 @@ export async function validatePoiCoverage(
     return cached.result;
   }
 
-  const data = await queryOverpass(buildPoiQuery(bbox));
-  const { counts, hasMotorway, hasRailway } = classifyElements(data);
+  const [poiData, roadData] = await Promise.all([
+    queryOverpass(buildPoiQuery(bbox)),
+    queryOverpass(buildMotorwayQuery(bbox)),
+  ]);
+  const { counts, hasMotorway, hasRailway } = classifyElements(poiData, roadData);
   const missing = POI_CATEGORIES.filter((cat) => counts[cat] === 0);
   const insufficient = POI_CATEGORIES.filter((cat) => counts[cat] > 0 && counts[cat] < MIN_POIS_PER_CATEGORY);
 
@@ -215,8 +227,11 @@ export async function fetchPoiCandidates(
     return cached.candidates;
   }
 
-  const data = await queryOverpass(buildPoiQuery(bbox));
-  const { candidates } = classifyElements(data);
+  const [poiData, roadData] = await Promise.all([
+    queryOverpass(buildPoiQuery(bbox)),
+    queryOverpass(buildMotorwayQuery(bbox)),
+  ]);
+  const { candidates } = classifyElements(poiData, roadData);
 
   log.debug("POI candidates fetched:", candidates.length);
   poiCandidateCache.set(bbox, { candidates, expiresAt: Date.now() + POI_CACHE_TTL_MS });
