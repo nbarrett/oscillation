@@ -49,6 +49,7 @@ export default function SelectGridSquares() {
     diceResult,
     movementPath,
     playerStartGridKey,
+    showPreviewPaths,
   } = useGameStore();
 
   function clearPathPolygons() {
@@ -67,8 +68,22 @@ export default function SelectGridSquares() {
     });
   }
 
-  function drawEndpointPreviews(endpoints: Set<string>) {
+  function drawEndpointPreviews(endpoints: Set<string>, reachableGrids: Map<string, number> | null, maxSteps: number) {
     clearEndpointPreviews();
+
+    if (reachableGrids) {
+      reachableGrids.forEach((steps, gridKey) => {
+        if (steps === maxSteps) return;
+        const latLngs = gridKeyToLatLngs(map, gridKey);
+        const polygon = new EndpointPreview(latLngs, gridKey, {
+          interactive: false,
+          color: colours.osMapsPurple,
+          weight: 2,
+          fillOpacity: 0.35,
+        });
+        polygon.addTo(map);
+      });
+    }
 
     let count = 0;
     endpoints.forEach((gridKey) => {
@@ -114,6 +129,11 @@ export default function SelectGridSquares() {
 
   useEffect(() => {
     if (!map) return;
+    if (!showPreviewPaths) {
+      endpointsRef.current = null;
+      clearEndpointPreviews();
+      return;
+    }
     if (gameTurnState === GameTurnState.DICE_ROLLED && diceResult && playerStartGridKey && movementPath.length === 0) {
       const { reachableGrids } = useGameStore.getState();
       const endpoints = new Set<string>();
@@ -123,12 +143,12 @@ export default function SelectGridSquares() {
         });
       }
       endpointsRef.current = endpoints;
-      drawEndpointPreviews(endpoints);
+      drawEndpointPreviews(endpoints, reachableGrids, diceResult);
     } else if (gameTurnState !== GameTurnState.DICE_ROLLED) {
       endpointsRef.current = null;
       clearEndpointPreviews();
     }
-  }, [map, gameTurnState, diceResult, playerStartGridKey, movementPath.length]);
+  }, [map, gameTurnState, diceResult, playerStartGridKey, movementPath.length, showPreviewPaths]);
 
   useEffect(() => {
     if (!mapClickPosition || !map) return;
@@ -160,7 +180,8 @@ export default function SelectGridSquares() {
       setSelectedEndpoint(newPath.length > 0 ? newPath[newPath.length - 1] : null);
       drawPath(newPath, diceResult);
       if (newPath.length === 0 && endpointsRef.current) {
-        drawEndpointPreviews(endpointsRef.current);
+        const { reachableGrids } = useGameStore.getState();
+        drawEndpointPreviews(endpointsRef.current, reachableGrids, diceResult);
       }
       return;
     }

@@ -112,7 +112,9 @@ interface GameState {
   selectedPois: SelectedPoi[] | null;
   poiCandidates: SelectedPoi[] | null;
   winnerName: string | null;
+  showPreviewPaths: boolean;
 
+  setShowPreviewPaths: (show: boolean) => void;
   setReachableGrids: (grids: Map<string, number> | null) => void;
   setSelectedEndpoint: (endpoint: string | null) => void;
   setAreaSize: (areaSize: AreaSize) => void;
@@ -186,7 +188,9 @@ export const useGameStore = create<GameState>()(
       selectedPois: null,
       poiCandidates: null,
       winnerName: null,
+      showPreviewPaths: true,
 
+      setShowPreviewPaths: (showPreviewPaths) => set({ showPreviewPaths }),
       setReachableGrids: (reachableGrids) => set({ reachableGrids }),
 
       setSelectedEndpoint: (selectedEndpoint) => set({ selectedEndpoint }),
@@ -464,6 +468,7 @@ export const useGameStore = create<GameState>()(
         areaSize: state.areaSize,
         phase: state.phase,
         creatorPlayerId: state.creatorPlayerId,
+        showPreviewPaths: state.showPreviewPaths,
       }),
     }
   )

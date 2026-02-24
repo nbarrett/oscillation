@@ -83,7 +83,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
   const [locationSearch, setLocationSearch] = useState("")
   const [areaSize, setAreaSize] = useState<AreaSize>(DEFAULT_AREA_SIZE)
 
-  const { setSessionId, setPlayerId, setSessionCode, setCreatorPlayerId } = useGameStore()
+  const { setSessionId, setPlayerId, setSessionCode, setCreatorPlayerId, showPreviewPaths, setShowPreviewPaths: showPreviewPathsSetter } = useGameStore()
   const { preferredCar } = useCarStore()
   const { data: locations, refetch: refetchLocations } = trpc.locations.getAll.useQuery()
   const { data: availableGames } = trpc.game.list.useQuery()
@@ -410,6 +410,39 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
                     );
                   })}
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Preview Paths</Label>
+                <div className="flex rounded-md border overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => showPreviewPathsSetter(true)}
+                    className={cn(
+                      "flex-1 px-3 py-1.5 text-xs font-medium transition-colors",
+                      showPreviewPaths
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background hover:bg-muted text-muted-foreground"
+                    )}
+                  >
+                    On
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => showPreviewPathsSetter(false)}
+                    className={cn(
+                      "flex-1 px-3 py-1.5 text-xs font-medium transition-colors",
+                      !showPreviewPaths
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background hover:bg-muted text-muted-foreground"
+                    )}
+                  >
+                    Off
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Show reachable paths and endpoints after rolling dice
+                </p>
               </div>
             </>
           )}
