@@ -131,7 +131,7 @@ export default function GamePage() {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            {inSession && sessionCode && phase === "playing" && (
+            {inSession && sessionCode && (phase === "playing" || phase === "picking") && (
               <div className="hidden sm:flex items-center gap-2 mr-2">
                 <Tooltip>
                   <TooltipTrigger asChild>
