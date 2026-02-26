@@ -148,7 +148,7 @@ start_dev() {
   info "Starting Next.js dev server (logs: $DEV_LOG | $SWARM_LOG)..."
   (
     cd "$ROOT_DIR"
-    pnpm dev:direct --port "${DEV_PORT:-3002}"
+    pnpm dev
   ) | tee -a "$DEV_LOG" "$SWARM_LOG" &
   DEV_PID=$!
 

@@ -152,11 +152,12 @@ export default function SelectGridSquares() {
       return;
     }
     if (gameTurnState === GameTurnState.DICE_ROLLED && diceResult && playerStartGridKey && movementPath.length === 0) {
-      const { reachableGrids } = useGameStore.getState();
+      const { reachableGrids, players, currentPlayerName } = useGameStore.getState();
+      const occupied = occupiedGridKeys(players, currentPlayerName ?? "");
       const endpoints = new Set<string>();
       if (reachableGrids) {
         reachableGrids.forEach((steps, gridKey) => {
-          if (steps === diceResult) endpoints.add(gridKey);
+          if (steps === diceResult && !occupied.has(gridKey)) endpoints.add(gridKey);
         });
       }
       endpointsRef.current = endpoints;
@@ -209,7 +210,7 @@ export default function SelectGridSquares() {
     if (movementPath.includes(gridKey)) return;
 
     if (endpointsRef.current?.has(gridKey) && movementPath.length === 0) {
-      const path = shortestPath(playerStartGridKey, gridKey, diceResult, occupied);
+      const path = shortestPath(playerStartGridKey, gridKey, diceResult);
       if (path) {
         setMovementPath(path);
         setSelectedEndpoint(gridKey);
@@ -228,7 +229,8 @@ export default function SelectGridSquares() {
     const validNeighbors = getAdjacentRoadGrids(lastKey);
     if (!validNeighbors.includes(gridKey)) return;
 
-    if (occupied.has(gridKey)) return;
+    const wouldBeEndpoint = movementPath.length + 1 === diceResult;
+    if (wouldBeEndpoint && occupied.has(gridKey)) return;
 
     const newPath = [...movementPath, gridKey];
     setMovementPath(newPath);

@@ -44,7 +44,7 @@ export interface RoadDataCache {
   timestamp: number;
 }
 
-const STORAGE_KEY = "oscillation-road-data";
+const STORAGE_KEY = "oscillation-road-data-v2";
 const STORAGE_MAX_AGE = 24 * 60 * 60 * 1000;
 
 let roadDataCache: RoadDataCache | null = null;
