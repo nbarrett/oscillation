@@ -6,6 +6,8 @@ import L from "leaflet";
 import { useGameStore, occupiedGridKeys, GameTurnState } from "@/stores/game-store";
 import { latLngToGridKey, getAdjacentRoadGrids, shortestPath } from "@/lib/road-data";
 import { gridKeyToLatLngs } from "@/lib/grid-polygon";
+import { isOnBoardEdge, isOnMotorwayOrRailway } from "@/lib/deck-triggers";
+import { type GameBounds } from "@/lib/area-size";
 import { colours, log } from "@/lib/utils";
 
 class IdentifiedPolygon extends L.Polygon {
@@ -51,6 +53,21 @@ export default function SelectGridSquares() {
     playerStartGridKey,
     showPreviewPaths,
   } = useGameStore();
+
+  function checkMidMovementTrigger(path: string[], gameBounds: GameBounds | null) {
+    const lastKey = path[path.length - 1];
+    if (!lastKey) return;
+
+    if (isOnBoardEdge(lastKey, gameBounds)) {
+      useGameStore.getState().setCardTrigger({ type: "edge", gridKey: lastKey, stepsUsed: path.length });
+      return;
+    }
+
+    const mwResult = isOnMotorwayOrRailway(lastKey);
+    if (mwResult.triggered) {
+      useGameStore.getState().setCardTrigger({ type: "motorway", gridKey: lastKey, stepsUsed: path.length });
+    }
+  }
 
   function clearPathPolygons() {
     map.eachLayer((layer) => {
@@ -163,6 +180,9 @@ export default function SelectGridSquares() {
       gameTurnState,
     } = state;
 
+    const { cardTrigger, gameBounds } = state;
+    if (cardTrigger) return;
+
     if (gameTurnState !== GameTurnState.DICE_ROLLED || !playerStartGridKey || !diceResult) return;
 
     const gridKey = latLngToGridKey(
@@ -194,6 +214,7 @@ export default function SelectGridSquares() {
         setMovementPath(path);
         setSelectedEndpoint(gridKey);
         drawPath(path, diceResult);
+        checkMidMovementTrigger(path, gameBounds);
         return;
       }
     }
@@ -213,6 +234,7 @@ export default function SelectGridSquares() {
     setMovementPath(newPath);
     setSelectedEndpoint(gridKey);
     drawPath(newPath, diceResult);
+    checkMidMovementTrigger(newPath, gameBounds);
   }, [mapClickPosition]);
 
   useEffect(() => {

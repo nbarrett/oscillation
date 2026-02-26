@@ -13,8 +13,8 @@ import { useNotificationStore } from "@/stores/notification-store"
 import { useDeckStore } from "@/stores/deck-store"
 import { detectPoiVisits } from "@/lib/poi-detection"
 import { POI_CATEGORY_LABELS, type PoiCategory } from "@/lib/poi-categories"
-import { isNearBoundaryEdge, isOnMotorwayOrRailway } from "@/lib/deck-triggers"
-import { type DeckType, type ChanceCard } from "@/lib/card-decks"
+import { type DeckType, type ChanceCard, type EdgeCard, type MotorwayCard } from "@/lib/card-decks"
+import { resolveEdgeCard, resolveMotorwayCard } from "@/lib/card-resolution"
 import { Button } from "@/components/ui/button"
 import { DiceDisplay } from "@/components/ui/dice"
 import GridSelectionButton from "./GridSelectionButton"
@@ -39,6 +39,9 @@ export default function DiceRoller() {
     phase,
     selectedPois,
     gameBounds,
+    cardTrigger,
+    setCardTrigger,
+    handleCardRelocation,
   } = useGameStore()
 
   const pubs = usePubStore(s => s.pubs)
@@ -78,6 +81,14 @@ export default function DiceRoller() {
   const drawDeckCardMutation = trpc.game.drawDeckCard.useMutation()
   const applyChanceEffectMutation = trpc.game.applyChanceEffect.useMutation()
   const skipMissedTurnMutation = trpc.game.skipMissedTurn.useMutation()
+
+  useEffect(() => {
+    if (cardTrigger && !processingDeckDraws && !drawnDeckCard) {
+      queueDraw(cardTrigger.type)
+      setProcessingDeckDraws(true)
+      processNextDraw()
+    }
+  }, [cardTrigger, processingDeckDraws, drawnDeckCard, queueDraw, processNextDraw])
 
   useEffect(() => {
     if (hasSettled && !isRolling) {
@@ -165,15 +176,8 @@ export default function DiceRoller() {
 
     const triggeredDecks: DeckType[] = []
 
-    if (isNearBoundaryEdge(lastGridKey, gameBounds)) {
-      triggeredDecks.push("edge")
-    }
-
-    if (lastGridKey) {
-      const mwResult = isOnMotorwayOrRailway(lastGridKey)
-      if (mwResult.triggered) {
-        triggeredDecks.push("motorway")
-      }
+    if (dice1Value === dice2Value) {
+      triggeredDecks.push("chance")
     }
 
     if (triggeredDecks.length > 0) {
@@ -188,6 +192,7 @@ export default function DiceRoller() {
 
   function handleDeckCardClose() {
     const card = drawnDeckCard
+    const trigger = cardTrigger
     clearDrawnCard()
 
     if (card && card.deck === "chance") {
@@ -208,6 +213,27 @@ export default function DiceRoller() {
           })
         }
       }
+    }
+
+    if (trigger && card && (card.deck === "edge" || card.deck === "motorway")) {
+      let destination: string | null = null
+      if (card.deck === "edge" && gameBounds) {
+        destination = resolveEdgeCard(card as EdgeCard, trigger.gridKey, gameBounds)
+      } else if (card.deck === "motorway") {
+        destination = resolveMotorwayCard(card as MotorwayCard, trigger.gridKey)
+      }
+
+      setProcessingDeckDraws(false)
+
+      if (destination) {
+        const remaining = (diceResult ?? 0) - trigger.stepsUsed
+        addNotification(`Relocated! ${remaining > 0 ? `${remaining} moves remaining` : "Turn ending"}`, "info")
+        handleCardRelocation(destination, remaining)
+      } else {
+        addNotification("No valid destination found — continuing normally", "info")
+        setCardTrigger(null)
+      }
+      return
     }
 
     const nextCard = processNextDraw()

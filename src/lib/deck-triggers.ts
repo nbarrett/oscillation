@@ -44,6 +44,63 @@ export function isNearBoundaryEdge(
   )
 }
 
+export function isOnBoardEdge(
+  gridKey: string,
+  gameBounds: GameBounds | null
+): boolean {
+  if (!gameBounds) return false
+
+  const bngCorners = cornersToBng(gameBounds.corners)
+  const minE = Math.min(...bngCorners.map(([e]) => e))
+  const maxE = Math.max(...bngCorners.map(([e]) => e))
+  const minN = Math.min(...bngCorners.map(([, n]) => n))
+  const maxN = Math.max(...bngCorners.map(([, n]) => n))
+
+  const [e, n] = gridKeyToBng(gridKey)
+
+  const gridMinE = Math.floor(minE / 1000) * 1000 + 500
+  const gridMaxE = Math.floor(maxE / 1000) * 1000 + 500
+  const gridMinN = Math.floor(minN / 1000) * 1000 + 500
+  const gridMaxN = Math.floor(maxN / 1000) * 1000 + 500
+
+  return e <= gridMinE || e >= gridMaxE || n <= gridMinN || n >= gridMaxN
+}
+
+export function boundaryEdge(
+  gridKey: string,
+  gameBounds: GameBounds
+): "N" | "S" | "E" | "W" | null {
+  const bngCorners = cornersToBng(gameBounds.corners)
+  const minE = Math.floor(Math.min(...bngCorners.map(([e]) => e)) / 1000) * 1000 + 500
+  const maxE = Math.floor(Math.max(...bngCorners.map(([e]) => e)) / 1000) * 1000 + 500
+  const minN = Math.floor(Math.min(...bngCorners.map(([, n]) => n)) / 1000) * 1000 + 500
+  const maxN = Math.floor(Math.max(...bngCorners.map(([, n]) => n)) / 1000) * 1000 + 500
+
+  const [e, n] = gridKeyToBng(gridKey)
+
+  if (n >= maxN) return "N"
+  if (n <= minN) return "S"
+  if (e >= maxE) return "E"
+  if (e <= minE) return "W"
+  return null
+}
+
+export function boundaryGridKeys(gameBounds: GameBounds): string[] {
+  const bngCorners = cornersToBng(gameBounds.corners)
+  const minE = Math.floor(Math.min(...bngCorners.map(([e]) => e)) / 1000) * 1000
+  const maxE = Math.floor(Math.max(...bngCorners.map(([e]) => e)) / 1000) * 1000
+  const minN = Math.floor(Math.min(...bngCorners.map(([, n]) => n)) / 1000) * 1000
+  const maxN = Math.floor(Math.max(...bngCorners.map(([, n]) => n)) / 1000) * 1000
+
+  const keys: string[] = []
+  for (let e = minE; e <= maxE; e += 1000) keys.push(`${e}-${minN}`)
+  for (let n = minN + 1000; n <= maxN; n += 1000) keys.push(`${maxE}-${n}`)
+  for (let e = maxE - 1000; e >= minE; e -= 1000) keys.push(`${e}-${maxN}`)
+  for (let n = maxN - 1000; n > minN; n -= 1000) keys.push(`${minE}-${n}`)
+
+  return keys
+}
+
 export function isOnMotorwayOrRailway(
   gridKey: string,
   railwayStations?: Array<{ lat: number; lng: number }>
