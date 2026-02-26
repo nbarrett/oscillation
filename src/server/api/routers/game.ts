@@ -4,6 +4,7 @@ import { TRPCError } from "@trpc/server"
 import { createTRPCRouter, publicProcedure } from "../trpc"
 import { CAR_STYLES } from "@/stores/car-store"
 import { AREA_SIZES, DEFAULT_AREA_SIZE, areaSizeBounds, isWithinBounds, type AreaSize } from "@/lib/area-size"
+import { snapToGridCenter } from "@/lib/road-data"
 import { validatePoiCoverage, fetchPoiCandidates } from "@/server/overpass"
 import { POI_CATEGORIES } from "@/lib/poi-categories"
 import { EDGE_DECK, MOTORWAY_DECK, CHANCE_DECK, shuffleDeck, cardById, type ObstructionToken } from "@/lib/card-decks"
@@ -100,18 +101,20 @@ export const gameRouter = createTRPCRouter({
         attempts++
       }
 
+      const snapped = snapToGridCenter(input.startLat, input.startLng)
+
       const session = await ctx.db.gameSession.create({
         data: {
           code,
-          startLat: input.startLat,
-          startLng: input.startLng,
+          startLat: snapped.lat,
+          startLng: snapped.lng,
           areaSize: input.areaSize,
           players: {
             create: {
               name: input.playerName,
               iconType: input.iconType ?? CAR_STYLES[0],
-              positionLat: input.startLat,
-              positionLng: input.startLng,
+              positionLat: snapped.lat,
+              positionLng: snapped.lng,
               turnOrder: 0,
             },
           },
