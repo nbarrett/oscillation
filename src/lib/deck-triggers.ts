@@ -19,10 +19,10 @@ function cornersToBng(corners: GameBounds["corners"]): [number, number][] {
 }
 
 export function isNearBoundaryEdge(
-  movementPath: string[],
+  destinationGridKey: string | null,
   gameBounds: GameBounds | null
 ): boolean {
-  if (!gameBounds || movementPath.length === 0) return false
+  if (!gameBounds || !destinationGridKey) return false
 
   const bngCorners = cornersToBng(gameBounds.corners)
   const minE = Math.min(...bngCorners.map(([e]) => e))
@@ -30,24 +30,18 @@ export function isNearBoundaryEdge(
   const minN = Math.min(...bngCorners.map(([, n]) => n))
   const maxN = Math.max(...bngCorners.map(([, n]) => n))
 
-  for (const gridKey of movementPath) {
-    const [e, n] = gridKeyToBng(gridKey)
-    const distToWest = e - minE
-    const distToEast = maxE - e
-    const distToSouth = n - minN
-    const distToNorth = maxN - n
+  const [e, n] = gridKeyToBng(destinationGridKey)
+  const distToWest = e - minE
+  const distToEast = maxE - e
+  const distToSouth = n - minN
+  const distToNorth = maxN - n
 
-    if (
-      distToWest <= BOUNDARY_THRESHOLD_M ||
-      distToEast <= BOUNDARY_THRESHOLD_M ||
-      distToSouth <= BOUNDARY_THRESHOLD_M ||
-      distToNorth <= BOUNDARY_THRESHOLD_M
-    ) {
-      return true
-    }
-  }
-
-  return false
+  return (
+    distToWest <= BOUNDARY_THRESHOLD_M ||
+    distToEast <= BOUNDARY_THRESHOLD_M ||
+    distToSouth <= BOUNDARY_THRESHOLD_M ||
+    distToNorth <= BOUNDARY_THRESHOLD_M
+  )
 }
 
 export function isOnMotorwayOrRailway(
@@ -75,6 +69,3 @@ export function isOnMotorwayOrRailway(
   return { triggered: false, type: null }
 }
 
-export function shouldTriggerChance(dice1: number, dice2: number): boolean {
-  return dice1 === dice2
-}
