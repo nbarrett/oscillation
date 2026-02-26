@@ -1,13 +1,14 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import { useGameStore, GameTurnState } from "@/stores/game-store"
+import { useGameStore, GameTurnState, occupiedGridKeys, type SelectedPoi } from "@/stores/game-store"
 import { useNotificationStore } from "@/stores/notification-store"
 import { useDeckStore } from "@/stores/deck-store"
 import { usePubStore } from "@/stores/pub-store"
 import { useSpireStore, useTowerStore } from "@/stores/church-store"
 import { usePhoneStore } from "@/stores/phone-store"
 import { useSchoolStore } from "@/stores/school-store"
+import { useRouteStore } from "@/stores/route-store"
 import { trpc } from "@/lib/trpc/client"
 import { latLngToGridKey, nearestRoadPosition, reachableRoadGrids, gridKeyToLatLng, shortestPath } from "@/lib/road-data"
 import { detectPoiVisits } from "@/lib/poi-detection"
@@ -17,6 +18,64 @@ import { resolveEdgeCard, resolveMotorwayCard } from "@/lib/card-resolution"
 import { type GameBounds } from "@/lib/area-size"
 import { type DeckType, type ChanceCard, type EdgeCard, type MotorwayCard } from "@/lib/card-decks"
 
+function distanceSq(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const dLat = lat2 - lat1
+  const dLng = lng2 - lng1
+  return dLat * dLat + dLng * dLng
+}
+
+function chooseTarget(
+  visitedPois: string[],
+  selectedPois: SelectedPoi[] | null,
+  startLat: number | null,
+  startLng: number | null,
+  botLat: number,
+  botLng: number,
+): { lat: number; lng: number } | null {
+  if (selectedPois && selectedPois.length > 0) {
+    const visitedSet = new Set(visitedPois)
+    const unvisited = selectedPois.filter(
+      (poi) => !visitedSet.has(`${poi.category}:${poi.osmId}`)
+    )
+
+    if (unvisited.length > 0) {
+      let nearest = unvisited[0]
+      let nearestDist = distanceSq(botLat, botLng, nearest.lat, nearest.lng)
+      for (let i = 1; i < unvisited.length; i++) {
+        const d = distanceSq(botLat, botLng, unvisited[i].lat, unvisited[i].lng)
+        if (d < nearestDist) {
+          nearestDist = d
+          nearest = unvisited[i]
+        }
+      }
+      return { lat: nearest.lat, lng: nearest.lng }
+    }
+  }
+
+  if (startLat != null && startLng != null) {
+    return { lat: startLat, lng: startLng }
+  }
+
+  return null
+}
+
+function pickBestEndpoint(
+  candidates: string[],
+  target: { lat: number; lng: number },
+): string {
+  let best = candidates[0]
+  let bestDist = Infinity
+  for (const gridKey of candidates) {
+    const [lat, lng] = gridKeyToLatLng(gridKey)
+    const d = distanceSq(lat, lng, target.lat, target.lng)
+    if (d < bestDist) {
+      bestDist = d
+      best = gridKey
+    }
+  }
+  return best
+}
+
 export default function BotTurnPlayer() {
   const {
     currentPlayerName,
@@ -25,6 +84,7 @@ export default function BotTurnPlayer() {
     playerId,
     phase,
     gameTurnState,
+    selectedPois,
     setDiceResult,
     setGameTurnState,
     setCurrentPlayer,
@@ -32,11 +92,11 @@ export default function BotTurnPlayer() {
     setPlayerStartGridKey,
     setPendingServerUpdate,
     updatePlayerPosition,
-    selectedPois,
     gameBounds,
   } = useGameStore()
   const { addNotification } = useNotificationStore()
   const { missedTurns, decrementMissedTurns, obstructions } = useDeckStore()
+  const { startingPosition } = useRouteStore()
   const pubs = usePubStore(s => s.pubs)
   const spires = useSpireStore(s => s.spires)
   const towers = useTowerStore(s => s.towers)
@@ -198,17 +258,31 @@ export default function BotTurnPlayer() {
 
     const reachable = reachableRoadGrids(startGridKey, total, excluded)
 
-    let destination: [number, number] | null = null
+    const occupied = occupiedGridKeys(players, currentPlayerName)
     let destinationGridKey: string | null = null
+    let destination: [number, number] | null = null
+
     if (reachable && reachable.size > 0) {
       const exactStepGrids = [...reachable.entries()]
-        .filter(([, steps]) => steps === total)
+        .filter(([key, steps]) => steps === total && !occupied.has(key))
         .map(([key]) => key)
 
       if (exactStepGrids.length > 0) {
-        const picked = exactStepGrids[Math.floor(Math.random() * exactStepGrids.length)]
-        destination = gridKeyToLatLng(picked)
-        destinationGridKey = picked
+        const target = chooseTarget(
+          botPlayer.visitedPois,
+          selectedPois,
+          startingPosition?.lat ?? null,
+          startingPosition?.lng ?? null,
+          pos[0],
+          pos[1],
+        )
+
+        if (target) {
+          destinationGridKey = pickBestEndpoint(exactStepGrids, target)
+        } else {
+          destinationGridKey = exactStepGrids[Math.floor(Math.random() * exactStepGrids.length)]
+        }
+        destination = gridKeyToLatLng(destinationGridKey)
       }
     }
 
@@ -282,7 +356,7 @@ export default function BotTurnPlayer() {
             visitedPoiIds = visits.map(v => v.id)
             visits.forEach(v => {
               const categoryLabel = POI_CATEGORY_LABELS[v.category as PoiCategory] ?? v.category
-              addNotification(`${currentPlayerName} visited ${categoryLabel}: ${v.name ?? "Unknown"}`, "info")
+              addNotification(`${currentPlayerName} visited ${categoryLabel}: ${v.name ?? "Unknown"}`, "success")
             })
 
             if (visits.length > 0) {

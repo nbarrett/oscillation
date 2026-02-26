@@ -336,7 +336,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
             <>
               <div className="space-y-2">
                 <Label>Starting Point</Label>
-                <p className="text-xs text-muted-foreground">Must be on an A road (pink roads on the map)</p>
+                <p className="text-xs text-muted-foreground">Must be on an A road (pink) or B road (brown/yellow)</p>
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

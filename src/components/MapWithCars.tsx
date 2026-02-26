@@ -23,6 +23,7 @@ import GameBoundary from "./GameBoundary";
 import ObstructionMarkers from "./ObstructionMarkers";
 import PoiCandidateMarkers from "./PoiCandidateMarkers";
 import SelectedPoiMarkers from "./SelectedPoiMarkers";
+import ObjectiveArrows from "./ObjectiveArrows";
 import { AREA_SIZE_PRESETS } from "@/lib/area-size";
 
 function createBritishNationalGridCRS(): L.Proj.CRS | null {
@@ -169,6 +170,7 @@ export default function MapWithCars() {
         <MapSearch />
         <GameBoundary />
         <ObstructionMarkers />
+        <ObjectiveArrows />
       </MapContainer>
     </div>
   );
