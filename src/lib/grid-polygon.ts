@@ -9,6 +9,11 @@ function bngToLatLng(easting: number, northing: number): L.LatLng {
   return new L.LatLng(lat, lng);
 }
 
+export function gridKeyToCenter(gridKey: string): L.LatLng {
+  const [easting, northing] = gridKey.split("-").map(Number);
+  return bngToLatLng(easting + 500, northing + 500);
+}
+
 export function gridKeyToLatLngs(_map: L.Map, gridKey: string): L.LatLng[] {
   const [easting, northing] = gridKey.split("-").map(Number);
   return [

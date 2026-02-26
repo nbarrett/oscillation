@@ -40,6 +40,7 @@ const SpireIconSelector = dynamic(() => import("@/components/ChurchIconSelector"
 const TowerIconSelector = dynamic(() => import("@/components/TowerIconSelector"), { ssr: false })
 const PhoneIconSelector = dynamic(() => import("@/components/PhoneIconSelector"), { ssr: false })
 const SchoolIconSelector = dynamic(() => import("@/components/SchoolIconSelector"), { ssr: false })
+const ObstructionIconSelector = dynamic(() => import("@/components/ObstructionIconSelector"), { ssr: false })
 const IconDetailToggle = dynamic(() => import("@/components/IconDetailToggle"), { ssr: false })
 const MapPositions = dynamic(() => import("@/components/MapPositions"), { ssr: false })
 const JoinGame = dynamic(() => import("@/components/JoinGame"), { ssr: false })
@@ -239,6 +240,7 @@ export default function GamePage() {
                     <TowerIconSelector />
                     <PhoneIconSelector />
                     <SchoolIconSelector />
+                    <ObstructionIconSelector />
                   </div>
                 </div>
               </div>
