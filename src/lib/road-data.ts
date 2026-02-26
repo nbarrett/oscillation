@@ -467,6 +467,9 @@ export function getAdjacentRoadGrids(gridKey: string): string[] {
   if (roadDataCache?.gridAdjacency.has(gridKey)) {
     return Array.from(roadDataCache.gridAdjacency.get(gridKey)!);
   }
+  if (roadDataCache) {
+    return allAdjacentGrids(gridKey).filter((g) => roadDataCache!.gridSquaresWithRoads.has(g));
+  }
   return allAdjacentGrids(gridKey);
 }
 
@@ -495,7 +498,7 @@ export function reachableRoadGrids(
     const current = queue.shift()!;
     if (current.depth >= maxSteps) continue;
 
-    const neighbors = hasRoads && gridHasRoad(current.key)
+    const neighbors = hasRoads
       ? getAdjacentRoadGrids(current.key)
       : allAdjacentGrids(current.key);
 
@@ -534,7 +537,7 @@ export function shortestPath(
     }
     if (current.depth >= maxSteps) continue;
 
-    const neighbors = hasRoads && gridHasRoad(current.key)
+    const neighbors = hasRoads
       ? getAdjacentRoadGrids(current.key)
       : allAdjacentGrids(current.key);
 
@@ -564,7 +567,7 @@ export function exactStepEndpoints(
       return;
     }
 
-    const neighbors = hasRoads && gridHasRoad(key)
+    const neighbors = hasRoads
       ? getAdjacentRoadGrids(key)
       : allAdjacentGrids(key);
 
@@ -595,7 +598,7 @@ export function findExactPath(
       return key === targetGridKey;
     }
 
-    const neighbors = hasRoads && gridHasRoad(key)
+    const neighbors = hasRoads
       ? getAdjacentRoadGrids(key)
       : allAdjacentGrids(key);
 
