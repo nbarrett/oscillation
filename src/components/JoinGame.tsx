@@ -92,7 +92,19 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
 
   const pinMismatch = confirmPin.length > 0 && registerPin !== confirmPin
   const sortedLocations = (locations ?? []).slice().sort((a, b) => a.name.localeCompare(b.name))
-  const filteredLocations = sortedLocations.filter(l =>
+
+  const validLocationQuery = trpc.game.validLocationIds.useQuery(
+    { areaSize },
+    { enabled: mode === "create", staleTime: 5 * 60 * 1000 },
+  )
+  const validLocationSet = new Set(validLocationQuery.data ?? [])
+  const isValidating = mode === "create" && validLocationQuery.isLoading
+
+  const validSortedLocations = validLocationQuery.data
+    ? sortedLocations.filter(l => validLocationSet.has(l.id))
+    : sortedLocations
+
+  const filteredLocations = validSortedLocations.filter(l =>
     l.name.toLowerCase().includes(locationSearch.toLowerCase())
   )
   const selectedLocation = locations?.find(l => l.id === selectedLocationId)
@@ -235,9 +247,9 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
   }
 
   function pickRandomLocation() {
-    if (sortedLocations.length === 0) return
-    const randomIndex = Math.floor(Math.random() * sortedLocations.length)
-    const picked = sortedLocations[randomIndex]
+    if (validSortedLocations.length === 0) return
+    const randomIndex = Math.floor(Math.random() * validSortedLocations.length)
+    const picked = validSortedLocations[randomIndex]
     setSelectedLocationId(picked.id)
     setLocationSearch(asTitle(picked.name))
   }
@@ -351,17 +363,24 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
                     variant="outline"
                     size="icon"
                     onClick={pickRandomLocation}
-                    disabled={!locations || locations.length === 0}
+                    disabled={isValidating || validSortedLocations.length === 0}
                     title="Random starting point"
                   >
                     <Shuffle className="h-4 w-4" />
                   </Button>
                   <AddStartingPointDialog onSuccess={refetchLocations} />
                 </div>
-                <div className="max-h-48 overflow-y-auto rounded-md border">
-                  {filteredLocations.length === 0 ? (
+                <div className="max-h-48 overflow-y-auto rounded-md border relative">
+                  {isValidating ? (
+                    <div className="p-3 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Checking locations...
+                    </div>
+                  ) : filteredLocations.length === 0 ? (
                     <div className="p-3 text-sm text-muted-foreground text-center">
-                      No locations found
+                      {validLocationQuery.data && validSortedLocations.length === 0
+                        ? "No locations meet the requirements for this area size"
+                        : "No locations found"}
                     </div>
                   ) : (
                     filteredLocations.map((location) => (
