@@ -372,6 +372,14 @@ export function latLngToGridKey(lat: number, lng: number): string {
   return `${e}-${n}`;
 }
 
+export function snapToGridCenter(lat: number, lng: number): { lat: number; lng: number } {
+  const [easting, northing] = proj4("EPSG:4326", BNG, [lng, lat]);
+  const e = Math.floor(easting / 1000) * 1000 + 500;
+  const n = Math.floor(northing / 1000) * 1000 + 500;
+  const [snappedLng, snappedLat] = proj4(BNG, "EPSG:4326", [e, n]);
+  return { lat: snappedLat, lng: snappedLng };
+}
+
 function calculateGridSquaresWithRoads(roads: RoadSegment[]): Set<string> {
   const gridSquares = new Set<string>();
 
