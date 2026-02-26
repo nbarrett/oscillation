@@ -363,24 +363,28 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
                     variant="outline"
                     size="icon"
                     onClick={pickRandomLocation}
-                    disabled={isValidating || validSortedLocations.length === 0}
+                    disabled={validSortedLocations.length === 0}
                     title="Random starting point"
                   >
                     <Shuffle className="h-4 w-4" />
                   </Button>
                   <AddStartingPointDialog onSuccess={refetchLocations} />
                 </div>
-                <div className="max-h-48 overflow-y-auto rounded-md border relative">
-                  {isValidating ? (
-                    <div className="p-3 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Checking locations...
-                    </div>
-                  ) : filteredLocations.length === 0 ? (
+                {isValidating && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Checking which locations meet area requirements...
+                  </div>
+                )}
+                {!isValidating && validLocationQuery.data && validSortedLocations.length === 0 && (
+                  <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-sm text-destructive">
+                    No locations meet the requirements for this area size
+                  </div>
+                )}
+                <div className="max-h-48 overflow-y-auto rounded-md border">
+                  {filteredLocations.length === 0 ? (
                     <div className="p-3 text-sm text-muted-foreground text-center">
-                      {validLocationQuery.data && validSortedLocations.length === 0
-                        ? "No locations meet the requirements for this area size"
-                        : "No locations found"}
+                      No locations found
                     </div>
                   ) : (
                     filteredLocations.map((location) => (
