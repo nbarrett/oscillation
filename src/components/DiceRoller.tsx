@@ -13,8 +13,8 @@ import { useNotificationStore } from "@/stores/notification-store"
 import { useDeckStore } from "@/stores/deck-store"
 import { detectPoiVisits } from "@/lib/poi-detection"
 import { POI_CATEGORY_LABELS, type PoiCategory } from "@/lib/poi-categories"
-import { isNearBoundaryEdge, isOnMotorwayOrRailway, shouldTriggerChance } from "@/lib/deck-triggers"
-import { type DeckType, type GameCard, type ChanceCard } from "@/lib/card-decks"
+import { isNearBoundaryEdge, isOnMotorwayOrRailway } from "@/lib/deck-triggers"
+import { type DeckType, type ChanceCard } from "@/lib/card-decks"
 import { Button } from "@/components/ui/button"
 import { DiceDisplay } from "@/components/ui/dice"
 import GridSelectionButton from "./GridSelectionButton"
@@ -165,7 +165,7 @@ export default function DiceRoller() {
 
     const triggeredDecks: DeckType[] = []
 
-    if (isNearBoundaryEdge(movementPath, gameBounds)) {
+    if (isNearBoundaryEdge(lastGridKey, gameBounds)) {
       triggeredDecks.push("edge")
     }
 
@@ -174,10 +174,6 @@ export default function DiceRoller() {
       if (mwResult.triggered) {
         triggeredDecks.push("motorway")
       }
-    }
-
-    if (shouldTriggerChance(dice1Value, dice2Value)) {
-      triggeredDecks.push("chance")
     }
 
     if (triggeredDecks.length > 0) {
