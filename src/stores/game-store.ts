@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import { log } from "@/lib/utils"
-import { latLngToGridKey, gridKeyToLatLng, gridHasRoad, isRoadDataLoaded, reachableRoadGrids } from "@/lib/road-data"
+import { latLngToGridKey, gridKeyToLatLng, isRoadDataLoaded, reachableRoadGrids } from "@/lib/road-data"
 import { CAR_STYLES } from "@/stores/car-store"
 import { type AreaSize, type GameBounds, DEFAULT_AREA_SIZE } from "@/lib/area-size"
 import { useDeckStore } from "@/stores/deck-store"
