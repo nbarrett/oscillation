@@ -7,6 +7,7 @@ import { AREA_SIZES, DEFAULT_AREA_SIZE, areaSizeBounds, isWithinBounds, type Are
 import { validatePoiCoverage, fetchPoiCandidates } from "@/server/overpass"
 import { POI_CATEGORIES } from "@/lib/poi-categories"
 import { EDGE_DECK, MOTORWAY_DECK, CHANCE_DECK, shuffleDeck, cardById, type ObstructionToken } from "@/lib/card-decks"
+import { log } from "@/lib/utils"
 
 function generateSessionCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -55,6 +56,30 @@ export const gameRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const bounds = areaSizeBounds(input.lat, input.lng, input.areaSize as AreaSize)
       return validatePoiCoverage(bounds.south, bounds.west, bounds.north, bounds.east)
+    }),
+
+  validLocationIds: publicProcedure
+    .input(z.object({
+      areaSize: z.enum(AREA_SIZES as [string, ...string[]]).default(DEFAULT_AREA_SIZE),
+    }))
+    .query(async ({ ctx, input }) => {
+      const locations = await ctx.db.namedLocation.findMany()
+      const results = await Promise.allSettled(
+        locations.map(async (loc) => {
+          const bounds = areaSizeBounds(loc.lat, loc.lng, input.areaSize as AreaSize)
+          const result = await validatePoiCoverage(bounds.south, bounds.west, bounds.north, bounds.east)
+          return { id: loc.id, valid: result.valid }
+        })
+      )
+      const validIds: string[] = []
+      for (const r of results) {
+        if (r.status === "fulfilled" && r.value.valid) {
+          validIds.push(r.value.id)
+        } else if (r.status === "rejected") {
+          log.warn("Failed to validate location:", r.reason)
+        }
+      }
+      return validIds
     }),
 
   create: publicProcedure
