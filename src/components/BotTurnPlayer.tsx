@@ -9,11 +9,13 @@ import { useSpireStore, useTowerStore } from "@/stores/church-store"
 import { usePhoneStore } from "@/stores/phone-store"
 import { useSchoolStore } from "@/stores/school-store"
 import { trpc } from "@/lib/trpc/client"
-import { latLngToGridKey, nearestRoadPosition, reachableRoadGrids, gridKeyToLatLng } from "@/lib/road-data"
+import { latLngToGridKey, nearestRoadPosition, reachableRoadGrids, gridKeyToLatLng, shortestPath } from "@/lib/road-data"
 import { detectPoiVisits } from "@/lib/poi-detection"
 import { POI_CATEGORY_LABELS, type PoiCategory } from "@/lib/poi-categories"
-import { isNearBoundaryEdge, isOnMotorwayOrRailway } from "@/lib/deck-triggers"
-import { type DeckType, type ChanceCard } from "@/lib/card-decks"
+import { isOnBoardEdge, isOnMotorwayOrRailway } from "@/lib/deck-triggers"
+import { resolveEdgeCard, resolveMotorwayCard } from "@/lib/card-resolution"
+import { type GameBounds } from "@/lib/area-size"
+import { type DeckType, type ChanceCard, type EdgeCard, type MotorwayCard } from "@/lib/card-decks"
 
 export default function BotTurnPlayer() {
   const {
@@ -147,6 +149,23 @@ export default function BotTurnPlayer() {
     }
   }
 
+  function findBotMidMovementTrigger(
+    path: string[],
+    gameBounds: GameBounds | null
+  ): { type: "edge" | "motorway"; gridKey: string; stepsUsed: number } | null {
+    for (let i = 0; i < path.length; i++) {
+      const gridKey = path[i]
+      if (isOnBoardEdge(gridKey, gameBounds)) {
+        return { type: "edge", gridKey, stepsUsed: i + 1 }
+      }
+      const mwResult = isOnMotorwayOrRailway(gridKey)
+      if (mwResult.triggered) {
+        return { type: "motorway", gridKey, stepsUsed: i + 1 }
+      }
+    }
+    return null
+  }
+
   function playBotTurn() {
     if (!sessionId || !playerId || !currentPlayerName) return
 
@@ -193,10 +212,6 @@ export default function BotTurnPlayer() {
       }
     }
 
-    const botMovementPath = destinationGridKey
-      ? [startGridKey, destinationGridKey]
-      : [startGridKey]
-
     setPendingServerUpdate(true)
 
     rollDiceMutation.mutate({
@@ -207,13 +222,63 @@ export default function BotTurnPlayer() {
     }, {
       onSuccess: () => {
         setTimeout(() => {
-          if (destination) {
-            updatePlayerPosition(currentPlayerName!, destination)
+          let finalDestination = destination
+          let finalDestinationGridKey = destinationGridKey
+
+          if (destinationGridKey) {
+            const path = shortestPath(startGridKey, destinationGridKey, total, excluded)
+            if (path) {
+              const midResult = findBotMidMovementTrigger(path, gameBounds)
+              if (midResult) {
+                addNotification(`${currentPlayerName} triggered a ${midResult.type} card mid-movement!`, "info")
+                const deckStore = useDeckStore.getState()
+                deckStore.queueDraw(midResult.type)
+                const card = deckStore.processNextDraw()
+                if (card) {
+                  addNotification(`${currentPlayerName} drew: ${card.title}`, "info")
+                  let resolvedGridKey: string | null = null
+                  if (card.deck === "edge" && gameBounds) {
+                    resolvedGridKey = resolveEdgeCard(card as EdgeCard, midResult.gridKey, gameBounds)
+                  } else if (card.deck === "motorway") {
+                    resolvedGridKey = resolveMotorwayCard(card as MotorwayCard, midResult.gridKey)
+                  }
+
+                  if (resolvedGridKey) {
+                    const remaining = total - midResult.stepsUsed
+                    addNotification(`${currentPlayerName} relocated with ${remaining} moves remaining`, "info")
+
+                    if (remaining > 0) {
+                      const newReachable = reachableRoadGrids(resolvedGridKey, remaining, excluded)
+                      const newExact = [...newReachable.entries()]
+                        .filter(([, steps]) => steps === remaining)
+                        .map(([key]) => key)
+
+                      if (newExact.length > 0) {
+                        const newPicked = newExact[Math.floor(Math.random() * newExact.length)]
+                        finalDestination = gridKeyToLatLng(newPicked)
+                        finalDestinationGridKey = newPicked
+                      } else {
+                        finalDestination = gridKeyToLatLng(resolvedGridKey)
+                        finalDestinationGridKey = resolvedGridKey
+                      }
+                    } else {
+                      finalDestination = gridKeyToLatLng(resolvedGridKey)
+                      finalDestinationGridKey = resolvedGridKey
+                    }
+                  }
+                  deckStore.clearDrawnCard()
+                }
+              }
+            }
+          }
+
+          if (finalDestination) {
+            updatePlayerPosition(currentPlayerName!, finalDestination)
           }
 
           let visitedPoiIds: string[] = []
-          if (destinationGridKey) {
-            const visits = detectPoiVisits(destinationGridKey, pubs, spires, towers, phones, schools, selectedPois)
+          if (finalDestinationGridKey) {
+            const visits = detectPoiVisits(finalDestinationGridKey, pubs, spires, towers, phones, schools, selectedPois)
             visitedPoiIds = visits.map(v => v.id)
             visits.forEach(v => {
               const categoryLabel = POI_CATEGORY_LABELS[v.category as PoiCategory] ?? v.category
@@ -225,41 +290,29 @@ export default function BotTurnPlayer() {
                 sessionId: sessionId!,
                 playerId: playerId!,
                 poiCategory: visits[0].category,
-                gridKey: destinationGridKey,
+                gridKey: finalDestinationGridKey,
               })
             }
           }
 
-          const triggeredDecks: DeckType[] = []
-
-          if (isNearBoundaryEdge(destinationGridKey, gameBounds)) {
-            triggeredDecks.push("edge")
-          }
-
-          if (destinationGridKey) {
-            const mwResult = isOnMotorwayOrRailway(destinationGridKey)
-            if (mwResult.triggered) {
-              triggeredDecks.push("motorway")
+          if (dice1 === dice2) {
+            const deckStore = useDeckStore.getState()
+            deckStore.queueDraw("chance")
+            let drawnCard = deckStore.processNextDraw()
+            while (drawnCard) {
+              addNotification(`${currentPlayerName} drew: ${drawnCard.title}`, "info")
+              if (drawnCard.deck === "chance") {
+                processBotCardEffect(drawnCard as ChanceCard)
+              }
+              drawnCard = useDeckStore.getState().processNextDraw()
             }
-          }
-
-          const deckStore = useDeckStore.getState()
-          triggeredDecks.forEach(deck => deckStore.queueDraw(deck))
-
-          let drawnCard = deckStore.processNextDraw()
-          while (drawnCard) {
-            addNotification(`${currentPlayerName} drew: ${drawnCard.title}`, "info")
-            if (drawnCard.deck === "chance") {
-              processBotCardEffect(drawnCard as ChanceCard)
-            }
-            drawnCard = useDeckStore.getState().processNextDraw()
           }
 
           endTurnMutation.mutate({
             sessionId: sessionId!,
             playerId: playerId!,
-            newLat: destination?.[0],
-            newLng: destination?.[1],
+            newLat: finalDestination?.[0],
+            newLng: finalDestination?.[1],
             visitedPoiIds: visitedPoiIds.length > 0 ? visitedPoiIds : undefined,
           }, {
             onSettled: () => {

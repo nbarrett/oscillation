@@ -6,6 +6,12 @@ import { CAR_STYLES } from "@/stores/car-store"
 import { type AreaSize, type GameBounds, DEFAULT_AREA_SIZE } from "@/lib/area-size"
 import { useDeckStore } from "@/stores/deck-store"
 
+export interface CardTrigger {
+  type: "edge" | "motorway"
+  gridKey: string
+  stepsUsed: number
+}
+
 export enum GameTurnState {
   ROLL_DICE = "ROLL_DICE",
   DICE_ROLLED = "DICE_ROLLED",
@@ -114,8 +120,11 @@ interface GameState {
   poiCandidates: SelectedPoi[] | null;
   winnerName: string | null;
   showPreviewPaths: boolean;
+  cardTrigger: CardTrigger | null;
 
   setShowPreviewPaths: (show: boolean) => void;
+  setCardTrigger: (trigger: CardTrigger | null) => void;
+  handleCardRelocation: (destinationGridKey: string, remainingMoves: number) => void;
   setReachableGrids: (grids: Map<string, number> | null) => void;
   setSelectedEndpoint: (endpoint: string | null) => void;
   setAreaSize: (areaSize: AreaSize) => void;
@@ -190,8 +199,47 @@ export const useGameStore = create<GameState>()(
       poiCandidates: null,
       winnerName: null,
       showPreviewPaths: true,
+      cardTrigger: null,
 
       setShowPreviewPaths: (showPreviewPaths) => set({ showPreviewPaths }),
+
+      setCardTrigger: (cardTrigger) => set({ cardTrigger }),
+
+      handleCardRelocation: (destinationGridKey, remainingMoves) => {
+        const state = get();
+        const destination = gridKeyToLatLng(destinationGridKey);
+
+        set({
+          players: state.players.map((player) =>
+            player.name === state.currentPlayerName
+              ? { ...player, previousPosition: player.position, position: destination }
+              : player
+          ),
+          selectedGridSquares: [],
+          movementPath: [],
+          selectedEndpoint: null,
+          cardTrigger: null,
+        });
+
+        if (remainingMoves > 0) {
+          const occupied = occupiedGridKeys(state.players, state.currentPlayerName ?? "");
+          const obstructionKeys = useDeckStore.getState().obstructions.map((o) => o.gridKey);
+          for (const key of obstructionKeys) {
+            occupied.add(key);
+          }
+          const reachable = reachableRoadGrids(destinationGridKey, remainingMoves, occupied);
+
+          set({
+            diceResult: remainingMoves,
+            playerStartGridKey: destinationGridKey,
+            reachableGrids: reachable,
+            selectedEndpoint: null,
+            gridClearRequest: get().gridClearRequest + 1,
+          } as Partial<GameState> as GameState);
+        } else {
+          get().handleEndTurn();
+        }
+      },
       setReachableGrids: (reachableGrids) => set({ reachableGrids }),
 
       setSelectedEndpoint: (selectedEndpoint) => set({ selectedEndpoint }),

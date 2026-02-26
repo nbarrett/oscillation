@@ -11,6 +11,20 @@ export interface RoadSegment {
   coordinates: [number, number][];
 }
 
+export interface MotorwayJunction {
+  id: number;
+  lat: number;
+  lng: number;
+  ref?: string;
+}
+
+export interface RailwayStation {
+  id: number;
+  lat: number;
+  lng: number;
+  name?: string;
+}
+
 export interface RoadDataCache {
   bounds: {
     south: number;
@@ -22,7 +36,11 @@ export interface RoadDataCache {
   motorways: RoadSegment[];
   gridSquaresWithRoads: Set<string>;
   gridSquaresWithABRoads: Set<string>;
+  gridSquaresWithARoads: Set<string>;
+  gridSquaresWithBRoads: Set<string>;
   gridAdjacency: Map<string, Set<string>>;
+  motorwayJunctions: MotorwayJunction[];
+  railwayStations: RailwayStation[];
   timestamp: number;
 }
 
@@ -56,7 +74,11 @@ function saveToStorage(cache: RoadDataCache): void {
       motorways: cache.motorways,
       gridSquaresWithRoads: Array.from(cache.gridSquaresWithRoads),
       gridSquaresWithABRoads: Array.from(cache.gridSquaresWithABRoads),
+      gridSquaresWithARoads: Array.from(cache.gridSquaresWithARoads),
+      gridSquaresWithBRoads: Array.from(cache.gridSquaresWithBRoads),
       gridAdjacency: serializeAdjacency(cache.gridAdjacency),
+      motorwayJunctions: cache.motorwayJunctions,
+      railwayStations: cache.railwayStations,
       timestamp: cache.timestamp,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(serializable));
@@ -74,13 +96,21 @@ function loadFromStorage(): RoadDataCache | null {
       localStorage.removeItem(STORAGE_KEY);
       return null;
     }
+    if (!parsed.gridSquaresWithARoads || !parsed.gridSquaresWithBRoads || !parsed.motorwayJunctions || !parsed.railwayStations) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
     const cache: RoadDataCache = {
       bounds: parsed.bounds,
       roads: parsed.roads,
       motorways: parsed.motorways ?? [],
       gridSquaresWithRoads: new Set(parsed.gridSquaresWithRoads),
       gridSquaresWithABRoads: new Set(parsed.gridSquaresWithABRoads ?? []),
+      gridSquaresWithARoads: new Set(parsed.gridSquaresWithARoads),
+      gridSquaresWithBRoads: new Set(parsed.gridSquaresWithBRoads),
       gridAdjacency: deserializeAdjacency(parsed.gridAdjacency),
+      motorwayJunctions: parsed.motorwayJunctions,
+      railwayStations: parsed.railwayStations,
       timestamp: parsed.timestamp,
     };
     if (cache.gridSquaresWithABRoads.size === 0 && cache.roads.length > 0) {
@@ -134,6 +164,8 @@ async function queryOverpassWithRetry(
 interface RoadQueryResult {
   roads: RoadSegment[];
   motorways: RoadSegment[];
+  motorwayJunctions: MotorwayJunction[];
+  railwayStations: RailwayStation[];
 }
 
 async function queryOverpassForRoads(
@@ -150,6 +182,8 @@ async function queryOverpassForRoads(
       way["highway"="trunk"](${south},${west},${north},${east});
       way["highway"="primary"](${south},${west},${north},${east});
       way["highway"="secondary"](${south},${west},${north},${east});
+      node["highway"="motorway_junction"](${south},${west},${north},${east});
+      node["railway"="station"](${south},${west},${north},${east});
     );
     out body;
     >;
@@ -184,7 +218,28 @@ async function queryOverpassForRoads(
 
   const roads: RoadSegment[] = [];
   const motorways: RoadSegment[] = [];
+  const motorwayJunctions: MotorwayJunction[] = [];
+  const railwayStations: RailwayStation[] = [];
+
   for (const element of data.elements) {
+    if (element.type === 'node' && element.tags) {
+      if (element.tags.highway === 'motorway_junction') {
+        motorwayJunctions.push({
+          id: element.id,
+          lat: element.lat,
+          lng: element.lon,
+          ref: element.tags.ref,
+        });
+      } else if (element.tags.railway === 'station') {
+        railwayStations.push({
+          id: element.id,
+          lat: element.lat,
+          lng: element.lon,
+          name: element.tags.name,
+        });
+      }
+    }
+
     if (element.type === 'way' && element.tags?.highway) {
       const highway = element.tags.highway;
       let roadType: 'A' | 'B' | 'M' | null = null;
@@ -224,7 +279,7 @@ async function queryOverpassForRoads(
     }
   }
 
-  return { roads, motorways };
+  return { roads, motorways, motorwayJunctions, railwayStations };
 }
 
 export function gridKeyToLatLng(gridKey: string): [number, number] {
@@ -423,10 +478,15 @@ export async function loadRoadData(
   log.info("Loading road data for area:", { south, west, north, east });
 
   try {
-    const { roads, motorways } = await queryOverpassForRoads(south, west, north, east);
+    const result = await queryOverpassForRoads(south, west, north, east);
+    const { roads, motorways, motorwayJunctions, railwayStations } = result;
     const gridSquaresWithRoads = calculateGridSquaresWithRoads(roads);
     const abRoads = roads.filter((r) => r.highway === "primary" || r.highway === "secondary");
     const gridSquaresWithABRoads = calculateGridSquaresWithRoads(abRoads);
+    const aRoads = roads.filter((r) => r.type === "A");
+    const gridSquaresWithARoads = calculateGridSquaresWithRoads(aRoads);
+    const bRoads = roads.filter((r) => r.type === "B");
+    const gridSquaresWithBRoads = calculateGridSquaresWithRoads(bRoads);
     const gridAdjacency = calculateGridAdjacency(roads);
 
     roadDataCache = {
@@ -435,14 +495,18 @@ export async function loadRoadData(
       motorways,
       gridSquaresWithRoads,
       gridSquaresWithABRoads,
+      gridSquaresWithARoads,
+      gridSquaresWithBRoads,
       gridAdjacency,
+      motorwayJunctions,
+      railwayStations,
       timestamp: Date.now(),
     };
 
     saveToStorage(roadDataCache);
 
     log.info(
-      `Loaded ${roads.length} road segments, ${motorways.length} motorway segments, ${gridSquaresWithRoads.size} grid squares with roads, ${gridSquaresWithABRoads.size} with A/B roads, ${gridAdjacency.size} connected grids`
+      `Loaded ${roads.length} road segments, ${motorways.length} motorway segments, ${motorwayJunctions.length} junctions, ${railwayStations.length} stations, ${gridSquaresWithRoads.size} grid squares with roads, ${gridSquaresWithABRoads.size} with A/B roads, ${gridAdjacency.size} connected grids`
     );
   } catch (error) {
     log.error("Failed to load road data:", error);
@@ -647,6 +711,24 @@ function distToSegment(
   if (lenSq === 0) return haversineMetres(px, py, ax, ay);
   const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
   return haversineMetres(px, py, ax + t * dx, ay + t * dy);
+}
+
+export function gridHasARoad(gridKey: string): boolean {
+  if (!roadDataCache) return true;
+  return roadDataCache.gridSquaresWithARoads.has(gridKey);
+}
+
+export function gridHasBRoad(gridKey: string): boolean {
+  if (!roadDataCache) return true;
+  return roadDataCache.gridSquaresWithBRoads.has(gridKey);
+}
+
+export function motorwayJunctions(): MotorwayJunction[] {
+  return roadDataCache?.motorwayJunctions ?? [];
+}
+
+export function railwayStations(): RailwayStation[] {
+  return roadDataCache?.railwayStations ?? [];
 }
 
 export function isNearMotorway(lat: number, lng: number): boolean {
