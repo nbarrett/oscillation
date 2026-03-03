@@ -82,7 +82,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
   const [selectedLocationId, setSelectedLocationId] = useState<string>("")
   const [locationSearch, setLocationSearch] = useState("")
   const [areaSize, setAreaSize] = useState<AreaSize>(DEFAULT_AREA_SIZE)
-  const [botCount, setBotCount] = useState(3)
+  const [botsEnabled, setBotsEnabled] = useState(true)
 
   const { setSessionId, setPlayerId, setSessionCode, setCreatorPlayerId, showPreviewPaths, setShowPreviewPaths: showPreviewPathsSetter } = useGameStore()
   const { preferredCar } = useCarStore()
@@ -260,7 +260,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
       startLng: selectedLocation.lng,
       iconType: preferredCar,
       areaSize,
-      botCount,
+      botsEnabled,
     })
   }
 
@@ -468,6 +468,39 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Show reachable paths and endpoints after rolling dice
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Bots</Label>
+                <div className="flex rounded-md border overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setBotsEnabled(true)}
+                    className={cn(
+                      "flex-1 px-3 py-1.5 text-xs font-medium transition-colors",
+                      botsEnabled
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background hover:bg-muted text-muted-foreground"
+                    )}
+                  >
+                    On
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBotsEnabled(false)}
+                    className={cn(
+                      "flex-1 px-3 py-1.5 text-xs font-medium transition-colors",
+                      !botsEnabled
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background hover:bg-muted text-muted-foreground"
+                    )}
+                  >
+                    Off
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Fill empty player slots with bots (up to 4 players)
                 </p>
               </div>
             </>

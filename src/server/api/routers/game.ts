@@ -63,28 +63,9 @@ export const gameRouter = createTRPCRouter({
     .input(z.object({
       areaSize: z.enum(AREA_SIZES as [string, ...string[]]).default(DEFAULT_AREA_SIZE),
     }))
-    .query(async ({ ctx, input }) => {
+    .query(async ({ ctx }) => {
       const locations = await ctx.db.namedLocation.findMany()
-      const validIds: string[] = []
-      const BATCH_SIZE = 2
-      for (let i = 0; i < locations.length; i += BATCH_SIZE) {
-        const batch = locations.slice(i, i + BATCH_SIZE)
-        const results = await Promise.allSettled(
-          batch.map(async (loc) => {
-            const bounds = areaSizeBounds(loc.lat, loc.lng, input.areaSize as AreaSize)
-            const result = await validatePoiCoverage(bounds.south, bounds.west, bounds.north, bounds.east)
-            return { id: loc.id, valid: result.valid }
-          })
-        )
-        for (const r of results) {
-          if (r.status === "fulfilled" && r.value.valid) {
-            validIds.push(r.value.id)
-          } else if (r.status === "rejected") {
-            log.warn("Failed to validate location:", r.reason)
-          }
-        }
-      }
-      return validIds
+      return locations.map((loc) => loc.id)
     }),
 
   create: publicProcedure
@@ -94,7 +75,7 @@ export const gameRouter = createTRPCRouter({
       startLng: z.number(),
       iconType: z.string().optional(),
       areaSize: z.enum(AREA_SIZES as [string, ...string[]]).default(DEFAULT_AREA_SIZE),
-      botCount: z.number().min(0).max(3).default(3),
+      botsEnabled: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
       let code = generateSessionCode()
@@ -114,7 +95,7 @@ export const gameRouter = createTRPCRouter({
           startLat: snapped.lat,
           startLng: snapped.lng,
           areaSize: input.areaSize,
-          botCount: input.botCount,
+          botsEnabled: input.botsEnabled,
           players: {
             create: {
               name: input.playerName,
@@ -237,9 +218,10 @@ export const gameRouter = createTRPCRouter({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Need at least 1 player to start." })
       }
 
-      if (session.players.length === 1 && session.botCount > 0) {
+      if (session.botsEnabled && session.players.length < 4) {
         const botNames = ["Bot Alice", "Bot Bob", "Bot Charlie"]
-        for (let i = 0; i < session.botCount; i++) {
+        const botsNeeded = 4 - session.players.length
+        for (let i = 0; i < botsNeeded; i++) {
           const turnOrder = session.players.length + i
           const iconType = CAR_STYLES[turnOrder % CAR_STYLES.length]
           const offsetLat = (session.startLat || 0) + 0.00014 * turnOrder

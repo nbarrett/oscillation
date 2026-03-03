@@ -45,8 +45,8 @@ model GameSession {
   motorwayJunctions  Json         @default("[]")
   railwayStations    Json         @default("[]")
   deckState          Json?
-  botCount           Int          @default(3)
   obstructions       Json         @default("[]")
+  botsEnabled        Boolean      @default(true)
   mapZoom            Int          @default(7)
   mapCentreLat       Float?
   mapCentreLng       Float?
