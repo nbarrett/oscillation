@@ -28,7 +28,7 @@ export interface OverpassResponse {
   elements: OverpassElement[];
 }
 
-export async function queryOverpass(query: string): Promise<OverpassResponse> {
+export async function queryOverpass(query: string, timeoutMs = FETCH_TIMEOUT_MS): Promise<OverpassResponse> {
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -45,7 +45,7 @@ export async function queryOverpass(query: string): Promise<OverpassResponse> {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: `data=${encodeURIComponent(query)}`,
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMs),
       });
 
       if (response.status === 429 || response.status === 504) {
@@ -122,6 +122,41 @@ function buildCombinedQuery(bbox: string): string {
   ].join("");
 }
 
+/**
+ * Count-only validation query using named sets.
+ * Returns 6 count elements (pubs, churches, phones, schools, motorways, railways)
+ * instead of hundreds of full elements — dramatically faster.
+ */
+function buildValidationQuery(bbox: string): string {
+  return [
+    `[out:json][timeout:10];`,
+    `node["amenity"="pub"](${bbox})->.pubs;`,
+    `.pubs out count;`,
+    `(`,
+    `node["amenity"="place_of_worship"]["religion"="christian"](${bbox});`,
+    `way["amenity"="place_of_worship"]["religion"="christian"](${bbox});`,
+    `way["building"="cathedral"](${bbox});`,
+    `)->.churches;`,
+    `.churches out count;`,
+    `(`,
+    `node["amenity"="telephone"](${bbox});`,
+    `node["emergency"="phone"](${bbox});`,
+    `)->.phones;`,
+    `.phones out count;`,
+    `(`,
+    `node["amenity"="school"](${bbox});`,
+    `way["amenity"="school"](${bbox});`,
+    `node["amenity"="college"](${bbox});`,
+    `way["amenity"="college"](${bbox});`,
+    `)->.schools;`,
+    `.schools out count;`,
+    `${motorwayOverpassClause(bbox).replace(/;$/, "")}->.motors;`,
+    `.motors out count;`,
+    `way["railway"="rail"](${bbox})->.rails;`,
+    `.rails out count;`,
+  ].join("");
+}
+
 interface ClassifyResult {
   counts: Record<PoiCategory, number>;
   candidates: PoiCandidate[];
@@ -129,7 +164,7 @@ interface ClassifyResult {
   hasRailway: boolean;
 }
 
-function classifyElements(data: OverpassResponse): ClassifyResult {
+function classifyElements(data: OverpassResponse, filterMotorways = true): ClassifyResult {
   const counts: Record<PoiCategory, number> = { pub: 0, spire: 0, tower: 0, phone: 0, school: 0 };
   const candidates: PoiCandidate[] = [];
   let hasMotorway = false;
@@ -154,7 +189,7 @@ function classifyElements(data: OverpassResponse): ClassifyResult {
     const lat = el.lat ?? el.center?.lat;
     const lng = el.lon ?? el.center?.lon;
     if (lat == null || lng == null) continue;
-    if (isNearMotorway(lat, lng, motorways)) continue;
+    if (filterMotorways && isNearMotorway(lat, lng, motorways)) continue;
     counts[category]++;
     candidates.push({
       category,
@@ -182,8 +217,29 @@ export async function validatePoiCoverage(
     return cached.result;
   }
 
-  const data = await queryOverpass(buildCombinedQuery(bbox));
-  const { counts, hasMotorway, hasRailway } = classifyElements(data);
+  // Count-only query: returns 6 count elements (pubs, churches, phones, schools, motorways, railways)
+  const data = await queryOverpass(buildValidationQuery(bbox), 15_000);
+  const countElements = data.elements.filter((el) => el.type === "count");
+  const getCount = (idx: number) => parseInt(countElements[idx]?.tags?.["total"] ?? "0", 10);
+
+  const pubCount = getCount(0);
+  const churchCount = getCount(1);
+  const phoneCount = getCount(2);
+  const schoolCount = getCount(3);
+  const motorwayCount = getCount(4);
+  const railwayCount = getCount(5);
+
+  // Split churches ~50/50 into spire/tower (matches classifyChurch fallback behaviour)
+  const counts: Record<PoiCategory, number> = {
+    pub: pubCount,
+    spire: Math.ceil(churchCount / 2),
+    tower: Math.floor(churchCount / 2),
+    phone: phoneCount,
+    school: schoolCount,
+  };
+  const hasMotorway = motorwayCount > 0;
+  const hasRailway = railwayCount > 0;
+
   const missing = POI_CATEGORIES.filter((cat) => counts[cat] === 0);
   const insufficient = POI_CATEGORIES.filter((cat) => counts[cat] > 0 && counts[cat] < MIN_POIS_PER_CATEGORY);
 

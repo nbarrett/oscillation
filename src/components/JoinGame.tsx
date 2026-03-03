@@ -336,6 +336,39 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
           <CarIconSelector />
 
           {mode === "create" && (
+            <div className="space-y-2">
+              <Label>Bots</Label>
+              <p className="text-xs text-muted-foreground">Fill empty slots with bots when starting a game</p>
+              <div className="flex rounded-md border overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setBotsEnabled(true)}
+                  className={cn(
+                    "flex-1 px-3 py-1.5 text-xs font-medium transition-colors",
+                    botsEnabled
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-background hover:bg-muted text-muted-foreground"
+                  )}
+                >
+                  On
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBotsEnabled(false)}
+                  className={cn(
+                    "flex-1 px-3 py-1.5 text-xs font-medium transition-colors",
+                    !botsEnabled
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-background hover:bg-muted text-muted-foreground"
+                  )}
+                >
+                  Off
+                </button>
+              </div>
+            </div>
+          )}
+
+          {mode === "create" && (
             <>
               <div className="space-y-2">
                 <Label>Starting Point</Label>
@@ -448,38 +481,6 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <Label>Bots</Label>
-                <div className="flex rounded-md border overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => setBotsEnabled(true)}
-                    className={cn(
-                      "flex-1 px-3 py-1.5 text-xs font-medium transition-colors",
-                      botsEnabled
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-background hover:bg-muted text-muted-foreground"
-                    )}
-                  >
-                    On
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBotsEnabled(false)}
-                    className={cn(
-                      "flex-1 px-3 py-1.5 text-xs font-medium transition-colors",
-                      !botsEnabled
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-background hover:bg-muted text-muted-foreground"
-                    )}
-                  >
-                    Off
-                  </button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Fill empty player slots with bots (up to 4 players)
-                </p>
-              </div>
             </>
           )}
 
