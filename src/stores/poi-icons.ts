@@ -172,33 +172,6 @@ export const PHONE_ICON_OPTIONS: PoiIconOption<PhoneIconStyle>[] = [
   },
 ];
 
-export enum ObstructionIconStyle {
-  BARRIER = "BARRIER",
-  TRAFFIC_CONE = "TRAFFIC_CONE",
-  NO_ENTRY = "NO_ENTRY",
-}
-
-export const OBSTRUCTION_ICON_OPTIONS: PoiIconOption<ObstructionIconStyle>[] = [
-  {
-    style: ObstructionIconStyle.BARRIER,
-    label: "Road Barrier",
-    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="6" y="28" width="52" height="12" rx="2" fill="#ff6600" stroke="#cc4400" stroke-width="1.5"/><rect x="6" y="28" width="10" height="12" fill="#fff" opacity="0.9"/><rect x="22" y="28" width="10" height="12" fill="#fff" opacity="0.9"/><rect x="38" y="28" width="10" height="12" fill="#fff" opacity="0.9"/><rect x="54" y="28" width="4" height="12" fill="#fff" opacity="0.9"/><rect x="10" y="40" width="4" height="16" rx="1" fill="#888" stroke="#666" stroke-width="0.5"/><rect x="50" y="40" width="4" height="16" rx="1" fill="#888" stroke="#666" stroke-width="0.5"/><rect x="6" y="54" width="12" height="4" rx="1" fill="#888"/><rect x="46" y="54" width="12" height="4" rx="1" fill="#888"/><circle cx="12" cy="24" r="4" fill="#ff3300" opacity="0.8"/><circle cx="12" cy="24" r="2" fill="#ff6644"/><circle cx="52" cy="24" r="4" fill="#ff3300" opacity="0.8"/><circle cx="52" cy="24" r="2" fill="#ff6644"/></svg>`,
-    simpleSvg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="8" width="20" height="5" rx="1"/><rect x="2" y="8" width="5" height="5" fill="#fff" opacity="0.7"/><rect x="10" y="8" width="5" height="5" fill="#fff" opacity="0.7"/><rect x="5" y="13" width="2" height="7"/><rect x="17" y="13" width="2" height="7"/><rect x="2" y="19" width="8" height="2" rx="0.5"/><rect x="14" y="19" width="8" height="2" rx="0.5"/></svg>`,
-  },
-  {
-    style: ObstructionIconStyle.TRAFFIC_CONE,
-    label: "Traffic Cone",
-    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="12" y="54" width="40" height="6" rx="2" fill="#cc4400" stroke="#993300" stroke-width="1"/><polygon points="32,6 44,54 20,54" fill="#ff6600" stroke="#cc4400" stroke-width="1"/><rect x="24" y="22" width="16" height="6" rx="1" fill="#fff" opacity="0.9"/><rect x="22" y="36" width="20" height="6" rx="1" fill="#fff" opacity="0.9"/><polygon points="32,6 34,6 33,2 31,2" fill="#cc4400"/><line x1="28" y1="12" x2="26" y2="22" stroke="#fff" stroke-width="0.5" opacity="0.3"/><line x1="36" y1="12" x2="38" y2="22" stroke="#fff" stroke-width="0.5" opacity="0.3"/></svg>`,
-    simpleSvg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><polygon points="12,2 17,20 7,20"/><rect x="9" y="7" width="6" height="2.5" rx="0.5" fill="#fff" opacity="0.7"/><rect x="8" y="13" width="8" height="2.5" rx="0.5" fill="#fff" opacity="0.7"/><rect x="5" y="20" width="14" height="3" rx="1"/></svg>`,
-  },
-  {
-    style: ObstructionIconStyle.NO_ENTRY,
-    label: "No Entry",
-    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="#dd2200" stroke="#aa1100" stroke-width="2"/><circle cx="32" cy="32" r="24" fill="#ee3311"/><rect x="12" y="27" width="40" height="10" rx="2" fill="#fff"/><circle cx="32" cy="32" r="28" fill="none" stroke="#991100" stroke-width="1" opacity="0.3"/><ellipse cx="24" cy="20" rx="6" ry="4" fill="#fff" opacity="0.15" transform="rotate(-30 24 20)"/></svg>`,
-    simpleSvg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><rect x="5" y="9.5" width="14" height="5" rx="1" fill="#fff"/></svg>`,
-  },
-];
-
 export enum SchoolIconStyle {
   BUILDING = "BUILDING",
   BOOKS = "BOOKS",
@@ -237,5 +210,39 @@ export const SCHOOL_ICON_OPTIONS: PoiIconOption<SchoolIconStyle>[] = [
     label: "Map Pin",
     svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 80"><path d="M32 0C18.7 0 8 10.7 8 24c0 17.8 24 40 24 40s24-22.2 24-40C56 10.7 45.3 0 32 0z" fill="#16a34a"/><rect x="18" y="12" width="28" height="20" fill="#cc7744" stroke="#8a4420" stroke-width="0.7"/><polygon points="18,12 32,4 46,12" fill="#8b4513"/><rect x="28" y="22" width="8" height="10" rx="1" fill="#5c3d1e"/><rect x="20" y="16" width="5" height="5" fill="#87ceeb" opacity="0.5"/><rect x="39" y="16" width="5" height="5" fill="#87ceeb" opacity="0.5"/></svg>`,
     simpleSvg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 30"><path d="M12 0C6.5 0 2 4.5 2 10c0 7.4 10 18 10 18s10-10.6 10-18C22 4.5 17.5 0 12 0z" fill="currentColor"/><path d="M12 5L7 8l2 1.1v3L12 14l3-1.9v-3l1-.55V11h1V8L12 5z" fill="#fff"/></svg>`,
+  },
+];
+
+export enum ObstructionIconStyle {
+  BARRIER = "BARRIER",
+  CONE = "CONE",
+  CROSS = "CROSS",
+  MAP_PIN = "MAP_PIN",
+}
+
+export const OBSTRUCTION_ICON_OPTIONS: PoiIconOption<ObstructionIconStyle>[] = [
+  {
+    style: ObstructionIconStyle.BARRIER,
+    label: "Barrier",
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="8" y="24" width="48" height="16" rx="2" fill="currentColor" stroke="#333" stroke-width="1"/><rect x="8" y="24" width="12" height="16" fill="#fff" opacity="0.3"/><rect x="32" y="24" width="12" height="16" fill="#fff" opacity="0.3"/><rect x="12" y="40" width="4" height="16" fill="#666"/><rect x="48" y="40" width="4" height="16" fill="#666"/></svg>`,
+    simpleSvg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="8" width="20" height="6" rx="1"/><rect x="2" y="8" width="5" height="6" opacity="0.3" fill="#fff"/><rect x="12" y="8" width="5" height="6" opacity="0.3" fill="#fff"/><rect x="5" y="14" width="2" height="6"/><rect x="17" y="14" width="2" height="6"/></svg>`,
+  },
+  {
+    style: ObstructionIconStyle.CONE,
+    label: "Traffic Cone",
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><polygon points="32,4 44,52 20,52" fill="currentColor" stroke="#333" stroke-width="1"/><rect x="22" y="18" width="20" height="4" fill="#fff" opacity="0.4"/><rect x="24" y="30" width="16" height="4" fill="#fff" opacity="0.4"/><rect x="14" y="52" width="36" height="8" rx="2" fill="#444"/></svg>`,
+    simpleSvg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><polygon points="12,2 17,20 7,20"/><rect x="8" y="6" width="8" height="2" fill="#fff" opacity="0.4"/><rect x="9" y="12" width="6" height="2" fill="#fff" opacity="0.4"/><rect x="5" y="20" width="14" height="3" rx="1"/></svg>`,
+  },
+  {
+    style: ObstructionIconStyle.CROSS,
+    label: "Cross",
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path d="M16 16L48 48M48 16L16 48" stroke="currentColor" stroke-width="10" stroke-linecap="round"/></svg>`,
+    simpleSvg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6L18 18M18 6L6 18" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
+  },
+  {
+    style: ObstructionIconStyle.MAP_PIN,
+    label: "Map Pin",
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 80"><path d="M32 0C18.7 0 8 10.7 8 24c0 17.8 24 40 24 40s24-22.2 24-40C56 10.7 45.3 0 32 0z" fill="currentColor"/><path d="M22 18L42 30M42 18L22 30" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg>`,
+    simpleSvg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 30"><path d="M12 0C6.5 0 2 4.5 2 10c0 7.4 10 18 10 18s10-10.6 10-18C22 4.5 17.5 0 12 0z" fill="currentColor"/><path d="M8 7L16 13M16 7L8 13" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>`,
   },
 ];
