@@ -336,29 +336,6 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
           <CarIconSelector />
 
           {mode === "create" && (
-            <div className="space-y-2">
-              <Label>Number of Bots</Label>
-              <p className="text-xs text-muted-foreground">Bots are added when playing solo (1 player)</p>
-              <div className="grid grid-cols-4 gap-2">
-                {[0, 1, 2, 3].map((count) => (
-                  <button
-                    key={count}
-                    type="button"
-                    onClick={() => setBotCount(count)}
-                    className={`p-3 rounded-lg border text-center transition-colors ${
-                      botCount === count
-                        ? "border-primary bg-primary/5"
-                        : "border-input hover:bg-muted"
-                    }`}
-                  >
-                    <div className="font-semibold text-sm">{count}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {mode === "create" && (
             <>
               <div className="space-y-2">
                 <Label>Starting Point</Label>
