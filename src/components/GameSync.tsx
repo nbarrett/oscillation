@@ -141,8 +141,14 @@ export default function GameSync() {
         }
 
         if (gameState.dice1 !== null && gameState.dice2 !== null) {
-          setDiceResult(gameState.dice1 + gameState.dice2)
-          setGameTurnState(GameTurnState.DICE_ROLLED)
+          const total = gameState.dice1 + gameState.dice2
+          const freshState = useGameStore.getState()
+          if (!freshState.playerStartGridKey) {
+            freshState.handleDiceRoll(total)
+          } else {
+            setDiceResult(total)
+            setGameTurnState(GameTurnState.DICE_ROLLED)
+          }
         } else if (turnChanged || !localState.diceResult) {
           setDiceResult(null)
           setGameTurnState(GameTurnState.ROLL_DICE)

@@ -172,6 +172,33 @@ export const PHONE_ICON_OPTIONS: PoiIconOption<PhoneIconStyle>[] = [
   },
 ];
 
+export enum ObstructionIconStyle {
+  BARRIER = "BARRIER",
+  TRAFFIC_CONE = "TRAFFIC_CONE",
+  NO_ENTRY = "NO_ENTRY",
+}
+
+export const OBSTRUCTION_ICON_OPTIONS: PoiIconOption<ObstructionIconStyle>[] = [
+  {
+    style: ObstructionIconStyle.BARRIER,
+    label: "Road Barrier",
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="6" y="28" width="52" height="12" rx="2" fill="#ff6600" stroke="#cc4400" stroke-width="1.5"/><rect x="6" y="28" width="10" height="12" fill="#fff" opacity="0.9"/><rect x="22" y="28" width="10" height="12" fill="#fff" opacity="0.9"/><rect x="38" y="28" width="10" height="12" fill="#fff" opacity="0.9"/><rect x="54" y="28" width="4" height="12" fill="#fff" opacity="0.9"/><rect x="10" y="40" width="4" height="16" rx="1" fill="#888" stroke="#666" stroke-width="0.5"/><rect x="50" y="40" width="4" height="16" rx="1" fill="#888" stroke="#666" stroke-width="0.5"/><rect x="6" y="54" width="12" height="4" rx="1" fill="#888"/><rect x="46" y="54" width="12" height="4" rx="1" fill="#888"/><circle cx="12" cy="24" r="4" fill="#ff3300" opacity="0.8"/><circle cx="12" cy="24" r="2" fill="#ff6644"/><circle cx="52" cy="24" r="4" fill="#ff3300" opacity="0.8"/><circle cx="52" cy="24" r="2" fill="#ff6644"/></svg>`,
+    simpleSvg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="8" width="20" height="5" rx="1"/><rect x="2" y="8" width="5" height="5" fill="#fff" opacity="0.7"/><rect x="10" y="8" width="5" height="5" fill="#fff" opacity="0.7"/><rect x="5" y="13" width="2" height="7"/><rect x="17" y="13" width="2" height="7"/><rect x="2" y="19" width="8" height="2" rx="0.5"/><rect x="14" y="19" width="8" height="2" rx="0.5"/></svg>`,
+  },
+  {
+    style: ObstructionIconStyle.TRAFFIC_CONE,
+    label: "Traffic Cone",
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="12" y="54" width="40" height="6" rx="2" fill="#cc4400" stroke="#993300" stroke-width="1"/><polygon points="32,6 44,54 20,54" fill="#ff6600" stroke="#cc4400" stroke-width="1"/><rect x="24" y="22" width="16" height="6" rx="1" fill="#fff" opacity="0.9"/><rect x="22" y="36" width="20" height="6" rx="1" fill="#fff" opacity="0.9"/><polygon points="32,6 34,6 33,2 31,2" fill="#cc4400"/><line x1="28" y1="12" x2="26" y2="22" stroke="#fff" stroke-width="0.5" opacity="0.3"/><line x1="36" y1="12" x2="38" y2="22" stroke="#fff" stroke-width="0.5" opacity="0.3"/></svg>`,
+    simpleSvg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><polygon points="12,2 17,20 7,20"/><rect x="9" y="7" width="6" height="2.5" rx="0.5" fill="#fff" opacity="0.7"/><rect x="8" y="13" width="8" height="2.5" rx="0.5" fill="#fff" opacity="0.7"/><rect x="5" y="20" width="14" height="3" rx="1"/></svg>`,
+  },
+  {
+    style: ObstructionIconStyle.NO_ENTRY,
+    label: "No Entry",
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="#dd2200" stroke="#aa1100" stroke-width="2"/><circle cx="32" cy="32" r="24" fill="#ee3311"/><rect x="12" y="27" width="40" height="10" rx="2" fill="#fff"/><circle cx="32" cy="32" r="28" fill="none" stroke="#991100" stroke-width="1" opacity="0.3"/><ellipse cx="24" cy="20" rx="6" ry="4" fill="#fff" opacity="0.15" transform="rotate(-30 24 20)"/></svg>`,
+    simpleSvg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><rect x="5" y="9.5" width="14" height="5" rx="1" fill="#fff"/></svg>`,
+  },
+];
+
 export enum SchoolIconStyle {
   BUILDING = "BUILDING",
   BOOKS = "BOOKS",
