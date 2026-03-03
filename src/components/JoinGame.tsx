@@ -82,6 +82,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
   const [selectedLocationId, setSelectedLocationId] = useState<string>("")
   const [locationSearch, setLocationSearch] = useState("")
   const [areaSize, setAreaSize] = useState<AreaSize>(DEFAULT_AREA_SIZE)
+  const [botCount, setBotCount] = useState(3)
 
   const { setSessionId, setPlayerId, setSessionCode, setCreatorPlayerId, showPreviewPaths, setShowPreviewPaths: showPreviewPathsSetter } = useGameStore()
   const { preferredCar } = useCarStore()
@@ -259,6 +260,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
       startLng: selectedLocation.lng,
       iconType: preferredCar,
       areaSize,
+      botCount,
     })
   }
 
@@ -332,6 +334,29 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
           </div>
 
           <CarIconSelector />
+
+          {mode === "create" && (
+            <div className="space-y-2">
+              <Label>Number of Bots</Label>
+              <p className="text-xs text-muted-foreground">Bots are added when playing solo (1 player)</p>
+              <div className="grid grid-cols-4 gap-2">
+                {[0, 1, 2, 3].map((count) => (
+                  <button
+                    key={count}
+                    type="button"
+                    onClick={() => setBotCount(count)}
+                    className={`p-3 rounded-lg border text-center transition-colors ${
+                      botCount === count
+                        ? "border-primary bg-primary/5"
+                        : "border-input hover:bg-muted"
+                    }`}
+                  >
+                    <div className="font-semibold text-sm">{count}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {mode === "create" && (
             <>

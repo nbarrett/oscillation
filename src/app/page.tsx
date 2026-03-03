@@ -58,6 +58,17 @@ export default function GamePage() {
   const [copied, setCopied] = useState(false)
   const [showVictory, setShowVictory] = useState(false)
 
+  const sessionCheck = trpc.game.state.useQuery(
+    { sessionId: sessionId! },
+    { enabled: !!sessionId, retry: false },
+  )
+
+  useEffect(() => {
+    if (sessionId && sessionCheck.isFetched && !sessionCheck.data) {
+      leaveSession()
+    }
+  }, [sessionId, sessionCheck.isFetched, sessionCheck.data, leaveSession])
+
   const utils = trpc.useUtils()
   const leaveMutation = trpc.game.leave.useMutation({
     onSuccess: () => {
@@ -101,7 +112,8 @@ export default function GamePage() {
     handleLeaveGame()
   }
 
-  const inSession = !!sessionId
+  const validatingSession = !!sessionId && !sessionCheck.isFetched
+  const inSession = !!sessionId && sessionCheck.isFetched && !!sessionCheck.data
   const winningPlayer = useGameStore.getState().players.find(p => p.name === winnerName)
 
   return (
@@ -172,7 +184,11 @@ export default function GamePage() {
       {inSession && phase === "playing" && <BotTurnPlayer />}
 
       <main className="w-full px-4 py-3 flex-1 flex flex-col gap-3">
-        {!inSession ? (
+        {validatingSession ? (
+          <div className="flex-1 flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : !inSession ? (
           <div className="flex-1 flex items-center justify-center py-8">
             <JoinGame startingPosition={startingPosition} />
           </div>

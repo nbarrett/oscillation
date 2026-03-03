@@ -94,6 +94,7 @@ export const gameRouter = createTRPCRouter({
       startLng: z.number(),
       iconType: z.string().optional(),
       areaSize: z.enum(AREA_SIZES as [string, ...string[]]).default(DEFAULT_AREA_SIZE),
+      botCount: z.number().min(0).max(3).default(3),
     }))
     .mutation(async ({ ctx, input }) => {
       let code = generateSessionCode()
@@ -113,6 +114,7 @@ export const gameRouter = createTRPCRouter({
           startLat: snapped.lat,
           startLng: snapped.lng,
           areaSize: input.areaSize,
+          botCount: input.botCount,
           players: {
             create: {
               name: input.playerName,
@@ -235,9 +237,9 @@ export const gameRouter = createTRPCRouter({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Need at least 1 player to start." })
       }
 
-      if (session.players.length === 1) {
+      if (session.players.length === 1 && session.botCount > 0) {
         const botNames = ["Bot Alice", "Bot Bob", "Bot Charlie"]
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < session.botCount; i++) {
           const turnOrder = session.players.length + i
           const iconType = CAR_STYLES[turnOrder % CAR_STYLES.length]
           const offsetLat = (session.startLat || 0) + 0.00014 * turnOrder

@@ -98,7 +98,7 @@ export interface PoiCandidate {
   lng: number;
 }
 
-function buildPoiQuery(bbox: string): string {
+function buildCombinedQuery(bbox: string): string {
   return [
     "[out:json][timeout:30];",
     "(",
@@ -114,12 +114,6 @@ function buildPoiQuery(bbox: string): string {
     `way["amenity"="college"](${bbox});`,
     ");",
     "out center tags;",
-  ].join("");
-}
-
-function buildMotorwayQuery(bbox: string): string {
-  return [
-    "[out:json][timeout:30];",
     "(",
     motorwayOverpassClause(bbox),
     `way["railway"="rail"](${bbox});`,
@@ -135,14 +129,14 @@ interface ClassifyResult {
   hasRailway: boolean;
 }
 
-function classifyElements(poiData: OverpassResponse, roadData: OverpassResponse): ClassifyResult {
+function classifyElements(data: OverpassResponse): ClassifyResult {
   const counts: Record<PoiCategory, number> = { pub: 0, spire: 0, tower: 0, phone: 0, school: 0 };
   const candidates: PoiCandidate[] = [];
   let hasMotorway = false;
   let hasRailway = false;
 
   const motorways: OverpassElement[] = [];
-  for (const el of roadData.elements) {
+  for (const el of data.elements) {
     if (el.type !== "way") continue;
     const hw = el.tags?.highway;
     if (hw === "motorway" || hw === "motorway_link") {
@@ -154,7 +148,7 @@ function classifyElements(poiData: OverpassResponse, roadData: OverpassResponse)
     }
   }
 
-  for (const el of poiData.elements) {
+  for (const el of data.elements) {
     const category = classifyElement(el.tags ?? {}, el.id);
     if (!category) continue;
     const lat = el.lat ?? el.center?.lat;
@@ -188,11 +182,8 @@ export async function validatePoiCoverage(
     return cached.result;
   }
 
-  const [poiData, roadData] = await Promise.all([
-    queryOverpass(buildPoiQuery(bbox)),
-    queryOverpass(buildMotorwayQuery(bbox)),
-  ]);
-  const { counts, hasMotorway, hasRailway } = classifyElements(poiData, roadData);
+  const data = await queryOverpass(buildCombinedQuery(bbox));
+  const { counts, hasMotorway, hasRailway } = classifyElements(data);
   const missing = POI_CATEGORIES.filter((cat) => counts[cat] === 0);
   const insufficient = POI_CATEGORIES.filter((cat) => counts[cat] > 0 && counts[cat] < MIN_POIS_PER_CATEGORY);
 
@@ -227,11 +218,8 @@ export async function fetchPoiCandidates(
     return cached.candidates;
   }
 
-  const [poiData, roadData] = await Promise.all([
-    queryOverpass(buildPoiQuery(bbox)),
-    queryOverpass(buildMotorwayQuery(bbox)),
-  ]);
-  const { candidates } = classifyElements(poiData, roadData);
+  const data = await queryOverpass(buildCombinedQuery(bbox));
+  const { candidates } = classifyElements(data);
 
   log.debug("POI candidates fetched:", candidates.length);
   poiCandidateCache.set(bbox, { candidates, expiresAt: Date.now() + POI_CACHE_TTL_MS });
