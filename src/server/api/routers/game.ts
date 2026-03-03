@@ -65,19 +65,23 @@ export const gameRouter = createTRPCRouter({
     }))
     .query(async ({ ctx, input }) => {
       const locations = await ctx.db.namedLocation.findMany()
-      const results = await Promise.allSettled(
-        locations.map(async (loc) => {
-          const bounds = areaSizeBounds(loc.lat, loc.lng, input.areaSize as AreaSize)
-          const result = await validatePoiCoverage(bounds.south, bounds.west, bounds.north, bounds.east)
-          return { id: loc.id, valid: result.valid }
-        })
-      )
       const validIds: string[] = []
-      for (const r of results) {
-        if (r.status === "fulfilled" && r.value.valid) {
-          validIds.push(r.value.id)
-        } else if (r.status === "rejected") {
-          log.warn("Failed to validate location:", r.reason)
+      const BATCH_SIZE = 2
+      for (let i = 0; i < locations.length; i += BATCH_SIZE) {
+        const batch = locations.slice(i, i + BATCH_SIZE)
+        const results = await Promise.allSettled(
+          batch.map(async (loc) => {
+            const bounds = areaSizeBounds(loc.lat, loc.lng, input.areaSize as AreaSize)
+            const result = await validatePoiCoverage(bounds.south, bounds.west, bounds.north, bounds.east)
+            return { id: loc.id, valid: result.valid }
+          })
+        )
+        for (const r of results) {
+          if (r.status === "fulfilled" && r.value.valid) {
+            validIds.push(r.value.id)
+          } else if (r.status === "rejected") {
+            log.warn("Failed to validate location:", r.reason)
+          }
         }
       }
       return validIds

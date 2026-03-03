@@ -93,18 +93,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
   const pinMismatch = confirmPin.length > 0 && registerPin !== confirmPin
   const sortedLocations = (locations ?? []).slice().sort((a, b) => a.name.localeCompare(b.name))
 
-  const validLocationQuery = trpc.game.validLocationIds.useQuery(
-    { areaSize },
-    { enabled: mode === "create", staleTime: 5 * 60 * 1000 },
-  )
-  const validLocationSet = new Set(validLocationQuery.data ?? [])
-  const isValidating = mode === "create" && validLocationQuery.isLoading
-
-  const validSortedLocations = validLocationQuery.data
-    ? sortedLocations.filter(l => validLocationSet.has(l.id))
-    : sortedLocations
-
-  const filteredLocations = validSortedLocations.filter(l =>
+  const filteredLocations = sortedLocations.filter(l =>
     l.name.toLowerCase().includes(locationSearch.toLowerCase())
   )
   const selectedLocation = locations?.find(l => l.id === selectedLocationId)
@@ -247,9 +236,9 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
   }
 
   function pickRandomLocation() {
-    if (validSortedLocations.length === 0) return
-    const randomIndex = Math.floor(Math.random() * validSortedLocations.length)
-    const picked = validSortedLocations[randomIndex]
+    if (filteredLocations.length === 0) return
+    const randomIndex = Math.floor(Math.random() * filteredLocations.length)
+    const picked = filteredLocations[randomIndex]
     setSelectedLocationId(picked.id)
     setLocationSearch(asTitle(picked.name))
   }
@@ -363,24 +352,13 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
                     variant="outline"
                     size="icon"
                     onClick={pickRandomLocation}
-                    disabled={validSortedLocations.length === 0}
+                    disabled={sortedLocations.length === 0}
                     title="Random starting point"
                   >
                     <Shuffle className="h-4 w-4" />
                   </Button>
                   <AddStartingPointDialog onSuccess={refetchLocations} />
                 </div>
-                {isValidating && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Checking which locations meet area requirements...
-                  </div>
-                )}
-                {!isValidating && validLocationQuery.data && validSortedLocations.length === 0 && (
-                  <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-sm text-destructive">
-                    No locations meet the requirements for this area size
-                  </div>
-                )}
                 <div className="max-h-48 overflow-y-auto rounded-md border">
                   {filteredLocations.length === 0 ? (
                     <div className="p-3 text-sm text-muted-foreground text-center">
@@ -584,10 +562,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
             <Button
               className="flex-1 gap-2"
               onClick={mode === "create" ? handleCreate : handleJoin}
-              disabled={
-                createGame.isPending || joinGame.isPending ||
-                (mode === "create" && (validation.isLoading || validation.data?.valid === false))
-              }
+              disabled={createGame.isPending || joinGame.isPending}
             >
               {(createGame.isPending || joinGame.isPending) && <Loader2 className="h-4 w-4 animate-spin" />}
               {mode === "create" ? "Create Game" : "Join Game"}

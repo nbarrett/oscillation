@@ -536,13 +536,19 @@ export function gridHasABRoad(gridKey: string): boolean {
 }
 
 export function getAdjacentRoadGrids(gridKey: string): string[] {
-  if (roadDataCache?.gridAdjacency.has(gridKey)) {
-    return Array.from(roadDataCache.gridAdjacency.get(gridKey)!);
+  if (!roadDataCache) {
+    return allAdjacentGrids(gridKey);
   }
-  if (roadDataCache) {
-    return allAdjacentGrids(gridKey).filter((g) => roadDataCache!.gridSquaresWithRoads.has(g));
+  const cardinalWithRoads = allAdjacentGrids(gridKey).filter(
+    (g) => roadDataCache!.gridSquaresWithRoads.has(g)
+  );
+  if (roadDataCache.gridAdjacency.has(gridKey)) {
+    const fromAdj = roadDataCache.gridAdjacency.get(gridKey)!;
+    const merged = new Set(fromAdj);
+    for (const g of cardinalWithRoads) merged.add(g);
+    return Array.from(merged);
   }
-  return allAdjacentGrids(gridKey);
+  return cardinalWithRoads;
 }
 
 function allAdjacentGrids(gridKey: string): string[] {
