@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Oscillation — Codebase Evolution</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #1a2332;
+      --surface: #223044;
+      --border: #2e4057;
+      --text: #e8ecf0;
+      --muted: #8fa3b8;
+      --os-green: #00a99d;
+      --os-green-dark: #008c82;
+      --os-pink: #e4147d;
+      --os-navy: #0b2239;
+      --os-blue: #2a7de1;
+      --os-orange: #f5a623;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+
+    .sticky-nav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: var(--bg);
+      border-bottom: 2px solid var(--os-green);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1.25rem;
+      backdrop-filter: blur(8px);
+    }
+    .sticky-nav img {
+      height: 36px;
+      background: white;
+      border-radius: 6px;
+      padding: 3px 8px;
+    }
+    .sticky-nav .nav-title {
+      font-size: 1.75rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--os-green), var(--os-blue));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero {
+      text-align: center;
+      padding: 2.5rem 0 2rem;
+      margin-bottom: 3rem;
+    }
+    .hero .subtitle {
+      color: var(--muted);
+      font-size: 1.1rem;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    .tribute {
+      background: linear-gradient(135deg, var(--os-navy), var(--surface));
+      border: 1px solid var(--os-green);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 3rem;
+      text-align: center;
+    }
+    .tribute h2 {
+      color: var(--os-green);
+      font-size: 1.3rem;
+      margin-bottom: 0.75rem;
+      border: none;
+      padding: 0;
+    }
+    .tribute p {
+      color: var(--muted);
+      max-width: 700px;
+      margin: 0 auto;
+      font-size: 0.95rem;
+      line-height: 1.7;
+    }
+    .tribute .kerry-name {
+      color: var(--os-green);
+      font-weight: 600;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 3rem;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      text-align: center;
+    }
+    .stat-card .value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--os-green);
+      line-height: 1;
+    }
+    .stat-card .label {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .stat-card .detail {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 0.25rem;
+      opacity: 0.7;
+    }
+
+    section {
+      margin-bottom: 3rem;
+    }
+    section h2 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      padding: 0.75rem 0 0.5rem;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 62px;
+      background: var(--bg);
+      z-index: 10;
+    }
+    section h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      color: var(--os-blue);
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+    }
+    @media (max-width: 768px) {
+      .two-col { grid-template-columns: 1fr; }
+    }
+
+    .journey-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+    .journey-card h3 { margin-bottom: 1rem; }
+    .journey-card .metric {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .journey-card .metric:last-child { border-bottom: none; }
+    .journey-card .metric .key { color: var(--muted); }
+    .journey-card .metric .val { font-weight: 600; }
+
+    .chart-container {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .chart-container canvas { max-height: 350px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--surface);
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    th {
+      text-align: left;
+      padding: 0.75rem 1rem;
+      background: rgba(0, 169, 157, 0.15);
+      color: var(--os-green);
+      font-weight: 600;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    td {
+      padding: 0.75rem 1rem;
+      border-top: 1px solid var(--border);
+    }
+    tr:hover { background: rgba(255,255,255,0.02); }
+
+    .tech-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 0.75rem;
+    }
+    .tech-tag {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.85rem;
+      text-align: center;
+    }
+
+    .timeline {
+      position: relative;
+      padding-left: 2rem;
+    }
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: var(--os-green);
+      opacity: 0.4;
+    }
+    .timeline-item {
+      position: relative;
+      margin-bottom: 1.5rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.5rem;
+    }
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: -2.35rem;
+      top: 1.2rem;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--os-green);
+      border: 2px solid var(--bg);
+    }
+    .timeline-item .date {
+      font-size: 0.8rem;
+      color: var(--os-green);
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    .timeline-item .title {
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    .timeline-item .desc {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .bar-visual {
+      display: flex;
+      height: 28px;
+      border-radius: 6px;
+      overflow: hidden;
+      margin: 0.5rem 0;
+    }
+    .bar-visual .segment {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: white;
+      min-width: 40px;
+    }
+
+    .os-map-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--surface);
+      border: 1px solid var(--os-green);
+      border-radius: 8px;
+      padding: 0.5rem 1rem;
+      font-size: 0.85rem;
+      color: var(--os-green);
+      margin-bottom: 1rem;
+    }
+    .os-map-badge img {
+      height: 20px;
+      background: white;
+      border-radius: 3px;
+      padding: 1px 4px;
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem 0;
+      border-top: 2px solid var(--os-green);
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    footer a { color: var(--os-green); text-decoration: none; }
+    footer .memorial {
+      color: var(--os-green);
+      font-style: italic;
+      margin-top: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="sticky-nav">
+    <img src="https://labs.os.uk/static/media/os-logo.svg" alt="Ordnance Survey">
+    <span class="nav-title">Oscillation: Codebase Evolution</span>
+  </div>
+
+  <div class="container">
+    <div class="hero">
+      <p class="subtitle">From a 1980s physical board game prototype to a real-time multiplayer web app on Ordnance Survey Maps &mdash; built in 5 weeks with a team of 3.</p>
+    </div>
+
+    <div class="tribute">
+      <h2>In Memory of Kerry Barrett</h2>
+      <p>
+        Oscillation was created by <span class="kerry-name">Kerry Barrett</span>, a lifelong Ordnance Survey surveyor
+        who believed that inside every map, a fun and interesting game could be found. He spent years designing
+        the game in the 1980s and 90s, and even presented it to Waddingtons, the game manufacturer. Kerry passed away
+        in 2012. This digital version is a tribute to his creativity and passion for maps &mdash; bringing his
+        vision to life on the very Ordnance Survey maps he devoted his career to.
+      </p>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="value">13.7K</div>
+        <div class="label">Lines of TypeScript</div>
+        <div class="detail">125 source files</div>
+      </div>
+      <div class="stat-card">
+        <div class="value">107</div>
+        <div class="label">Total Commits</div>
+        <div class="detail">80 in active development</div>
+      </div>
+      <div class="stat-card">
+        <div class="value">58</div>
+        <div class="label">React Components</div>
+        <div class="detail">73 component files</div>
+      </div>
+      <div class="stat-card">
+        <div class="value">5</div>
+        <div class="label">Weeks Active Dev</div>
+        <div class="detail">31 Jan &mdash; 3 Mar 2026</div>
+      </div>
+    </div>
+
+    <section>
+      <h2>Project Journey</h2>
+      <div class="two-col">
+        <div class="journey-card">
+          <h3 style="color: var(--muted);">Phase 1: Prototype (2024)</h3>
+          <div class="metric"><span class="key">Period</span><span class="val">Jan 2024</span></div>
+          <div class="metric"><span class="key">Commits</span><span class="val">27</span></div>
+          <div class="metric"><span class="key">Developer</span><span class="val">Nick</span></div>
+          <div class="metric"><span class="key">Stack</span><span class="val">React + Recoil + Remult</span></div>
+          <div class="metric"><span class="key">Features</span><span class="val">Maps, dice, grid selection</span></div>
+          <div class="metric"><span class="key">Deployment</span><span class="val">Fly.io (Docker)</span></div>
+        </div>
+        <div class="journey-card">
+          <h3 style="color: var(--os-green);">Phase 2: Full Game (2026)</h3>
+          <div class="metric"><span class="key">Period</span><span class="val">31 Jan &mdash; 3 Mar 2026</span></div>
+          <div class="metric"><span class="key">Commits</span><span class="val">80</span></div>
+          <div class="metric"><span class="key">Team</span><span class="val">Nick, Ben, James</span></div>
+          <div class="metric"><span class="key">Stack</span><span class="val">T3 (Next.js + tRPC + Prisma)</span></div>
+          <div class="metric"><span class="key">Features</span><span class="val">Multiplayer, cards, bots, POIs</span></div>
+          <div class="metric"><span class="key">LOC Growth</span><span class="val">+13,700 lines</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Contributor Breakdown</h2>
+      <div class="bar-visual">
+        <div class="segment" style="flex: 65; background: var(--os-green);">Nick 61%</div>
+        <div class="segment" style="flex: 24; background: var(--os-blue);">Ben 22%</div>
+        <div class="segment" style="flex: 18; background: var(--os-pink);">James 17%</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Contributor</th>
+            <th>Commits</th>
+            <th>Lines Added</th>
+            <th>Lines Removed</th>
+            <th>Active Period</th>
+            <th>Focus Areas</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Nick</strong> (nbarrett)</td>
+            <td>65</td>
+            <td>59,536</td>
+            <td>40,541</td>
+            <td>Jan 2024 &mdash; Feb 2026</td>
+            <td>Architecture, deployment, multiplayer, auth</td>
+          </tr>
+          <tr>
+            <td><strong>Ben</strong> (BenmanB)</td>
+            <td>24</td>
+            <td>9,727</td>
+            <td>1,773</td>
+            <td>Feb &mdash; Mar 2026</td>
+            <td>POIs, cards, game phases, map features</td>
+          </tr>
+          <tr>
+            <td><strong>James</strong> (James Barrett)</td>
+            <td>18</td>
+            <td>2,275</td>
+            <td>1,298</td>
+            <td>Feb &mdash; Mar 2026</td>
+            <td>Movement, bots, path building, UI fixes</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Weekly Commit Activity</h2>
+      <div class="chart-container">
+        <canvas id="commitChart"></canvas>
+      </div>
+    </section>
+
+    <section>
+      <h2>Architecture Metrics</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="value">13</div>
+          <div class="label">tRPC Routers</div>
+        </div>
+        <div class="stat-card">
+          <div class="value">6</div>
+          <div class="label">Prisma Models</div>
+        </div>
+        <div class="stat-card">
+          <div class="value">3</div>
+          <div class="label">Zustand Stores</div>
+        </div>
+        <div class="stat-card">
+          <div class="value">53</div>
+          <div class="label">NPM Packages</div>
+          <div class="detail">37 deps + 16 devDeps</div>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>Count</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>React Components</td><td>58</td><td>Game UI, map, lobby, dice, cards</td></tr>
+          <tr><td>tRPC Routers</td><td>13</td><td>game, auth, admin, locations, cards, etc.</td></tr>
+          <tr><td>Prisma Models</td><td>6</td><td>User, GameSession, GamePlayer, Card, CardDraw, Location</td></tr>
+          <tr><td>Database Migrations</td><td>3</td><td>Initial schema + incremental changes</td></tr>
+          <tr><td>Server Files</td><td>17</td><td>API routers, auth, Overpass integration</td></tr>
+          <tr><td>Component Files</td><td>73</td><td>TSX components + supporting modules</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Largest Files</h2>
+      <div class="chart-container">
+        <canvas id="filesChart"></canvas>
+      </div>
+    </section>
+
+    <section>
+      <h2>Stack Migration</h2>
+      <div class="two-col">
+        <div class="journey-card">
+          <h3 style="color: var(--muted);">Before (2024)</h3>
+          <div class="metric"><span class="key">Framework</span><span class="val">React (CRA)</span></div>
+          <div class="metric"><span class="key">State</span><span class="val">Recoil</span></div>
+          <div class="metric"><span class="key">Backend</span><span class="val">Remult</span></div>
+          <div class="metric"><span class="key">Maps</span><span class="val">Leaflet + OSM</span></div>
+          <div class="metric"><span class="key">Routing</span><span class="val">Manual API routes</span></div>
+          <div class="metric"><span class="key">Auth</span><span class="val">None</span></div>
+        </div>
+        <div class="journey-card">
+          <h3 style="color: var(--os-green);">After (2026)</h3>
+          <div class="metric"><span class="key">Framework</span><span class="val">Next.js 14 (App Router)</span></div>
+          <div class="metric"><span class="key">State</span><span class="val">Zustand</span></div>
+          <div class="metric"><span class="key">Backend</span><span class="val">tRPC + Prisma</span></div>
+          <div class="metric"><span class="key">Maps</span><span class="val">Leaflet + OS Maps API</span></div>
+          <div class="metric"><span class="key">Routing</span><span class="val">tRPC type-safe RPCs</span></div>
+          <div class="metric"><span class="key">Auth</span><span class="val">NextAuth (PIN-based)</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Mapping &amp; Geography</h2>
+      <div class="os-map-badge">
+        <img src="https://labs.os.uk/static/media/os-logo.svg" alt="OS">
+        Powered by Ordnance Survey Maps API
+      </div>
+      <div class="journey-card">
+        <div class="metric"><span class="key">Projection</span><span class="val">British National Grid (EPSG:27700)</span></div>
+        <div class="metric"><span class="key">Tiles</span><span class="val">OS Maps API (OS Data Hub)</span></div>
+        <div class="metric"><span class="key">Grid System</span><span class="val">1km OS Grid Squares with 6-digit references</span></div>
+        <div class="metric"><span class="key">Coordinate Conversion</span><span class="val">proj4 for accurate BNG conversion</span></div>
+        <div class="metric"><span class="key">POI Data</span><span class="val">Overpass API (OpenStreetMap)</span></div>
+        <div class="metric"><span class="key">Road Network</span><span class="val">A &amp; B roads from OS Maps</span></div>
+        <div class="metric"><span class="key">Game Features</span><span class="val">Churches, pubs, schools, phone boxes on real map locations</span></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Development Timeline</h2>
+      <div class="timeline">
+        <div class="timeline-item">
+          <div class="date">3 Mar 2026</div>
+          <div class="title">Bot Players &amp; Build Fixes</div>
+          <div class="desc">Configurable bot count, stale session recovery, build stabilisation (9 commits)</div>
+        </div>
+        <div class="timeline-item">
+          <div class="date">24-26 Feb 2026</div>
+          <div class="title">Card System &amp; Smart Bots</div>
+          <div class="desc">Three digitised card decks from Kerry's original game, mid-movement triggers, smart bot AI with objective arrows (13 commits)</div>
+        </div>
+        <div class="timeline-item">
+          <div class="date">17-22 Feb 2026</div>
+          <div class="title">Game Phases &amp; Dev Tooling</div>
+          <div class="desc">Full game phase system (lobby/picking/playing/ended), win condition, claude-swarm integration (15 commits)</div>
+        </div>
+        <div class="timeline-item">
+          <div class="date">10-16 Feb 2026</div>
+          <div class="title">Movement System &amp; POIs</div>
+          <div class="desc">Grid-based movement on A/B roads, 5-type POI system matching Kerry's original categories, bounded game area (16 commits)</div>
+        </div>
+        <div class="timeline-item">
+          <div class="date">3 Feb 2026</div>
+          <div class="title">OS Grid Overlay</div>
+          <div class="desc">Ordnance Survey grid overlay with 6-digit British National Grid references (1 commit)</div>
+        </div>
+        <div class="timeline-item">
+          <div class="date">31 Jan &mdash; 2 Feb 2026</div>
+          <div class="title">T3 Stack &amp; Multiplayer</div>
+          <div class="desc">Full T3 migration, Fly.io deployment, real-time multiplayer, user auth (26 commits)</div>
+        </div>
+        <div class="timeline-item">
+          <div class="date">Sep 2025</div>
+          <div class="title">Dockerisation</div>
+          <div class="desc">Docker setup and initial Fly.io deployment</div>
+        </div>
+        <div class="timeline-item">
+          <div class="date">Jan 2024</div>
+          <div class="title">Initial Prototype</div>
+          <div class="desc">Frontend with Recoil, route calculation, OS Maps integration, dice roller (27 commits)</div>
+        </div>
+        <div class="timeline-item">
+          <div class="date">1980s &mdash; 2012</div>
+          <div class="title">Kerry Barrett's Original Game</div>
+          <div class="desc">Physical board game designed on 1:50,000 OS maps. Presented to Waddingtons. One prototype made, played by family and friends for decades.</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Technology Stack</h2>
+      <h3>Frontend</h3>
+      <div class="tech-grid">
+        <div class="tech-tag">Next.js 14</div>
+        <div class="tech-tag">React 18</div>
+        <div class="tech-tag">TypeScript</div>
+        <div class="tech-tag">Zustand</div>
+        <div class="tech-tag">Material UI</div>
+        <div class="tech-tag">React-Leaflet</div>
+        <div class="tech-tag">proj4</div>
+        <div class="tech-tag">Tailwind CSS</div>
+      </div>
+      <br>
+      <h3>Backend</h3>
+      <div class="tech-grid">
+        <div class="tech-tag">tRPC</div>
+        <div class="tech-tag">Prisma</div>
+        <div class="tech-tag">PostgreSQL</div>
+        <div class="tech-tag">NextAuth</div>
+        <div class="tech-tag">Overpass API</div>
+        <div class="tech-tag">OS Maps API</div>
+        <div class="tech-tag">bcrypt</div>
+        <div class="tech-tag">Zod</div>
+      </div>
+      <br>
+      <h3>Infrastructure</h3>
+      <div class="tech-grid">
+        <div class="tech-tag">Fly.io</div>
+        <div class="tech-tag">Docker</div>
+        <div class="tech-tag">GitHub Actions</div>
+        <div class="tech-tag">Neon (PG)</div>
+        <div class="tech-tag">pnpm</div>
+      </div>
+    </section>
+
+    <footer>
+      <p>Generated: 3 March 2026 &middot; Repository: <a href="https://github.com/nbarrett/oscillation">nbarrett/oscillation</a> &middot; Live: <a href="https://oscillation.fly.dev">oscillation.fly.dev</a></p>
+      <p class="memorial">In memory of Kerry Barrett (d. 2012) &mdash; Ordnance Survey surveyor, game designer, and map enthusiast</p>
+    </footer>
+  </div>
+
+  <script>
+    Chart.defaults.color = '#8fa3b8';
+    Chart.defaults.borderColor = '#2e4057';
+
+    new Chart(document.getElementById('commitChart'), {
+      type: 'bar',
+      data: {
+        labels: [
+          '8-19 Jan\n2024',
+          '20-26 Jan\n2024',
+          '27 Jan-2 Feb\n2024',
+          '1-7 Sep\n2025',
+          '27 Jan-2 Feb\n2026',
+          '3-9 Feb\n2026',
+          '10-16 Feb\n2026',
+          '17-23 Feb\n2026',
+          '24 Feb-2 Mar\n2026',
+          '3-9 Mar\n2026'
+        ],
+        datasets: [
+          {
+            label: 'Nick',
+            data: [12, 8, 5, 1, 24, 2, 3, 10, 0, 0],
+            backgroundColor: '#00a99d',
+            borderSkipped: true
+          },
+          {
+            label: 'Ben',
+            data: [0, 0, 0, 0, 0, 1, 6, 2, 10, 5],
+            backgroundColor: '#2a7de1',
+            borderSkipped: true
+          },
+          {
+            label: 'James',
+            data: [0, 0, 0, 0, 0, 1, 7, 3, 3, 4],
+            backgroundColor: '#e4147d',
+            borderRadius: 6,
+            borderSkipped: 'start'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: { usePointStyle: true, pointStyle: 'rect', padding: 16 }
+          },
+          title: { display: true, text: 'Commits Per Week by Contributor', font: { size: 14 } }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            stacked: true,
+            grid: { color: '#1a2332' },
+            title: { display: true, text: 'Commits' }
+          },
+          x: {
+            stacked: true,
+            grid: { display: false },
+            ticks: { maxRotation: 45, minRotation: 0, font: { size: 10 } }
+          }
+        }
+      }
+    });
+
+    new Chart(document.getElementById('filesChart'), {
+      type: 'bar',
+      data: {
+        labels: [
+          'game.ts (router)', 'road-data.ts', 'JoinGame.tsx', 'game-store.ts',
+          'BotTurnPlayer.tsx', 'admin/page.tsx', 'DiceRoller.tsx', 'page.tsx',
+          'overpass.ts', 'SelectGridSquares.tsx'
+        ],
+        datasets: [{
+          label: 'Lines of code',
+          data: [817, 761, 756, 538, 417, 380, 353, 328, 284, 256],
+          backgroundColor: '#2a7de1',
+          borderRadius: 6,
+          borderSkipped: false
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          title: { display: true, text: 'Largest Source Files (LOC)', font: { size: 14 } }
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            grid: { color: '#1a2332' },
+            title: { display: true, text: 'Lines' }
+          },
+          y: { grid: { display: false } }
+        }
+      }
+    });
+  </script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useSession } from "next-auth/react"
-import { Trash2, Users, Gamepad2, Settings, RefreshCw, AlertTriangle } from "lucide-react"
+import { Trash2, Users, Gamepad2, Settings, RefreshCw, AlertTriangle, Shield, ShieldOff, Clock } from "lucide-react"
 import { trpc } from "@/lib/trpc/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -27,6 +27,28 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
+import { Badge } from "@/components/ui/badge"
+
+function phaseBadge(phase: string) {
+  const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+    lobby: "outline",
+    picking: "secondary",
+    playing: "default",
+    ended: "destructive",
+  }
+  return <Badge variant={variants[phase] ?? "outline"}>{phase}</Badge>
+}
+
+function timeAgo(date: Date) {
+  const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
+  if (seconds < 60) return "just now"
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
 
 export default function AdminPage() {
   const { data: session, status } = useSession()
@@ -59,6 +81,19 @@ export default function AdminPage() {
     },
   })
 
+  const clearStaleLobby = trpc.admin.clearStaleLobbyGames.useMutation({
+    onSuccess: (data) => {
+      utils.admin.getAllSessions.invalidate()
+      alert(`Deleted ${data.deletedCount} stale lobby games`)
+    },
+  })
+
+  const toggleAdmin = trpc.admin.toggleAdmin.useMutation({
+    onSuccess: () => {
+      utils.admin.getAllUsers.invalidate()
+    },
+  })
+
   function handleDelete() {
     if (!deleteTarget) return
     if (deleteTarget.type === "session") {
@@ -72,7 +107,10 @@ export default function AdminPage() {
     return new Date(date).toLocaleString()
   }
 
-  // TODO: Add proper admin role check
+  const staleLobbyCount = sessions?.filter(
+    (s) => s.phase === "lobby" && Date.now() - new Date(s.updatedAt).getTime() > 60 * 60 * 1000
+  ).length ?? 0
+
   if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -93,6 +131,9 @@ export default function AdminPage() {
             {session?.user && (
               <span className="text-sm text-muted-foreground">
                 {session.user.nickname}
+                {session.user.isAdmin && (
+                  <Badge variant="default" className="ml-2">Admin</Badge>
+                )}
               </span>
             )}
             <ThemeToggle />
@@ -104,22 +145,28 @@ export default function AdminPage() {
       </header>
 
       <main className="container mx-auto py-6 px-4">
-        {/* Warning banner */}
-        <Card className="mb-6 border-amber-500/50 bg-amber-500/10">
-          <CardContent className="flex items-center gap-3 py-3">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
-            <p className="text-sm">
-              <strong>Development Mode:</strong> Admin access is not restricted.
-              Add proper authentication before deploying to production.
-            </p>
-          </CardContent>
-        </Card>
+        {!session?.user?.isAdmin && (
+          <Card className="mb-6 border-amber-500/50 bg-amber-500/10">
+            <CardContent className="flex items-center gap-3 py-3">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              <p className="text-sm">
+                <strong>Development Mode:</strong> Admin access is not restricted.
+                Add proper authentication before deploying to production.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         <Tabs defaultValue="games" className="space-y-4">
           <TabsList>
             <TabsTrigger value="games" className="gap-2">
               <Gamepad2 className="h-4 w-4" />
               Games
+              {staleLobbyCount > 0 && (
+                <Badge variant="destructive" className="ml-1 h-5 w-5 p-0 flex items-center justify-center text-[10px]">
+                  {staleLobbyCount}
+                </Badge>
+              )}
             </TabsTrigger>
             <TabsTrigger value="users" className="gap-2">
               <Users className="h-4 w-4" />
@@ -131,7 +178,6 @@ export default function AdminPage() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Games Tab */}
           <TabsContent value="games">
             <Card>
               <CardHeader>
@@ -140,6 +186,11 @@ export default function AdminPage() {
                     <CardTitle>Game Sessions</CardTitle>
                     <CardDescription>
                       Manage all game sessions. {sessions?.length ?? 0} total.
+                      {staleLobbyCount > 0 && (
+                        <span className="text-destructive ml-2">
+                          {staleLobbyCount} stale lobby {staleLobbyCount === 1 ? "game" : "games"}
+                        </span>
+                      )}
                     </CardDescription>
                   </div>
                   <div className="flex gap-2">
@@ -151,6 +202,31 @@ export default function AdminPage() {
                       <RefreshCw className="h-4 w-4 mr-2" />
                       Refresh
                     </Button>
+                    {staleLobbyCount > 0 && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="secondary" size="sm">
+                            <Clock className="h-4 w-4 mr-2" />
+                            Clear Stale Lobbies
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Clear stale lobby games?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will delete {staleLobbyCount} lobby {staleLobbyCount === 1 ? "game" : "games"} that {staleLobbyCount === 1 ? "has" : "have"} been
+                              inactive for over 1 hour. This frees up players stuck on &ldquo;Waiting for host to start&rdquo;.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => clearStaleLobby.mutate()}>
+                              Clear Stale Games
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button variant="destructive" size="sm">
@@ -190,41 +266,50 @@ export default function AdminPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Code</TableHead>
+                        <TableHead>Phase</TableHead>
                         <TableHead>Players</TableHead>
                         <TableHead>Turn</TableHead>
+                        <TableHead>Last Active</TableHead>
                         <TableHead>Created</TableHead>
                         <TableHead className="w-[100px]">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {sessions?.map((session) => (
-                        <TableRow key={session.id}>
-                          <TableCell className="font-mono font-bold">{session.code}</TableCell>
-                          <TableCell>
-                            <span title={session.players.map(p => p.name).join(", ")}>
-                              {session.playerCount}
-                            </span>
-                          </TableCell>
-                          <TableCell>{session.currentTurn}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {formatDate(session.createdAt)}
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={() => setDeleteTarget({
-                                type: "session",
-                                id: session.id,
-                                name: session.code
-                              })}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {sessions?.map((s) => {
+                        const isStale = s.phase === "lobby" && Date.now() - new Date(s.updatedAt).getTime() > 60 * 60 * 1000
+                        return (
+                          <TableRow key={s.id} className={isStale ? "bg-destructive/5" : ""}>
+                            <TableCell className="font-mono font-bold">{s.code}</TableCell>
+                            <TableCell>{phaseBadge(s.phase)}</TableCell>
+                            <TableCell>
+                              <span title={s.players.map(p => p.name).join(", ")}>
+                                {s.playerCount}
+                              </span>
+                            </TableCell>
+                            <TableCell>{s.currentTurn}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {timeAgo(s.updatedAt)}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {formatDate(s.createdAt)}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={() => setDeleteTarget({
+                                  type: "session",
+                                  id: s.id,
+                                  name: s.code
+                                })}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
                     </TableBody>
                   </Table>
                 )}
@@ -232,7 +317,6 @@ export default function AdminPage() {
             </Card>
           </TabsContent>
 
-          {/* Users Tab */}
           <TabsContent value="users">
             <Card>
               <CardHeader>
@@ -265,32 +349,55 @@ export default function AdminPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Nickname</TableHead>
+                        <TableHead>Role</TableHead>
                         <TableHead>Games Played</TableHead>
                         <TableHead>Registered</TableHead>
-                        <TableHead className="w-[100px]">Actions</TableHead>
+                        <TableHead className="w-[140px]">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {users?.map((user) => (
                         <TableRow key={user.id}>
                           <TableCell className="font-medium">{user.nickname}</TableCell>
+                          <TableCell>
+                            {user.isAdmin ? (
+                              <Badge variant="default">Admin</Badge>
+                            ) : (
+                              <Badge variant="outline">Player</Badge>
+                            )}
+                          </TableCell>
                           <TableCell>{user.gamesPlayed}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {formatDate(user.createdAt)}
                           </TableCell>
                           <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={() => setDeleteTarget({
-                                type: "user",
-                                id: user.id,
-                                name: user.nickname
-                              })}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                title={user.isAdmin ? "Remove admin" : "Make admin"}
+                                onClick={() => toggleAdmin.mutate({ userId: user.id, isAdmin: !user.isAdmin })}
+                              >
+                                {user.isAdmin ? (
+                                  <ShieldOff className="h-4 w-4 text-amber-500" />
+                                ) : (
+                                  <Shield className="h-4 w-4 text-muted-foreground" />
+                                )}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={() => setDeleteTarget({
+                                  type: "user",
+                                  id: user.id,
+                                  name: user.nickname
+                                })}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -301,7 +408,6 @@ export default function AdminPage() {
             </Card>
           </TabsContent>
 
-          {/* Settings Tab */}
           <TabsContent value="settings">
             <Card>
               <CardHeader>
@@ -348,7 +454,6 @@ export default function AdminPage() {
         </Tabs>
       </main>
 
-      {/* Delete confirmation dialog */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -3,8 +3,15 @@
 set -e
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+CACHE_FILE="${ROOT_DIR}/.git/pre-push-passed"
 
 source "${ROOT_DIR}/node_modules/@annix/claude-swarm/timer.sh"
+
+current_head=$(git rev-parse HEAD)
+if [ -f "$CACHE_FILE" ] && [ "$(cat "$CACHE_FILE")" = "$current_head" ]; then
+  echo "Pre-push checks already passed for $(echo "$current_head" | cut -c1-7) — skipping."
+  exit 0
+fi
 
 echo "Running pre-push checks..."
 
@@ -47,4 +54,5 @@ timed_step "build" pnpm run build
 
 print_timing_summary
 
+echo "$current_head" > "$CACHE_FILE"
 echo "Pre-push checks passed!"

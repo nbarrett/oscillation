@@ -36,6 +36,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         return {
           id: user.id,
           nickname: user.nickname,
+          isAdmin: user.isAdmin,
         }
       },
     }),
@@ -45,6 +46,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user) {
         token.id = user.id
         token.nickname = user.nickname
+        token.isAdmin = user.isAdmin
       }
       return token
     },
@@ -52,6 +54,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (session.user) {
         session.user.id = token.id as string
         session.user.nickname = token.nickname as string
+        session.user.isAdmin = token.isAdmin as boolean
       }
       return session
     },

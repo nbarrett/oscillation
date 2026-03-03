@@ -11,6 +11,7 @@ model User {
   id        String       @id @default(cuid())
   nickname  String       @unique
   pinHash   String
+  isAdmin   Boolean      @default(false)
   players   GamePlayer[]
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt

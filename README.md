@@ -16,7 +16,13 @@ Only one prototype was ever made and it has been played by family members and fr
 Over Christmas period of 2023, I decided to create a digital version of the game as a tribute to my father and to see if I could overcome the limitations that Waddingtons had identified.
 
 ## Game Demo
-There's a demo of the game so far running at https://oscillation.fly.dev/. Note that the game is still in development and is not yet complete, so please don't expect all features in the instructions to be found! 
+There's a demo of the game so far running at https://oscillation.fly.dev/. Note that the game is still in development and is not yet complete, so please don't expect all features in the instructions to be found!
+
+## Project Documentation
+
+- **[Release Notes](docs/RELEASE-NOTES.md)** — Full development summary broken down by week and contributor
+- **[Codebase Evolution Stats](https://oscillation.fly.dev/codebase-evolution-stats.html)** — Interactive dashboard showing project growth, architecture metrics, and tech stack migration
+- **[Contributor Sync Guide](docs/CONTRIBUTOR-SYNC.md)** — Instructions for syncing after history rewrites and ensuring git hooks are enabled 
 
 ## Pictures of the prototype game being played
 ### Guy and Lynds play in 2020

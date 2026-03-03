@@ -1,11 +1,7 @@
 import { z } from "zod"
 import { createTRPCRouter, publicProcedure } from "@/server/api/trpc"
 
-// TODO: Add proper admin authentication
-// For now, this is a placeholder - should check for admin role
-
 export const adminRouter = createTRPCRouter({
-  // Get all game sessions with player counts
   getAllSessions: publicProcedure.query(async ({ ctx }) => {
     const sessions = await ctx.db.gameSession.findMany({
       include: {
@@ -26,14 +22,16 @@ export const adminRouter = createTRPCRouter({
     return sessions.map((session) => ({
       id: session.id,
       code: session.code,
+      phase: session.phase,
       currentTurn: session.currentTurn,
       playerCount: session._count.players,
       players: session.players,
+      creatorPlayerId: session.creatorPlayerId,
       createdAt: session.createdAt,
+      updatedAt: session.updatedAt,
     }))
   }),
 
-  // Get all registered users
   getAllUsers: publicProcedure.query(async ({ ctx }) => {
     const users = await ctx.db.user.findMany({
       include: {
@@ -47,12 +45,12 @@ export const adminRouter = createTRPCRouter({
     return users.map((user) => ({
       id: user.id,
       nickname: user.nickname,
+      isAdmin: user.isAdmin,
       gamesPlayed: user._count.players,
       createdAt: user.createdAt,
     }))
   }),
 
-  // Delete a game session
   deleteSession: publicProcedure
     .input(z.object({ sessionId: z.string() }))
     .mutation(async ({ ctx, input }) => {
@@ -62,7 +60,6 @@ export const adminRouter = createTRPCRouter({
       return { success: true }
     }),
 
-  // Delete old sessions
   clearOldSessions: publicProcedure
     .input(
       z.object({
@@ -82,7 +79,19 @@ export const adminRouter = createTRPCRouter({
       return { deletedCount: result.count }
     }),
 
-  // Delete a user (and their game associations)
+  clearStaleLobbyGames: publicProcedure.mutation(async ({ ctx }) => {
+    const oneHourAgo = new Date()
+    oneHourAgo.setHours(oneHourAgo.getHours() - 1)
+
+    const result = await ctx.db.gameSession.deleteMany({
+      where: {
+        phase: "lobby",
+        updatedAt: { lt: oneHourAgo },
+      },
+    })
+    return { deletedCount: result.count }
+  }),
+
   deleteUser: publicProcedure
     .input(z.object({ userId: z.string() }))
     .mutation(async ({ ctx, input }) => {
@@ -92,9 +101,17 @@ export const adminRouter = createTRPCRouter({
       return { success: true }
     }),
 
-  // Placeholder for future admin settings
+  toggleAdmin: publicProcedure
+    .input(z.object({ userId: z.string(), isAdmin: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.user.update({
+        where: { id: input.userId },
+        data: { isAdmin: input.isAdmin },
+      })
+      return { success: true }
+    }),
+
   getSettings: publicProcedure.query(async () => {
-    // TODO: Implement admin settings storage
     return {
       maxPlayersPerGame: 8,
       sessionTimeoutMinutes: 60,
