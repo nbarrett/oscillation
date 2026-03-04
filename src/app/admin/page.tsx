@@ -3,10 +3,12 @@
 import { useState } from "react"
 import { useSession } from "next-auth/react"
 import { Trash2, Users, Gamepad2, Settings, RefreshCw, AlertTriangle, Shield, ShieldOff, Clock } from "lucide-react"
+import { toast } from "sonner"
 import { trpc } from "@/lib/trpc/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { timeAgo } from "@/lib/utils"
 import {
   Table,
   TableBody,
@@ -39,16 +41,6 @@ function phaseBadge(phase: string) {
   return <Badge variant={variants[phase] ?? "outline"}>{phase}</Badge>
 }
 
-function timeAgo(date: Date) {
-  const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
-  if (seconds < 60) return "just now"
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
 
 export default function AdminPage() {
   const { data: session, status } = useSession()
@@ -77,14 +69,14 @@ export default function AdminPage() {
   const clearOldSessions = trpc.admin.clearOldSessions.useMutation({
     onSuccess: (data) => {
       utils.admin.getAllSessions.invalidate()
-      alert(`Deleted ${data.deletedCount} sessions`)
+      toast.success(`Deleted ${data.deletedCount} sessions`)
     },
   })
 
   const clearStaleLobby = trpc.admin.clearStaleLobbyGames.useMutation({
     onSuccess: (data) => {
       utils.admin.getAllSessions.invalidate()
-      alert(`Deleted ${data.deletedCount} stale lobby games`)
+      toast.success(`Deleted ${data.deletedCount} stale lobby games`)
     },
   })
 

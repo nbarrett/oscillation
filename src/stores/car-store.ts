@@ -71,7 +71,7 @@ export function carLabelForStyle(style: string): string {
 }
 
 export const CAR_SIZE_MIN = 40
-export const CAR_SIZE_MAX = 160
+export const CAR_SIZE_MAX = 240
 export const CAR_SIZE_DEFAULT = 80
 
 interface CarState {

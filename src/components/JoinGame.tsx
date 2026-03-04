@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react"
 import { useSession, signIn } from "next-auth/react"
-import { Users, Plus, LogIn, Copy, Check, Loader2, UserPlus, ChevronLeft, X, Shuffle, Search } from "lucide-react"
+import { Users, Plus, LogIn, Check, Loader2, UserPlus, ChevronLeft, ChevronRight, X, Shuffle, Search } from "lucide-react"
 import { trpc } from "@/lib/trpc/client"
 import { useGameStore } from "@/stores/game-store"
-import { useCarStore } from "@/stores/car-store"
+import { useCarStore, carLabelForStyle } from "@/stores/car-store"
 import CarIconSelector from "./CarIconSelector"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,10 +20,13 @@ export enum AuthTab {
 }
 
 import { cn } from "@/lib/cn"
+import IconDetailToggle from "./IconDetailToggle"
 import AddStartingPointDialog from "./AddStartingPointDialog"
-import { asTitle } from "@/lib/utils"
+import { asTitle, timeAgo } from "@/lib/utils"
 import { type AreaSize, AREA_SIZES, AREA_SIZE_PRESETS, DEFAULT_AREA_SIZE } from "@/lib/area-size"
 import { POI_CATEGORIES, POI_CATEGORY_LABELS, MIN_POIS_PER_CATEGORY } from "@/lib/poi-categories"
+
+const STEP_LABELS = ["Player", "Location", "Settings", "Review"] as const
 
 interface JoinGameProps {
   startingPosition: [number, number] | null
@@ -64,10 +67,57 @@ function PinInput({ id, name, value, onChange, placeholder, disabled, error }: {
   )
 }
 
+function StepIndicator({ currentStep, onStepClick }: { currentStep: number; onStepClick: (step: number) => void }) {
+  return (
+    <div className="flex items-center w-full">
+      {STEP_LABELS.map((label, index) => {
+        const isCompleted = index < currentStep
+        const isActive = index === currentStep
+        const isClickable = index <= currentStep
+        const isLast = index === STEP_LABELS.length - 1
+        return (
+          <div key={label} className={cn("flex items-center", isLast ? "" : "flex-1")}>
+            <button
+              type="button"
+              disabled={!isClickable}
+              onClick={() => onStepClick(index)}
+              className={cn(
+                "flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap",
+                isCompleted && "bg-primary/15 text-primary cursor-pointer hover:bg-primary/25",
+                isActive && "bg-primary text-primary-foreground",
+                !isCompleted && !isActive && "bg-muted text-muted-foreground cursor-default",
+              )}
+            >
+              {isCompleted && <Check className="h-3 w-3" />}
+              {label}
+            </button>
+            {!isLast && (
+              <div className={cn(
+                "flex-1 h-0.5 mx-1",
+                isCompleted ? "bg-primary/30" : "bg-muted",
+              )} />
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function SummaryItem({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border bg-muted/50 p-3">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="text-sm font-medium mt-0.5">{value}</div>
+    </div>
+  )
+}
+
 export default function JoinGame({ startingPosition }: JoinGameProps) {
   const { data: session } = useSession()
 
   const [mode, setMode] = useState<"welcome" | "create" | "join">("welcome")
+  const [createStep, setCreateStep] = useState(0)
   const [playerName, setPlayerName] = useState("")
   const [joinCode, setJoinCode] = useState("")
   const [createdCode, setCreatedCode] = useState<string | null>(null)
@@ -109,7 +159,6 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
     setError(null)
   }
 
-  // Pre-fill login nickname from localStorage
   useEffect(() => {
     const savedNickname = localStorage.getItem("oscillation-last-nickname")
     if (savedNickname && !loginNickname) {
@@ -117,7 +166,6 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
     }
   }, [])
 
-  // Set default location when locations load
   useEffect(() => {
     if (locations?.length && !selectedLocationId) {
       setSelectedLocationId(locations[0].id)
@@ -244,6 +292,31 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
     setLocationSearch(asTitle(picked.name))
   }
 
+  function validateStep(step: number): boolean {
+    setError(null)
+    if (step === 0 && !playerName.trim()) {
+      setError("Please enter your name")
+      return false
+    }
+    if (step === 1 && !selectedLocation) {
+      setError("Please select a starting point")
+      return false
+    }
+    return true
+  }
+
+  const lastStep = STEP_LABELS.length - 1
+
+  function nextStep() {
+    if (!validateStep(createStep)) return
+    setCreateStep(createStep + 1)
+  }
+
+  function prevStep() {
+    setError(null)
+    setCreateStep(createStep - 1)
+  }
+
   function handleCreate() {
     if (!playerName.trim()) {
       setError("Please enter your name")
@@ -290,7 +363,12 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
   }
 
   function goBack() {
+    if (mode === "create" && createStep > 0) {
+      prevStep()
+      return
+    }
     setMode("welcome")
+    setCreateStep(0)
     setError(null)
   }
 
@@ -298,153 +376,153 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
     return null
   }
 
-  if (mode === "create" || mode === "join") {
+  if (mode === "create") {
+    const preset = AREA_SIZE_PRESETS[areaSize]
     return (
-      <div className="w-full max-w-2xl mx-auto overflow-hidden rounded-lg border bg-card">
+      <div className="w-full max-w-2xl lg:max-w-4xl mx-auto overflow-hidden rounded-lg border bg-card">
         <MapPreviewHeader height="h-80" />
         <div className="p-6 space-y-4">
-          <div>
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-              {mode === "create" ? (
-                <>
-                  <Plus className="h-5 w-5" />
-                  Create New Game
-                </>
-              ) : (
-                <>
-                  <LogIn className="h-5 w-5" />
-                  Join Game
-                </>
-              )}
-            </h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              {mode === "create" ? "Start a new game and invite others" : "Enter the code shared by the game host"}
-            </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <Plus className="h-5 w-5" />
+                Create New Game
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                {STEP_LABELS[createStep]}
+              </p>
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="player-name">Your Name</Label>
-            <Input
-              id="player-name"
-              placeholder="Enter your name"
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              autoFocus
-            />
-          </div>
+          <StepIndicator currentStep={createStep} onStepClick={setCreateStep} />
 
-          <CarIconSelector />
+          {createStep === 0 && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="player-name">Your Name</Label>
+                <Input
+                  id="player-name"
+                  placeholder="Enter your name"
+                  value={playerName}
+                  onChange={(e) => setPlayerName(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <CarIconSelector />
+            </div>
+          )}
 
-          {mode === "create" && (
+          {createStep === 1 && (
             <div className="space-y-2">
-              <Label>Bots</Label>
-              <p className="text-xs text-muted-foreground">Fill empty slots with bots when starting a game</p>
-              <div className="flex rounded-md border overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setBotsEnabled(true)}
-                  className={cn(
-                    "flex-1 px-3 py-1.5 text-xs font-medium transition-colors",
-                    botsEnabled
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-background hover:bg-muted text-muted-foreground"
-                  )}
+              <Label>Starting Point</Label>
+              <p className="text-xs text-muted-foreground">Must be on an A road (pink) or B road (brown/yellow)</p>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search locations..."
+                    value={locationSearch}
+                    onChange={(e) => setLocationSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={pickRandomLocation}
+                  disabled={sortedLocations.length === 0}
+                  title="Random starting point"
                 >
-                  On
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setBotsEnabled(false)}
-                  className={cn(
-                    "flex-1 px-3 py-1.5 text-xs font-medium transition-colors",
-                    !botsEnabled
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-background hover:bg-muted text-muted-foreground"
-                  )}
-                >
-                  Off
-                </button>
+                  <Shuffle className="h-4 w-4" />
+                </Button>
+                <AddStartingPointDialog onSuccess={refetchLocations} />
+              </div>
+              <div className="max-h-48 overflow-y-auto rounded-md border">
+                {filteredLocations.length === 0 ? (
+                  <div className="p-3 text-sm text-muted-foreground text-center">
+                    No locations found
+                  </div>
+                ) : (
+                  filteredLocations.map((location) => (
+                    <button
+                      key={location.id}
+                      type="button"
+                      data-location-id={location.id}
+                      onClick={() => setSelectedLocationId(location.id)}
+                      className={cn(
+                        "w-full px-3 py-2 text-sm text-left transition-colors",
+                        "hover:bg-muted border-b last:border-b-0",
+                        selectedLocationId === location.id && "bg-primary/10 text-primary font-medium"
+                      )}
+                    >
+                      {asTitle(location.name)}
+                    </button>
+                  ))
+                )}
               </div>
             </div>
           )}
 
-          {mode === "create" && (
-            <>
-              <div className="space-y-2">
-                <Label>Starting Point</Label>
-                <p className="text-xs text-muted-foreground">Must be on an A road (pink) or B road (brown/yellow)</p>
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search locations..."
-                      value={locationSearch}
-                      onChange={(e) => setLocationSearch(e.target.value)}
-                      className="pl-9"
-                    />
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={pickRandomLocation}
-                    disabled={sortedLocations.length === 0}
-                    title="Random starting point"
-                  >
-                    <Shuffle className="h-4 w-4" />
-                  </Button>
-                  <AddStartingPointDialog onSuccess={refetchLocations} />
-                </div>
-                <div className="max-h-48 overflow-y-auto rounded-md border">
-                  {filteredLocations.length === 0 ? (
-                    <div className="p-3 text-sm text-muted-foreground text-center">
-                      No locations found
-                    </div>
-                  ) : (
-                    filteredLocations.map((location) => (
-                      <button
-                        key={location.id}
-                        type="button"
-                        data-location-id={location.id}
-                        onClick={() => setSelectedLocationId(location.id)}
-                        className={cn(
-                          "w-full px-3 py-2 text-sm text-left transition-colors",
-                          "hover:bg-muted border-b last:border-b-0",
-                          selectedLocationId === location.id && "bg-primary/10 text-primary font-medium"
-                        )}
-                      >
-                        {asTitle(location.name)}
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-
+          {createStep === 2 && (
+            <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Game Area Size</Label>
                 <div className="grid grid-cols-2 gap-2">
                   {AREA_SIZES.map((size) => {
-                    const preset = AREA_SIZE_PRESETS[size];
+                    const sizePreset = AREA_SIZE_PRESETS[size];
                     return (
                       <button
                         key={size}
                         type="button"
                         onClick={() => setAreaSize(size)}
-                        className={`p-3 rounded-lg border text-left transition-colors ${
+                        className={cn(
+                          "p-3 rounded-lg border text-left transition-colors",
                           areaSize === size
                             ? "border-primary bg-primary/5"
                             : "border-input hover:bg-muted"
-                        }`}
+                        )}
                       >
-                        <div className="font-semibold text-sm">{preset.label}</div>
+                        <div className="font-semibold text-sm">{sizePreset.label}</div>
                         <div className="text-xs text-muted-foreground">
-                          {preset.widthKm}x{preset.heightKm} km
+                          {sizePreset.widthKm}x{sizePreset.heightKm} km
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {preset.recommendedPlayers}
+                          {sizePreset.recommendedPlayers}
                         </div>
                       </button>
                     );
                   })}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Bots</Label>
+                <p className="text-xs text-muted-foreground">Fill empty slots with bots when starting a game</p>
+                <div className="flex rounded-md border overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setBotsEnabled(true)}
+                    className={cn(
+                      "flex-1 px-3 py-1.5 text-xs font-medium transition-colors",
+                      botsEnabled
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background hover:bg-muted text-muted-foreground"
+                    )}
+                  >
+                    On
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBotsEnabled(false)}
+                    className={cn(
+                      "flex-1 px-3 py-1.5 text-xs font-medium transition-colors",
+                      !botsEnabled
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background hover:bg-muted text-muted-foreground"
+                    )}
+                  >
+                    Off
+                  </button>
                 </div>
               </div>
 
@@ -481,127 +559,197 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
                 </p>
               </div>
 
-            </>
+              <IconDetailToggle />
+            </div>
           )}
 
-          {mode === "create" && selectedLocation && (
-            <div className="space-y-2">
-              <Label>POI Coverage</Label>
-              {validation.isLoading ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Checking area...
-                </div>
-              ) : validation.data ? (
-                <div className="space-y-1">
-                  <div className="grid grid-cols-2 gap-1">
-                    {POI_CATEGORIES.map((cat) => {
-                      const count = validation.data!.counts[cat];
-                      const present = count >= MIN_POIS_PER_CATEGORY;
-                      return (
-                        <div key={cat} className="flex items-center gap-1.5 text-sm">
-                          {present ? (
+          {createStep === 3 && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                <SummaryItem label="Name" value={playerName} />
+                <SummaryItem label="Car" value={carLabelForStyle(preferredCar)} />
+                <SummaryItem label="Location" value={selectedLocation ? asTitle(selectedLocation.name) : "—"} />
+                <SummaryItem label="Area Size" value={`${preset.label} (${preset.widthKm}x${preset.heightKm} km)`} />
+                <SummaryItem label="Bots" value={botsEnabled ? "On" : "Off"} />
+                <SummaryItem label="Preview Paths" value={showPreviewPaths ? "On" : "Off"} />
+              </div>
+
+              {selectedLocation && (
+                <div className="space-y-2">
+                  <Label>POI Coverage</Label>
+                  {validation.isLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Checking area...
+                    </div>
+                  ) : validation.data ? (
+                    <div className="space-y-1">
+                      <div className="grid grid-cols-2 gap-1">
+                        {POI_CATEGORIES.map((cat) => {
+                          const count = validation.data!.counts[cat];
+                          const present = count >= MIN_POIS_PER_CATEGORY;
+                          return (
+                            <div key={cat} className="flex items-center gap-1.5 text-sm">
+                              {present ? (
+                                <Check className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                              ) : (
+                                <X className="h-3.5 w-3.5 text-destructive shrink-0" />
+                              )}
+                              <span className={present ? "text-foreground" : "text-destructive"}>
+                                {POI_CATEGORY_LABELS[cat]} ({count})
+                              </span>
+                            </div>
+                          );
+                        })}
+                        <div className="flex items-center gap-1.5 text-sm">
+                          {validation.data.hasMotorway ? (
                             <Check className="h-3.5 w-3.5 text-green-600 shrink-0" />
                           ) : (
                             <X className="h-3.5 w-3.5 text-destructive shrink-0" />
                           )}
-                          <span className={present ? "text-foreground" : "text-destructive"}>
-                            {POI_CATEGORY_LABELS[cat]} ({count})
+                          <span className={validation.data.hasMotorway ? "text-foreground" : "text-destructive"}>
+                            Motorway
                           </span>
                         </div>
-                      );
-                    })}
-                    <div className="flex items-center gap-1.5 text-sm">
-                      {validation.data.hasMotorway ? (
-                        <Check className="h-3.5 w-3.5 text-green-600 shrink-0" />
-                      ) : (
-                        <X className="h-3.5 w-3.5 text-destructive shrink-0" />
-                      )}
-                      <span className={validation.data.hasMotorway ? "text-foreground" : "text-destructive"}>
-                        Motorway
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-sm">
-                      {validation.data.hasRailway ? (
-                        <Check className="h-3.5 w-3.5 text-green-600 shrink-0" />
-                      ) : (
-                        <X className="h-3.5 w-3.5 text-destructive shrink-0" />
-                      )}
-                      <span className={validation.data.hasRailway ? "text-foreground" : "text-destructive"}>
-                        Railway
-                      </span>
-                    </div>
-                  </div>
-                  {!validation.data.valid && (
-                    <p className="text-xs text-destructive mt-1">
-                      Missing requirements — choose a different location or larger area
-                    </p>
-                  )}
-                </div>
-              ) : null}
-            </div>
-          )}
-
-          {mode === "join" && (
-            <div className="space-y-4">
-              {availableGames && availableGames.filter(g => g.phase === "lobby").length > 0 && (
-                <div className="space-y-2">
-                  <Label>Available Games</Label>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {availableGames.filter(g => g.phase === "lobby").map((game) => (
-                      <button
-                        key={game.id}
-                        type="button"
-                        onClick={() => setJoinCode(game.code)}
-                        className={`w-full p-3 rounded-lg border text-left transition-colors ${
-                          joinCode === game.code
-                            ? "border-primary bg-primary/5"
-                            : "border-input hover:bg-muted"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-mono font-semibold tracking-wider">{game.code}</span>
-                          <span className="text-sm text-muted-foreground">
-                            {game.playerCount}/4 players
+                        <div className="flex items-center gap-1.5 text-sm">
+                          {validation.data.hasRailway ? (
+                            <Check className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                          ) : (
+                            <X className="h-3.5 w-3.5 text-destructive shrink-0" />
+                          )}
+                          <span className={validation.data.hasRailway ? "text-foreground" : "text-destructive"}>
+                            Railway
                           </span>
                         </div>
-                        <div className="text-sm text-muted-foreground mt-1">
-                          {game.playerNames.join(", ")}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+                      </div>
+                      {!validation.data.valid && (
+                        <p className="text-xs text-destructive mt-1">
+                          Missing requirements — choose a different location or larger area
+                        </p>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
               )}
-              <div className="space-y-2">
-                <Label htmlFor="game-code">
-                  {availableGames && availableGames.filter(g => g.phase === "lobby").length > 0 ? "Or enter code manually" : "Game Code"}
-                </Label>
-                <Input
-                  id="game-code"
-                  placeholder="e.g. ABC123"
-                  value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value.toUpperCase().slice(0, 6))}
-                  className="font-mono text-lg tracking-widest uppercase"
-                />
-              </div>
             </div>
           )}
 
           {error && <ErrorMessage message={error} />}
 
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={goBack}>
-              <ChevronLeft className="h-4 w-4 mr-1" />
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="outline" className="gap-1" onClick={goBack}>
+              <ChevronLeft className="h-4 w-4" />
+              {createStep === 0 ? "Back" : "Previous"}
+            </Button>
+            {createStep < lastStep ? (
+              <Button className="gap-1" onClick={nextStep}>
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                className="gap-2"
+                onClick={handleCreate}
+                disabled={createGame.isPending || !validation.data?.valid}
+              >
+                {(createGame.isPending || validation.isLoading) && <Loader2 className="h-4 w-4 animate-spin" />}
+                {validation.isLoading ? "Checking area..." : !validation.data?.valid ? "Area invalid" : "Create Game"}
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (mode === "join") {
+    return (
+      <div className="w-full max-w-2xl lg:max-w-4xl mx-auto overflow-hidden rounded-lg border bg-card">
+        <MapPreviewHeader height="h-80" />
+        <div className="p-6 space-y-4">
+          <div>
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <LogIn className="h-5 w-5" />
+              Join Game
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Enter the code shared by the game host
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="player-name">Your Name</Label>
+            <Input
+              id="player-name"
+              placeholder="Enter your name"
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              autoFocus
+            />
+          </div>
+
+          <CarIconSelector />
+
+          <div className="space-y-4">
+            {availableGames && availableGames.filter(g => g.phase === "lobby").length > 0 && (
+              <div className="space-y-2">
+                <Label>Available Games</Label>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {availableGames.filter(g => g.phase === "lobby").map((game) => (
+                    <button
+                      key={game.id}
+                      type="button"
+                      onClick={() => setJoinCode(game.code)}
+                      className={cn(
+                        "w-full p-3 rounded-lg border text-left transition-colors",
+                        joinCode === game.code
+                          ? "border-primary bg-primary/5"
+                          : "border-input hover:bg-muted"
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono font-semibold tracking-wider">{game.code}</span>
+                        <span className="text-sm text-muted-foreground">
+                          {game.playerCount}/4 players
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm text-muted-foreground mt-1">
+                        <span>{game.playerNames.join(", ")}</span>
+                        <span>{timeAgo(game.updatedAt)}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="game-code">
+                {availableGames && availableGames.filter(g => g.phase === "lobby").length > 0 ? "Or enter code manually" : "Game Code"}
+              </Label>
+              <Input
+                id="game-code"
+                placeholder="e.g. ABC123"
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value.toUpperCase().slice(0, 6))}
+                className="font-mono text-lg tracking-widest uppercase"
+              />
+            </div>
+          </div>
+
+          {error && <ErrorMessage message={error} />}
+
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="outline" className="gap-1" onClick={goBack}>
+              <ChevronLeft className="h-4 w-4" />
               Back
             </Button>
             <Button
-              className="flex-1 gap-2"
-              onClick={mode === "create" ? handleCreate : handleJoin}
-              disabled={createGame.isPending || joinGame.isPending}
+              className="gap-2"
+              onClick={handleJoin}
+              disabled={joinGame.isPending}
             >
-              {(createGame.isPending || joinGame.isPending) && <Loader2 className="h-4 w-4 animate-spin" />}
-              {mode === "create" ? "Create Game" : "Join Game"}
+              {joinGame.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Join Game
             </Button>
           </div>
         </div>
@@ -611,7 +759,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
 
   if (!session) {
     return (
-      <div className="w-full max-w-2xl mx-auto overflow-hidden rounded-lg border bg-card">
+      <div className="w-full max-w-2xl lg:max-w-4xl mx-auto overflow-hidden rounded-lg border bg-card">
         <MapPreviewHeader height="h-80" />
         <div className="p-6">
           <Tabs value={authTab === AuthTab.PLAY ? AuthTab.SIGN_IN : authTab} onValueChange={(v) => setAuthTab(v as AuthTab)}>
@@ -710,7 +858,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto overflow-hidden rounded-lg border bg-card">
+    <div className="w-full max-w-2xl lg:max-w-4xl mx-auto overflow-hidden rounded-lg border bg-card">
       <MapPreviewHeader height="h-80" />
       <div className="p-6">
         <Tabs value={authTab} onValueChange={(v) => setAuthTab(v as AuthTab)}>

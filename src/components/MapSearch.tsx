@@ -149,7 +149,7 @@ export default function MapSearch() {
 
   if (!expanded) {
     return (
-      <div className="absolute top-2 left-2 z-[1000]">
+      <div className="absolute top-2 left-12 z-[1000]">
         <Button
           variant="outline"
           size="icon"
@@ -163,7 +163,7 @@ export default function MapSearch() {
   }
 
   return (
-    <div className="absolute top-2 left-2 z-[1000] flex flex-col gap-1">
+    <div className="absolute top-2 left-12 z-[1000] flex flex-col gap-1">
       <div className="flex items-center gap-1 bg-background/95 backdrop-blur-sm rounded-md shadow-md border p-1">
         <Input
           ref={inputRef}

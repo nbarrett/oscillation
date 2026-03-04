@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Users, Copy, Check, Play, LogOut, Loader2, Crown } from "lucide-react"
 import { trpc } from "@/lib/trpc/client"
 import { useGameStore } from "@/stores/game-store"
@@ -20,7 +20,6 @@ export default function GameLobby() {
 
   const startGameMutation = trpc.game.startGame.useMutation({
     onSuccess: () => {
-      addNotification("Game started!", "success")
       utils.game.state.invalidate()
     },
     onError: (err) => {
@@ -53,6 +52,15 @@ export default function GameLobby() {
       leaveMutation.mutate({ sessionId, playerId })
     }
   }
+
+  const autoStartedRef = useRef(false)
+
+  useEffect(() => {
+    if (isCreator && sessionId && playerId && !autoStartedRef.current && !startGameMutation.isPending) {
+      autoStartedRef.current = true
+      startGameMutation.mutate({ sessionId, playerId })
+    }
+  }, [isCreator, sessionId, playerId])
 
   const preset = AREA_SIZE_PRESETS[areaSize as AreaSize]
 

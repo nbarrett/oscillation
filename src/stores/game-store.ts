@@ -5,6 +5,7 @@ import { latLngToGridKey, gridKeyToLatLng, isRoadDataLoaded, reachableRoadGrids 
 import { CAR_STYLES } from "@/stores/car-store"
 import { type AreaSize, type GameBounds, DEFAULT_AREA_SIZE } from "@/lib/area-size"
 import { useDeckStore } from "@/stores/deck-store"
+import { type PoiCategory } from "@/lib/poi-categories"
 
 export interface CardTrigger {
   type: "edge" | "motorway"
@@ -121,6 +122,7 @@ interface GameState {
   winnerName: string | null;
   showPreviewPaths: boolean;
   cardTrigger: CardTrigger | null;
+  activePickingCategory: PoiCategory | null;
 
   setShowPreviewPaths: (show: boolean) => void;
   setCardTrigger: (trigger: CardTrigger | null) => void;
@@ -163,6 +165,7 @@ interface GameState {
   setSelectedPois: (pois: SelectedPoi[] | null) => void;
   setPoiCandidates: (candidates: SelectedPoi[] | null) => void;
   setWinnerName: (name: string | null) => void;
+  setActivePickingCategory: (category: PoiCategory | null) => void;
   isCreator: () => boolean;
   leaveSession: () => void;
 }
@@ -200,6 +203,7 @@ export const useGameStore = create<GameState>()(
       winnerName: null,
       showPreviewPaths: true,
       cardTrigger: null,
+      activePickingCategory: null,
 
       setShowPreviewPaths: (showPreviewPaths) => set({ showPreviewPaths }),
 
@@ -485,6 +489,8 @@ export const useGameStore = create<GameState>()(
 
       setWinnerName: (winnerName) => set({ winnerName }),
 
+      setActivePickingCategory: (activePickingCategory) => set({ activePickingCategory }),
+
       isCreator: () => {
         const state = get();
         return state.playerId !== null && state.playerId === state.creatorPlayerId;
@@ -507,6 +513,7 @@ export const useGameStore = create<GameState>()(
         selectedPois: null,
         poiCandidates: null,
         winnerName: null,
+        activePickingCategory: null,
       }),
     }),
     {
@@ -518,6 +525,7 @@ export const useGameStore = create<GameState>()(
         playerId: state.playerId,
         sessionCode: state.sessionCode,
         localPlayerName: state.localPlayerName,
+        currentPlayerName: state.currentPlayerName,
         areaSize: state.areaSize,
         phase: state.phase,
         creatorPlayerId: state.creatorPlayerId,

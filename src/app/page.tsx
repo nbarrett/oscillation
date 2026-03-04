@@ -319,6 +319,10 @@ export default function GamePage() {
             <a href="https://osdatahub.os.uk" className="font-medium underline underline-offset-4 hover:text-primary">
               OS Maps API
             </a>
+            {" "}&bull;{" "}
+            <a href="/codebase-evolution-stats.html" className="font-medium underline underline-offset-4 hover:text-primary">
+              Codebase Evolution
+            </a>
           </p>
           <p>&copy; {new Date().getFullYear()} Oscillation. In memory of Kerry Barrett.</p>
         </footer>

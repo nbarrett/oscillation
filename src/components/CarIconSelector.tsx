@@ -49,7 +49,17 @@ export default function CarIconSelector() {
             step={10}
             className="flex-1"
           />
-          <span className="text-sm text-muted-foreground w-8 text-right">{carSize}</span>
+          <div
+            className="flex items-center justify-center shrink-0"
+            style={{ width: `${CAR_SIZE_MAX / 2}px`, height: `${CAR_SIZE_MAX / 3}px` }}
+          >
+            <img
+              src={CAR_ICON_OPTIONS.find((o) => o.style === preferredCar)?.image ?? CAR_ICON_OPTIONS[0].image}
+              alt="Car preview"
+              className="object-contain"
+              style={{ width: `${carSize / 2}px`, height: `${carSize / 3}px` }}
+            />
+          </div>
         </div>
       </div>
     </div>

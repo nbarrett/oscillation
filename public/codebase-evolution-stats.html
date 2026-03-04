@@ -7,17 +7,30 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     :root {
-      --bg: #1a2332;
-      --surface: #223044;
-      --border: #2e4057;
-      --text: #e8ecf0;
-      --muted: #8fa3b8;
+      --bg: #ffffff;
+      --surface: #f8f9fa;
+      --border: #e2e8f0;
+      --text: #1a202c;
+      --muted: #64748b;
       --os-green: #00a99d;
       --os-green-dark: #008c82;
       --os-pink: #e4147d;
       --os-navy: #0b2239;
       --os-blue: #2a7de1;
       --os-orange: #f5a623;
+      --chart-grid: #e2e8f0;
+      --row-hover: rgba(0,0,0,0.02);
+      --th-bg: rgba(0, 169, 157, 0.1);
+    }
+    .dark {
+      --bg: #1a2332;
+      --surface: #223044;
+      --border: #2e4057;
+      --text: #e8ecf0;
+      --muted: #8fa3b8;
+      --chart-grid: #1a2332;
+      --row-hover: rgba(255,255,255,0.02);
+      --th-bg: rgba(0, 169, 157, 0.15);
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -68,12 +81,15 @@
     }
 
     .tribute {
-      background: linear-gradient(135deg, var(--os-navy), var(--surface));
+      background: var(--surface);
       border: 1px solid var(--os-green);
       border-radius: 12px;
       padding: 2rem;
       margin-bottom: 3rem;
       text-align: center;
+    }
+    .dark .tribute {
+      background: linear-gradient(135deg, var(--os-navy), var(--surface));
     }
     .tribute h2 {
       color: var(--os-green);
@@ -194,7 +210,7 @@
     th {
       text-align: left;
       padding: 0.75rem 1rem;
-      background: rgba(0, 169, 157, 0.15);
+      background: var(--th-bg);
       color: var(--os-green);
       font-weight: 600;
       font-size: 0.85rem;
@@ -205,7 +221,7 @@
       padding: 0.75rem 1rem;
       border-top: 1px solid var(--border);
     }
-    tr:hover { background: rgba(255,255,255,0.02); }
+    tr:hover { background: var(--row-hover); }
 
     .tech-grid {
       display: grid;
@@ -318,12 +334,32 @@
       font-style: italic;
       margin-top: 0.5rem;
     }
+    .theme-toggle {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.4rem 0.6rem;
+      cursor: pointer;
+      font-size: 1.1rem;
+      line-height: 1;
+      transition: background 0.2s;
+    }
+    .theme-toggle:hover { background: var(--border); }
   </style>
 </head>
 <body>
+  <script>
+    (function() {
+      var stored = null;
+      try { stored = localStorage.getItem("theme"); } catch(e) {}
+      var isDark = stored === "dark" || (!stored && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      if (isDark) document.documentElement.classList.add("dark");
+    })();
+  </script>
   <div class="sticky-nav">
     <img src="https://labs.os.uk/static/media/os-logo.svg" alt="Ordnance Survey">
     <span class="nav-title">Oscillation: Codebase Evolution</span>
+    <button class="theme-toggle" id="themeToggle" title="Toggle dark/light mode"></button>
   </div>
 
   <div class="container">
@@ -626,8 +662,18 @@
   </div>
 
   <script>
-    Chart.defaults.color = '#8fa3b8';
-    Chart.defaults.borderColor = '#2e4057';
+    function getChartColors() {
+      var s = getComputedStyle(document.documentElement);
+      return {
+        text: s.getPropertyValue('--muted').trim(),
+        border: s.getPropertyValue('--border').trim(),
+        grid: s.getPropertyValue('--chart-grid').trim()
+      };
+    }
+
+    var cc = getChartColors();
+    Chart.defaults.color = cc.text;
+    Chart.defaults.borderColor = cc.border;
 
     new Chart(document.getElementById('commitChart'), {
       type: 'bar',
@@ -680,7 +726,7 @@
           y: {
             beginAtZero: true,
             stacked: true,
-            grid: { color: '#1a2332' },
+            grid: { color: cc.grid },
             title: { display: true, text: 'Commits' }
           },
           x: {
@@ -718,12 +764,45 @@
         scales: {
           x: {
             beginAtZero: true,
-            grid: { color: '#1a2332' },
+            grid: { color: cc.grid },
             title: { display: true, text: 'Lines' }
           },
           y: { grid: { display: false } }
         }
       }
+    });
+
+    function updateToggleIcon() {
+      var isDark = document.documentElement.classList.contains('dark');
+      document.getElementById('themeToggle').textContent = isDark ? '\u2600\uFE0F' : '\uD83C\uDF19';
+    }
+    updateToggleIcon();
+
+    document.getElementById('themeToggle').addEventListener('click', function() {
+      var isDark = document.documentElement.classList.toggle('dark');
+      try { localStorage.setItem('theme', isDark ? 'dark' : 'light'); } catch(e) {}
+      updateToggleIcon();
+
+      var nc = getChartColors();
+      Chart.defaults.color = nc.text;
+      Chart.defaults.borderColor = nc.border;
+      Chart.helpers.each(Chart.instances, function(chart) {
+        if (chart.options.scales) {
+          Object.keys(chart.options.scales).forEach(function(key) {
+            var scale = chart.options.scales[key];
+            if (scale.grid) scale.grid.color = nc.grid;
+            if (scale.ticks) scale.ticks.color = nc.text;
+            if (scale.title) scale.title.color = nc.text;
+          });
+          if (chart.options.plugins && chart.options.plugins.title) {
+            chart.options.plugins.title.color = nc.text;
+          }
+          if (chart.options.plugins && chart.options.plugins.legend && chart.options.plugins.legend.labels) {
+            chart.options.plugins.legend.labels.color = nc.text;
+          }
+        }
+        chart.update();
+      });
     });
   </script>
 </body>

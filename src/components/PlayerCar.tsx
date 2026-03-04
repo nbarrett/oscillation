@@ -122,7 +122,7 @@ export default function PlayerCar({ player }: PlayerCarProps) {
     } else if (active) {
       return `It's ${player.name}'s turn and it's time to ${asTitle(gameTurnState)}`
     } else {
-      return `It's ${currentPlayerName}'s turn - you must wait for them to finish first!`
+      return `${player.name} - waiting for ${currentPlayerName ?? "..."} to finish`
     }
   }
 

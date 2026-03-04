@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { MapContainer, TileLayer } from "react-leaflet";
@@ -40,12 +40,13 @@ function createBritishNationalGridCRS(): L.Proj.CRS | null {
 }
 
 export default function MapWithCars() {
-  const { players, mapZoom, mapCentre, setMapZoom, playerZoomRequest, setPlayerZoomRequest, areaSize, phase } = useGameStore();
+  const { players, mapZoom, mapCentre, setMapZoom, playerZoomRequest, setPlayerZoomRequest, areaSize, phase, gameBounds, sessionId } = useGameStore();
   const { accessToken, mapLayer, mappingProvider } = useMapStore();
   const { startingPosition } = useRouteStore();
 
   const [map, setMap] = useState<L.Map | null>(null);
   const [britishNationalGridCRS, setBritishNationalGridCRS] = useState<L.Proj.CRS | null>(null);
+  const fittedSessionRef = useRef<string | null>(null);
 
   const mapLayerAttributes = MapLayers[mapLayer];
 
@@ -88,6 +89,15 @@ export default function MapWithCars() {
     }
   }, [playerToZoom, map, setPlayerZoomRequest]);
 
+  useEffect(() => {
+    if (!map || phase !== "picking" || !gameBounds || !sessionId) return;
+    if (fittedSessionRef.current === sessionId) return;
+    fittedSessionRef.current = sessionId;
+    map.fitBounds(
+      [[gameBounds.south, gameBounds.west], [gameBounds.north, gameBounds.east]],
+      { padding: [20, 20] }
+    );
+  }, [map, phase, gameBounds, sessionId]);
 
   useEffect(() => {
     log.debug("zoom:", mapZoom, "mapLayerAttributes:", mapLayerAttributes, "usesBritishNationalGrid:", usesBritishNationalGrid);

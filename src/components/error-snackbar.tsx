@@ -1,77 +1,137 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { X, AlertCircle, Copy, Check } from "lucide-react"
-import { useErrorStore } from "@/stores/error-store"
+import { useEffect, useRef } from "react"
+import { X, AlertCircle, Trash2, ChevronDown } from "lucide-react"
+import { useErrorStore, type ErrorItem } from "@/stores/error-store"
 import { cn } from "@/lib/cn"
 
-const AUTO_DISMISS_MS = 6000
+const AUTO_DISMISS_MS = 5000
+const MAX_HISTORY = 50
+
+function formatTime(timestamp: number): string {
+  return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+}
+
+function ErrorHistoryRow({ error, onRemove }: { error: ErrorItem; onRemove: (id: string) => void }) {
+  return (
+    <div className="flex items-start gap-2 px-3 py-2 border-b border-border/50 last:border-b-0 text-xs">
+      <AlertCircle className="h-3.5 w-3.5 shrink-0 text-destructive mt-0.5" />
+      <div className="flex-1 min-w-0">
+        <p className="text-foreground break-words">{error.message}</p>
+        <p className="text-muted-foreground mt-0.5">{formatTime(error.timestamp)}</p>
+      </div>
+      <button
+        onClick={() => onRemove(error.id)}
+        className="shrink-0 opacity-50 hover:opacity-100 transition-opacity"
+        title="Remove"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </div>
+  )
+}
 
 export function ErrorSnackbar() {
-  const { errors, removeError } = useErrorStore()
-  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const { errors, dismissError, removeError, clearAll, panelOpen, togglePanel } = useErrorStore()
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const latestUndismissed = errors.filter((e) => !e.dismissed).at(-1) ?? null
+  const errorCount = errors.length
 
   useEffect(() => {
-    if (errors.length === 0) return
+    if (!latestUndismissed) return
 
-    const timers = errors.map((error) => {
-      const elapsed = Date.now() - error.timestamp
-      const remaining = Math.max(AUTO_DISMISS_MS - elapsed, 0)
+    if (timerRef.current) clearTimeout(timerRef.current)
 
-      return setTimeout(() => {
-        removeError(error.id)
-      }, remaining)
-    })
+    timerRef.current = setTimeout(() => {
+      dismissError(latestUndismissed.id)
+    }, AUTO_DISMISS_MS)
 
     return () => {
-      timers.forEach(clearTimeout)
+      if (timerRef.current) clearTimeout(timerRef.current)
     }
-  }, [errors, removeError])
+  }, [latestUndismissed?.id, dismissError])
 
-  function copyError(id: string, message: string) {
-    navigator.clipboard.writeText(message)
-    setCopiedId(id)
-    setTimeout(() => setCopiedId(null), 2000)
-  }
+  useEffect(() => {
+    if (errors.length > MAX_HISTORY) {
+      const excess = errors.slice(0, errors.length - MAX_HISTORY)
+      for (const e of excess) {
+        removeError(e.id)
+      }
+    }
+  }, [errors.length, removeError])
 
-  if (errors.length === 0) return null
+  if (errorCount === 0 && !latestUndismissed) return null
 
   return (
-    <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-2 w-full max-w-lg px-4">
-      {errors.map((error) => (
-        <div
-          key={error.id}
-          className={cn(
-            "flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4 shadow-lg",
-            "animate-in slide-in-from-bottom-2 fade-in-0 duration-200"
-          )}
-        >
-          <AlertCircle className="h-5 w-5 shrink-0 text-destructive" />
-          <p className="flex-1 text-sm text-destructive">{error.message}</p>
-          <div className="flex gap-1 shrink-0">
+    <>
+      {latestUndismissed && !panelOpen && (
+        <div className="fixed bottom-16 right-4 z-[9999] w-full max-w-sm">
+          <div
+            className={cn(
+              "flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 backdrop-blur-sm p-3 shadow-lg",
+              "animate-in slide-in-from-bottom-2 fade-in-0 duration-200"
+            )}
+          >
+            <AlertCircle className="h-4 w-4 shrink-0 text-destructive mt-0.5" />
+            <p className="flex-1 text-sm text-destructive">{latestUndismissed.message}</p>
             <button
-              onClick={() => copyError(error.id, error.message)}
-              className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-              title="Copy error"
-            >
-              {copiedId === error.id ? (
-                <Check className="h-4 w-4 text-destructive" />
-              ) : (
-                <Copy className="h-4 w-4 text-destructive" />
-              )}
-              <span className="sr-only">Copy error</span>
-            </button>
-            <button
-              onClick={() => removeError(error.id)}
-              className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              onClick={() => dismissError(latestUndismissed.id)}
+              className="shrink-0 opacity-70 hover:opacity-100 transition-opacity"
               title="Dismiss"
             >
               <X className="h-4 w-4 text-destructive" />
-              <span className="sr-only">Close</span>
             </button>
           </div>
         </div>
-      ))}
-    </div>
+      )}
+
+      {errorCount > 0 && (
+        <button
+          onClick={togglePanel}
+          className={cn(
+            "fixed bottom-4 right-4 z-[9999] flex items-center gap-2 rounded-full px-3 py-2 shadow-lg transition-colors",
+            "border border-destructive/50 bg-destructive/10 backdrop-blur-sm hover:bg-destructive/20",
+          )}
+          title={panelOpen ? "Close error history" : "View error history"}
+        >
+          <AlertCircle className="h-4 w-4 text-destructive" />
+          <span className="text-xs font-medium text-destructive">{errorCount}</span>
+          <ChevronDown className={cn(
+            "h-3 w-3 text-destructive transition-transform",
+            panelOpen && "rotate-180",
+          )} />
+        </button>
+      )}
+
+      {panelOpen && (
+        <div className="fixed bottom-14 right-4 z-[9998] w-full max-w-sm animate-in slide-in-from-bottom-2 fade-in-0 duration-150">
+          <div className="rounded-lg border border-border bg-card shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/50">
+              <span className="text-xs font-medium text-foreground">
+                Errors ({errorCount})
+              </span>
+              <button
+                onClick={clearAll}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                title="Clear all"
+              >
+                <Trash2 className="h-3 w-3" />
+                Clear
+              </button>
+            </div>
+            <div className="max-h-64 overflow-y-auto">
+              {errors.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">No errors</p>
+              ) : (
+                [...errors].reverse().map((error) => (
+                  <ErrorHistoryRow key={error.id} error={error} onRemove={removeError} />
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
