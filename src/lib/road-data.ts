@@ -48,6 +48,25 @@ const STORAGE_KEY = "oscillation-road-data-v2";
 const STORAGE_MAX_AGE = 24 * 60 * 60 * 1000;
 
 let roadDataCache: RoadDataCache | null = null;
+const roadDataListeners: Array<() => void> = [];
+
+export function onRoadDataReady(callback: () => void): () => void {
+  if (roadDataCache) {
+    callback();
+    return () => {};
+  }
+  roadDataListeners.push(callback);
+  return () => {
+    const idx = roadDataListeners.indexOf(callback);
+    if (idx >= 0) roadDataListeners.splice(idx, 1);
+  };
+}
+
+function notifyRoadDataListeners() {
+  for (const cb of roadDataListeners.splice(0)) {
+    cb();
+  }
+}
 
 function serializeAdjacency(adj: Map<string, Set<string>>): Record<string, string[]> {
   const result: Record<string, string[]> = {};
@@ -479,6 +498,7 @@ export async function loadRoadData(
       east <= bounds.east &&
       Date.now() - roadDataCache.timestamp < STORAGE_MAX_AGE
     ) {
+      notifyRoadDataListeners();
       return;
     }
   }
@@ -512,6 +532,7 @@ export async function loadRoadData(
     };
 
     saveToStorage(roadDataCache);
+    notifyRoadDataListeners();
 
     log.info(
       `Loaded ${roads.length} road segments, ${motorways.length} motorway segments, ${motorwayJunctions.length} junctions, ${railwayStations.length} stations, ${gridSquaresWithRoads.size} grid squares with roads, ${gridSquaresWithABRoads.size} with A/B roads, ${gridAdjacency.size} connected grids`

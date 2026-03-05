@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import { log } from "@/lib/utils"
-import { latLngToGridKey, gridKeyToLatLng, isRoadDataLoaded, reachableRoadGrids } from "@/lib/road-data"
+import { latLngToGridKey, gridKeyToLatLng, isRoadDataLoaded, reachableRoadGrids, onRoadDataReady } from "@/lib/road-data"
 import { CAR_STYLES } from "@/stores/car-store"
 import { type AreaSize, type GameBounds, DEFAULT_AREA_SIZE } from "@/lib/area-size"
 import { useDeckStore } from "@/stores/deck-store"
@@ -402,6 +402,21 @@ export const useGameStore = create<GameState>()(
           occupied.add(key)
         }
         const reachable = reachableRoadGrids(startGridKey, result, occupied);
+
+        if (!isRoadDataLoaded()) {
+          log.info("handleDiceRoll: road data not loaded yet, will recompute when ready");
+          onRoadDataReady(() => {
+            const s = get();
+            if (s.gameTurnState === GameTurnState.DICE_ROLLED && s.diceResult === result && s.playerStartGridKey === startGridKey) {
+              const occ = occupiedGridKeys(s.players, s.currentPlayerName ?? "");
+              const obs = useDeckStore.getState().obstructions.map((o) => o.gridKey);
+              for (const k of obs) occ.add(k);
+              const updated = reachableRoadGrids(startGridKey, result, occ);
+              log.info("handleDiceRoll: road data loaded, recomputed reachable grids:", updated.size);
+              set({ reachableGrids: updated } as Partial<GameState> as GameState);
+            }
+          });
+        }
 
         set({
           diceResult: result,

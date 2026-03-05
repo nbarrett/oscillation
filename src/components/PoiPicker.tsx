@@ -254,34 +254,6 @@ export default function PoiPicker() {
               </div>
             )}
 
-            {!celebration && activeCategory && !allPicked && (
-              <div className="absolute bottom-0 left-0 right-0 z-[999] pointer-events-none">
-                <div className="bg-background/90 backdrop-blur-sm border-t px-4 py-3 flex items-center justify-center gap-3">
-                  <span
-                    className="shrink-0 flex items-center"
-                    dangerouslySetInnerHTML={{ __html: styledSvg(resolveIcon(
-                      activeCategory === "pub" ? PUB_ICON_OPTIONS
-                        : activeCategory === "spire" ? SPIRE_ICON_OPTIONS
-                        : activeCategory === "tower" ? TOWER_ICON_OPTIONS
-                        : activeCategory === "phone" ? PHONE_ICON_OPTIONS
-                        : SCHOOL_ICON_OPTIONS,
-                      activeCategory === "pub" ? pubIconStyle
-                        : activeCategory === "spire" ? spireIconStyle
-                        : activeCategory === "tower" ? towerIconStyle
-                        : activeCategory === "phone" ? phoneIconStyle
-                        : schoolIconStyle,
-                      iconDetailMode,
-                    ), POI_COLOURS[activeCategory as keyof typeof POI_COLOURS], 32) }}
-                  />
-                  <span className="text-base font-semibold">
-                    Tap a {POI_CATEGORY_LABELS[activeCategory as PoiCategory]?.replace(/s$/, "")} on the map to place your staging post!
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    ({pickedCategories.size}/{POI_CATEGORIES.length})
-                  </span>
-                </div>
-              </div>
-            )}
           </div>
         </CardContent>
       </Card>

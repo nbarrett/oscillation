@@ -5,7 +5,7 @@ import { useMap } from "react-leaflet";
 import L from "leaflet";
 import { useGameStore, occupiedGridKeys, GameTurnState } from "@/stores/game-store";
 import { useDeckStore } from "@/stores/deck-store";
-import { latLngToGridKey, getAdjacentRoadGrids, shortestPath, reachableRoadGrids } from "@/lib/road-data";
+import { latLngToGridKey, getAdjacentRoadGrids, shortestPath, reachableRoadGrids, isRoadDataLoaded, onRoadDataReady } from "@/lib/road-data";
 import { gridKeyToLatLngs } from "@/lib/grid-polygon";
 import { isOnBoardEdge, isOnMotorwayOrRailway } from "@/lib/deck-triggers";
 import { type GameBounds } from "@/lib/area-size";
@@ -41,7 +41,6 @@ function isPreviewPolygon(layer: L.Layer): layer is PreviewPolygon {
 
 export default function SelectGridSquares() {
   const map = useMap();
-  const mapClickPosition = useGameStore((s) => s.mapClickPosition);
   const gridClearRequest = useGameStore((s) => s.gridClearRequest);
   const setSelectedGridSquares = useGameStore((s) => s.setSelectedGridSquares);
   const setMovementPath = useGameStore((s) => s.setMovementPath);
@@ -54,7 +53,7 @@ export default function SelectGridSquares() {
   const previewPaths = useGameStore((s) => s.previewPaths);
   const previewPathIndex = useGameStore((s) => s.previewPathIndex);
 
-  log.debug("SelectGridSquares render, turnState:", gameTurnState, "dice:", diceResult, "clickPos:", !!mapClickPosition);
+  log.debug("SelectGridSquares render, turnState:", gameTurnState, "dice:", diceResult);
 
   const prevIndexRef = useRef(previewPathIndex);
   const drawnPathRef = useRef<string[] | null>(null);
@@ -142,6 +141,10 @@ export default function SelectGridSquares() {
     if (gameTurnState !== GameTurnState.DICE_ROLLED || !diceResult || !playerStartGridKey || movementPath.length > 0) {
       return;
     }
+    if (!isRoadDataLoaded()) {
+      log.info("computeAndSetPaths: waiting for road data");
+      return;
+    }
 
     const { players, currentPlayerName, reachableGrids } = useGameStore.getState();
     const occupied = occupiedGridKeys(players, currentPlayerName ?? "");
@@ -198,6 +201,24 @@ export default function SelectGridSquares() {
 
   useEffect(() => {
     computeAndSetPaths();
+  }, [computeAndSetPaths]);
+
+  useEffect(() => {
+    const unsub = onRoadDataReady(() => {
+      log.info("road data ready, recomputing reachable grids and preview paths");
+      const state = useGameStore.getState();
+      if (state.gameTurnState === GameTurnState.DICE_ROLLED && state.diceResult && state.playerStartGridKey) {
+        const occupied = occupiedGridKeys(state.players, state.currentPlayerName ?? "");
+        const obstructionKeys = useDeckStore.getState().obstructions.map((o) => o.gridKey);
+        for (const key of obstructionKeys) {
+          occupied.add(key);
+        }
+        const reachable = reachableRoadGrids(state.playerStartGridKey, state.diceResult, occupied);
+        useGameStore.getState().setReachableGrids(reachable);
+      }
+      computeAndSetPaths();
+    });
+    return unsub;
   }, [computeAndSetPaths]);
 
   useEffect(() => {
@@ -263,116 +284,130 @@ export default function SelectGridSquares() {
   }, [gameTurnState, movementPath.length, previewPaths.length]);
 
   useEffect(() => {
-    if (!mapClickPosition || !map) return;
+    function handleMapClick(clickPos: { latLng: { lat: number; lng: number } }) {
+      if (!map) return;
 
-    const state = useGameStore.getState();
-    const {
-      playerStartGridKey,
-      diceResult,
-      movementPath,
-      players,
-      currentPlayerName,
-      gameTurnState,
-      previewPaths,
-      previewPathIndex,
-    } = state;
+      const state = useGameStore.getState();
+      const {
+        playerStartGridKey,
+        diceResult,
+        movementPath,
+        players,
+        currentPlayerName,
+        gameTurnState,
+        previewPaths,
+        previewPathIndex,
+        cardTrigger,
+        gameBounds,
+      } = state;
 
-    const { cardTrigger, gameBounds } = state;
-    if (cardTrigger) {
-      log.debug("click ignored: cardTrigger active");
-      return;
-    }
+      if (cardTrigger) {
+        log.debug("click ignored: cardTrigger active");
+        return;
+      }
 
-    if (gameTurnState !== GameTurnState.DICE_ROLLED || !playerStartGridKey || !diceResult) {
-      log.debug("click ignored: turnState=", gameTurnState, "startGrid=", playerStartGridKey, "dice=", diceResult);
-      return;
-    }
+      if (gameTurnState !== GameTurnState.DICE_ROLLED || !playerStartGridKey || !diceResult) {
+        log.debug("click ignored: turnState=", gameTurnState, "startGrid=", playerStartGridKey, "dice=", diceResult);
+        return;
+      }
 
-    const gridKey = latLngToGridKey(
-      mapClickPosition.latLng.lat,
-      mapClickPosition.latLng.lng
-    );
-    log.debug("click grid:", gridKey, "start:", playerStartGridKey);
+      if (!isRoadDataLoaded()) {
+        log.info("click ignored: road data not yet loaded");
+        return;
+      }
 
-    if (gridKey === playerStartGridKey) return;
+      const gridKey = latLngToGridKey(clickPos.latLng.lat, clickPos.latLng.lng);
+      log.debug("click grid:", gridKey, "start:", playerStartGridKey);
 
-    const occupied = occupiedGridKeys(players, currentPlayerName ?? "");
-    const clickObstructions = useDeckStore.getState().obstructions.map((o) => o.gridKey);
-    for (const key of clickObstructions) {
-      occupied.add(key);
-    }
+      if (gridKey === playerStartGridKey) return;
 
-    if (movementPath.length > 0 && movementPath[movementPath.length - 1] === gridKey) {
-      const newPath = movementPath.slice(0, -1);
+      const occupied = occupiedGridKeys(players, currentPlayerName ?? "");
+      const clickObstructions = useDeckStore.getState().obstructions.map((o) => o.gridKey);
+      for (const key of clickObstructions) {
+        occupied.add(key);
+      }
+
+      if (movementPath.length > 0 && movementPath[movementPath.length - 1] === gridKey) {
+        const newPath = movementPath.slice(0, -1);
+        setMovementPath(newPath);
+        setSelectedEndpoint(newPath.length > 0 ? newPath[newPath.length - 1] : null);
+        drawPath(newPath, diceResult);
+        if (newPath.length === 0) {
+          computeAndSetPaths();
+        }
+        return;
+      }
+
+      if (movementPath.includes(gridKey)) return;
+
+      if (movementPath.length === 0 && previewPaths.length > 0) {
+        const currentPreview = previewPaths[previewPathIndex];
+        if (currentPreview && currentPreview[currentPreview.length - 1] === gridKey) {
+          useGameStore.getState().confirmPreviewPath();
+          drawPath(currentPreview, diceResult);
+          checkMidMovementTrigger(currentPreview, gameBounds);
+          return;
+        }
+
+        const matchIdx = previewPaths.findIndex(p => p[p.length - 1] === gridKey);
+        if (matchIdx >= 0) {
+          const path = previewPaths[matchIdx];
+          useGameStore.getState().setPreviewPathIndex(matchIdx);
+          useGameStore.getState().confirmPreviewPath();
+          drawPath(path, diceResult);
+          checkMidMovementTrigger(path, gameBounds);
+          return;
+        }
+      }
+
+      if (movementPath.length === 0) {
+        const path = shortestPath(playerStartGridKey, gridKey, diceResult, occupied);
+        log.debug("shortestPath result:", path ? `length ${path.length}` : "null", "for grid", gridKey, "roadData:", isRoadDataLoaded());
+        if (path && path.length <= diceResult) {
+          setMovementPath(path);
+          setSelectedEndpoint(gridKey);
+          useGameStore.getState().setPreviewPaths([]);
+          drawPath(path, diceResult);
+          checkMidMovementTrigger(path, gameBounds);
+          return;
+        }
+      }
+
+      if (movementPath.length >= diceResult) {
+        log.debug("click ignored: path full", movementPath.length, ">=", diceResult);
+        return;
+      }
+
+      const lastKey = movementPath.length > 0
+        ? movementPath[movementPath.length - 1]
+        : playerStartGridKey;
+
+      const validNeighbors = getAdjacentRoadGrids(lastKey);
+      if (!validNeighbors.includes(gridKey)) {
+        log.debug("click ignored: grid", gridKey, "not adjacent to", lastKey, "valid:", validNeighbors.slice(0, 5));
+        return;
+      }
+
+      const wouldBeEndpoint = movementPath.length + 1 === diceResult;
+      if (wouldBeEndpoint && occupied.has(gridKey)) return;
+
+      const newPath = [...movementPath, gridKey];
       setMovementPath(newPath);
-      setSelectedEndpoint(newPath.length > 0 ? newPath[newPath.length - 1] : null);
+      setSelectedEndpoint(gridKey);
+      useGameStore.getState().setPreviewPaths([]);
       drawPath(newPath, diceResult);
-      if (newPath.length === 0) {
-        computeAndSetPaths();
+      checkMidMovementTrigger(newPath, gameBounds);
+    }
+
+    let prevClickPos = useGameStore.getState().mapClickPosition;
+    const unsub = useGameStore.subscribe((state) => {
+      if (state.mapClickPosition && state.mapClickPosition !== prevClickPos) {
+        prevClickPos = state.mapClickPosition;
+        handleMapClick(state.mapClickPosition);
       }
-      return;
-    }
-
-    if (movementPath.includes(gridKey)) return;
-
-    if (movementPath.length === 0 && previewPaths.length > 0) {
-      const currentPreview = previewPaths[previewPathIndex];
-      if (currentPreview && currentPreview[currentPreview.length - 1] === gridKey) {
-        useGameStore.getState().confirmPreviewPath();
-        drawPath(currentPreview, diceResult);
-        checkMidMovementTrigger(currentPreview, gameBounds);
-        return;
-      }
-
-      const matchIdx = previewPaths.findIndex(p => p[p.length - 1] === gridKey);
-      if (matchIdx >= 0) {
-        const path = previewPaths[matchIdx];
-        useGameStore.getState().setPreviewPathIndex(matchIdx);
-        useGameStore.getState().confirmPreviewPath();
-        drawPath(path, diceResult);
-        checkMidMovementTrigger(path, gameBounds);
-        return;
-      }
-    }
-
-    if (movementPath.length === 0) {
-      const path = shortestPath(playerStartGridKey, gridKey, diceResult, occupied);
-      log.debug("shortestPath result:", path ? `length ${path.length}` : "null", "for grid", gridKey);
-      if (path && path.length <= diceResult) {
-        setMovementPath(path);
-        setSelectedEndpoint(gridKey);
-        useGameStore.getState().setPreviewPaths([]);
-        drawPath(path, diceResult);
-        checkMidMovementTrigger(path, gameBounds);
-        return;
-      }
-    }
-
-    if (movementPath.length >= diceResult) {
-      log.debug("click ignored: path full", movementPath.length, ">=", diceResult);
-      return;
-    }
-
-    const lastKey = movementPath.length > 0
-      ? movementPath[movementPath.length - 1]
-      : playerStartGridKey;
-
-    const validNeighbors = getAdjacentRoadGrids(lastKey);
-    if (!validNeighbors.includes(gridKey)) {
-      log.debug("click ignored: grid", gridKey, "not adjacent to", lastKey, "valid:", validNeighbors.slice(0, 5));
-      return;
-    }
-
-    const wouldBeEndpoint = movementPath.length + 1 === diceResult;
-    if (wouldBeEndpoint && occupied.has(gridKey)) return;
-
-    const newPath = [...movementPath, gridKey];
-    setMovementPath(newPath);
-    setSelectedEndpoint(gridKey);
-    useGameStore.getState().setPreviewPaths([]);
-    drawPath(newPath, diceResult);
-    checkMidMovementTrigger(newPath, gameBounds);
-  }, [mapClickPosition]);
+    });
+    return unsub;
+  }, [map]);
 
   useEffect(() => {
     if (gridClearRequest > 0) {
