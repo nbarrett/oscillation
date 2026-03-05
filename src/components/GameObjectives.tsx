@@ -52,11 +52,10 @@ export default function GameObjectives() {
   const allVisited = selectedPois.every(poi => visitedSet.has(`${poi.category}:${poi.osmId}`))
 
   return (
-    <div className="space-y-1.5">
-      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-        Staging Posts
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide mr-1">
+        Staging Posts:
       </span>
-      <div className="flex flex-wrap gap-2">
         {selectedPois.map((poi) => {
           const poiId = `${poi.category}:${poi.osmId}`
           const visited = visitedSet.has(poiId)
@@ -104,7 +103,6 @@ export default function GameObjectives() {
             Return to start
           </span>
         </div>
-      </div>
     </div>
   )
 }

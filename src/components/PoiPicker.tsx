@@ -229,10 +229,10 @@ export default function PoiPicker() {
             <MapWithCars />
 
             {!celebration && pickedCategories.size === 0 && activeCategory && (
-              <div className="absolute inset-0 z-[1000] flex items-center justify-center pointer-events-none">
-                <div className="bg-background/95 backdrop-blur-sm px-8 py-5 rounded-xl shadow-2xl text-center border">
-                  <div className="text-xl font-bold">Place your Staging Posts</div>
-                  <div className="text-sm mt-1.5 text-muted-foreground">
+              <div className="absolute inset-0 z-[1000] flex items-center justify-center pointer-events-none animate-bounce-in">
+                <div className="bg-primary/95 text-primary-foreground px-8 py-5 rounded-xl shadow-2xl text-center">
+                  <div className="text-2xl font-bold">Place your Staging Posts</div>
+                  <div className="text-sm mt-1.5 opacity-90">
                     Tap a {POI_CATEGORY_LABELS[activeCategory as PoiCategory]?.replace(/s$/, "")} on the map to begin
                   </div>
                 </div>

@@ -31,12 +31,25 @@ class PreviewPolygon extends L.Polygon {
   }
 }
 
+class EndpointPolygon extends L.Polygon {
+  gridKey: string;
+
+  constructor(gridSquareLatLongs: L.LatLng[], gridKey: string, options?: L.PolylineOptions) {
+    super(gridSquareLatLongs, options);
+    this.gridKey = gridKey;
+  }
+}
+
 function isIdentifiedPolygon(layer: L.Layer): layer is IdentifiedPolygon {
   return layer instanceof IdentifiedPolygon;
 }
 
 function isPreviewPolygon(layer: L.Layer): layer is PreviewPolygon {
   return layer instanceof PreviewPolygon;
+}
+
+function isEndpointPolygon(layer: L.Layer): layer is EndpointPolygon {
+  return layer instanceof EndpointPolygon;
 }
 
 export default function SelectGridSquares() {
@@ -89,17 +102,39 @@ export default function SelectGridSquares() {
     });
   }
 
+  function clearEndpointPolygons() {
+    map.eachLayer((layer) => {
+      if (isEndpointPolygon(layer)) {
+        layer.remove();
+      }
+    });
+  }
+
+  function drawEndpoints(endpointKeys: string[]) {
+    clearEndpointPolygons();
+    for (const key of endpointKeys) {
+      const latLngs = gridKeyToLatLngs(map, key);
+      const polygon = new EndpointPolygon(latLngs, key, {
+        interactive: true,
+        color: colours.exactEndpoint,
+        weight: 3,
+        fillOpacity: 0.5,
+        fillColor: colours.exactEndpoint,
+      });
+      polygon.addTo(map);
+    }
+  }
+
   function drawPreviewPath(path: string[]) {
     clearPreviewPolygons();
-    for (let i = 0; i < path.length; i++) {
+    for (let i = 0; i < path.length - 1; i++) {
       const key = path[i];
-      const isLast = i === path.length - 1;
       const latLngs = gridKeyToLatLngs(map, key);
       const polygon = new PreviewPolygon(latLngs, key, {
         interactive: true,
-        color: isLast ? colours.exactEndpoint : colours.osMapsPurple,
-        weight: isLast ? 4 : 2,
-        fillOpacity: isLast ? 0.7 : 0.35,
+        color: colours.osMapsPurple,
+        weight: 2,
+        fillOpacity: 0.35,
       });
       polygon.addTo(map);
     }
@@ -109,6 +144,7 @@ export default function SelectGridSquares() {
     drawnPathRef.current = keys;
     clearPathPolygons();
     clearPreviewPolygons();
+    clearEndpointPolygons();
     const isComplete = maxSteps !== undefined && keys.length === maxSteps;
     for (let i = 0; i < keys.length; i++) {
       const key = keys[i];
@@ -136,6 +172,7 @@ export default function SelectGridSquares() {
   const computeAndSetPaths = useCallback(() => {
     if (!map || !showPreviewPaths) {
       clearPreviewPolygons();
+      clearEndpointPolygons();
       return;
     }
     if (gameTurnState !== GameTurnState.DICE_ROLLED || !diceResult || !playerStartGridKey || movementPath.length > 0) {
@@ -191,6 +228,9 @@ export default function SelectGridSquares() {
       }
     }
     log.debug("computeAndSetPaths: found", paths.length, "possible moves from", endpoints.length, "endpoints");
+
+    const allEndpointKeys = paths.map(p => p[p.length - 1]);
+    drawEndpoints(allEndpointKeys);
 
     useGameStore.getState().setPreviewPaths(paths);
 

@@ -6,7 +6,7 @@ import { Loader2, Gamepad2, ChevronDown, Settings, Users, LogOut, Copy, Check, T
 import { AuthDialog } from "@/components/auth/auth-dialog"
 import { UserMenu } from "@/components/auth/user-menu"
 import { useMapStore } from "@/stores/map-store"
-import { useGameStore } from "@/stores/game-store"
+import { useGameStore, GameTurnState } from "@/stores/game-store"
 import { carImageForStyle } from "@/stores/car-store"
 import { trpc } from "@/lib/trpc/client"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
@@ -49,6 +49,32 @@ const GameLobby = dynamic(() => import("@/components/GameLobby"), { ssr: false }
 const BotTurnPlayer = dynamic(() => import("@/components/BotTurnPlayer"), { ssr: false })
 const PoiPicker = dynamic(() => import("@/components/PoiPicker"), { ssr: false })
 const CarSizeControl = dynamic(() => import("@/components/CarSizeControl"), { ssr: false })
+
+function MovementOverlay() {
+  const gameTurnState = useGameStore((s) => s.gameTurnState)
+  const diceResult = useGameStore((s) => s.diceResult)
+  const movementPath = useGameStore((s) => s.movementPath)
+  const currentPlayerName = useGameStore((s) => s.currentPlayerName)
+  const localPlayerName = useGameStore((s) => s.localPlayerName)
+  const previewPaths = useGameStore((s) => s.previewPaths)
+
+  const isMyTurn = localPlayerName !== null && localPlayerName === currentPlayerName
+  const showOverlay = isMyTurn && gameTurnState === GameTurnState.DICE_ROLLED && diceResult && movementPath.length === 0
+
+  if (!showOverlay) return null
+
+  return (
+    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] pointer-events-none animate-bounce-in">
+      <div className="bg-primary/95 text-primary-foreground px-6 py-3 rounded-xl shadow-2xl text-center">
+        <div className="text-lg font-bold">
+          {previewPaths.length > 0
+            ? `${previewPaths.length} possible moves — click a green square or use arrow keys`
+            : `Move ${diceResult} squares — click a square on the road`}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function GamePage() {
   const setAccessToken = useMapStore((state) => state.setAccessToken)
@@ -233,9 +259,7 @@ export default function GamePage() {
                   </button>
                 </div>
 
-                <div className="mt-3 pt-3 border-t">
-                  <GameObjectives />
-                </div>
+                <GameObjectives />
 
             <div
               className={cn(
@@ -271,6 +295,7 @@ export default function GamePage() {
                   <MapWithCars />
                   <MapPositions />
                   <CarSizeControl />
+                  <MovementOverlay />
                 </div>
               </CardContent>
             </Card>
