@@ -48,6 +48,7 @@ const GameSync = dynamic(() => import("@/components/GameSync"), { ssr: false })
 const GameLobby = dynamic(() => import("@/components/GameLobby"), { ssr: false })
 const BotTurnPlayer = dynamic(() => import("@/components/BotTurnPlayer"), { ssr: false })
 const PoiPicker = dynamic(() => import("@/components/PoiPicker"), { ssr: false })
+const CarSizeControl = dynamic(() => import("@/components/CarSizeControl"), { ssr: false })
 
 export default function GamePage() {
   const setAccessToken = useMapStore((state) => state.setAccessToken)
@@ -269,6 +270,7 @@ export default function GamePage() {
                 <div className="h-[calc(100vh-280px)] min-h-[400px] relative">
                   <MapWithCars />
                   <MapPositions />
+                  <CarSizeControl />
                 </div>
               </CardContent>
             </Card>

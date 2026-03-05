@@ -1,15 +1,35 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useMemo, useState, useRef } from "react"
 import dynamic from "next/dynamic"
 import { Check, Loader2, LocateFixed } from "lucide-react"
 import { useCurrentPlayer, useGameStore } from "@/stores/game-store"
 import { POI_CATEGORIES, POI_CATEGORY_LABELS, type PoiCategory } from "@/lib/poi-categories"
-import { POI_COLOURS } from "@/stores/poi-icons"
+import { POI_COLOURS, PUB_ICON_OPTIONS, SPIRE_ICON_OPTIONS, TOWER_ICON_OPTIONS, PHONE_ICON_OPTIONS, SCHOOL_ICON_OPTIONS } from "@/stores/poi-icons"
+import { usePubStore } from "@/stores/pub-store"
+import { useSpireStore, useTowerStore } from "@/stores/church-store"
+import { usePhoneStore } from "@/stores/phone-store"
+import { useSchoolStore } from "@/stores/school-store"
 import { usePoiSettingsStore } from "@/stores/poi-settings-store"
+import { type PoiIconOption } from "@/stores/poi-types"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/cn"
+
+function resolveIcon<T extends string>(
+  options: PoiIconOption<T>[],
+  style: T,
+  detailMode: string,
+): string {
+  const option = options.find((o) => o.style === style) ?? options[0]!
+  return detailMode === "simple" ? option.simpleSvg : option.svg
+}
+
+function styledSvg(svgTemplate: string, colour: string, size: number): string {
+  return svgTemplate
+    .replace(/currentColor/g, colour)
+    .replace(/<svg /, `<svg width="${size}" height="${size}" `)
+}
 
 const MapWithCars = dynamic(
   () => import("@/components/MapWithCars"),
@@ -31,11 +51,41 @@ export default function PoiPicker() {
   const { selectedPois, playerId, creatorPlayerId, setPlayerZoomRequest, activePickingCategory, setActivePickingCategory } = useGameStore()
   const player = useCurrentPlayer()
   const { iconDetailMode, setIconDetailMode } = usePoiSettingsStore()
+  const pubIconStyle = usePubStore((s) => s.pubIconStyle)
+  const spireIconStyle = useSpireStore((s) => s.spireIconStyle)
+  const towerIconStyle = useTowerStore((s) => s.towerIconStyle)
+  const phoneIconStyle = usePhoneStore((s) => s.phoneIconStyle)
+  const schoolIconStyle = useSchoolStore((s) => s.schoolIconStyle)
   const isCreator = playerId !== null && playerId === creatorPlayerId
   const pickedCategories = new Set((selectedPois ?? []).map(p => p.category))
   const allPicked = pickedCategories.size === POI_CATEGORIES.length
 
   const activeCategory = activePickingCategory ?? firstUnpickedCategory(pickedCategories)
+
+  const [celebration, setCelebration] = useState<{ placed: string; next: string | null } | null>(null)
+  const prevPickedCountRef = useRef(pickedCategories.size)
+
+  useEffect(() => {
+    if (pickedCategories.size > prevPickedCountRef.current) {
+      const lastPicked = [...pickedCategories].pop()
+      const placedLabel = POI_CATEGORY_LABELS[lastPicked as PoiCategory]?.replace(/s$/, "")
+      const nextCategory = firstUnpickedCategory(pickedCategories)
+      const nextLabel = nextCategory ? POI_CATEGORY_LABELS[nextCategory]?.replace(/s$/, "") : null
+      setCelebration({ placed: placedLabel ?? "Staging Post", next: nextLabel })
+      const timer = setTimeout(() => setCelebration(null), 2000)
+      prevPickedCountRef.current = pickedCategories.size
+      return () => clearTimeout(timer)
+    }
+    prevPickedCountRef.current = pickedCategories.size
+  }, [pickedCategories.size])
+
+  const categoryIcons: Record<string, string> = useMemo(() => ({
+    pub: styledSvg(resolveIcon(PUB_ICON_OPTIONS, pubIconStyle, iconDetailMode), POI_COLOURS.pub, 28),
+    spire: styledSvg(resolveIcon(SPIRE_ICON_OPTIONS, spireIconStyle, iconDetailMode), POI_COLOURS.spire, 28),
+    tower: styledSvg(resolveIcon(TOWER_ICON_OPTIONS, towerIconStyle, iconDetailMode), POI_COLOURS.tower, 28),
+    phone: styledSvg(resolveIcon(PHONE_ICON_OPTIONS, phoneIconStyle, iconDetailMode), POI_COLOURS.phone, 28),
+    school: styledSvg(resolveIcon(SCHOOL_ICON_OPTIONS, schoolIconStyle, iconDetailMode), POI_COLOURS.school, 28),
+  }), [iconDetailMode, pubIconStyle, spireIconStyle, towerIconStyle, phoneIconStyle, schoolIconStyle])
 
   useEffect(() => {
     if (activePickingCategory && pickedCategories.has(activePickingCategory)) {
@@ -119,21 +169,35 @@ export default function PoiPicker() {
                         }
                       }}
                       className={cn(
-                        "flex items-center justify-center gap-1 px-2 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap",
-                        picked && "bg-primary/15 text-primary cursor-pointer hover:bg-primary/25",
-                        isActive && !picked && "text-white",
-                        !picked && !isActive && "bg-muted text-muted-foreground cursor-default",
+                        "flex flex-col items-center gap-0.5 px-2 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap",
+                        isActive && !picked && "bg-primary/10 ring-2 ring-primary",
+                        picked && "text-primary cursor-pointer hover:bg-primary/10 opacity-60",
+                        !picked && !isActive && "text-muted-foreground cursor-default opacity-40",
                       )}
-                      style={isActive && !picked ? { backgroundColor: colour } : {}}
                     >
-                      {picked && <Check className="h-3 w-3 shrink-0" />}
-                      {!picked && !isActive && (
-                        <span
-                          className="h-2 w-2 rounded-full shrink-0"
-                          style={{ backgroundColor: colour }}
-                        />
-                      )}
-                      {POI_CATEGORY_LABELS[category as PoiCategory]}
+                      <span
+                        className="shrink-0 flex items-center"
+                        dangerouslySetInnerHTML={{ __html: picked
+                          ? styledSvg(resolveIcon(
+                              category === "pub" ? PUB_ICON_OPTIONS
+                                : category === "spire" ? SPIRE_ICON_OPTIONS
+                                : category === "tower" ? TOWER_ICON_OPTIONS
+                                : category === "phone" ? PHONE_ICON_OPTIONS
+                                : SCHOOL_ICON_OPTIONS,
+                              category === "pub" ? pubIconStyle
+                                : category === "spire" ? spireIconStyle
+                                : category === "tower" ? towerIconStyle
+                                : category === "phone" ? phoneIconStyle
+                                : schoolIconStyle,
+                              iconDetailMode,
+                            ), colour, 28)
+                          : categoryIcons[category] ?? ""
+                        }}
+                      />
+                      <span className="flex items-center gap-0.5">
+                        {picked && <Check className="h-3 w-3 shrink-0" />}
+                        {POI_CATEGORY_LABELS[category as PoiCategory]}
+                      </span>
                     </button>
                     {!isLast && (
                       <div className={cn(
@@ -149,8 +213,8 @@ export default function PoiPicker() {
             {activeCategory && !allPicked && (
               <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                 <span
-                  className="inline-block h-2.5 w-2.5 rounded-full shrink-0"
-                  style={{ backgroundColor: POI_COLOURS[activeCategory as keyof typeof POI_COLOURS] }}
+                  className="shrink-0 flex items-center"
+                  dangerouslySetInnerHTML={{ __html: categoryIcons[activeCategory] ?? "" }}
                 />
                 Place a Staging Post on a {POI_CATEGORY_LABELS[activeCategory as PoiCategory]?.replace(/s$/, "")}
               </p>
@@ -161,8 +225,63 @@ export default function PoiPicker() {
 
       <Card className="overflow-hidden">
         <CardContent className="p-0">
-          <div className="h-[calc(100vh-280px)] min-h-[400px] relative">
+          <div className="h-[calc(100vh-300px)] min-h-[400px] relative">
             <MapWithCars />
+
+            {!celebration && pickedCategories.size === 0 && activeCategory && (
+              <div className="absolute inset-0 z-[1000] flex items-center justify-center pointer-events-none">
+                <div className="bg-background/95 backdrop-blur-sm px-8 py-5 rounded-xl shadow-2xl text-center border">
+                  <div className="text-xl font-bold">Place your Staging Posts</div>
+                  <div className="text-sm mt-1.5 text-muted-foreground">
+                    Tap a {POI_CATEGORY_LABELS[activeCategory as PoiCategory]?.replace(/s$/, "")} on the map to begin
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {celebration && (
+              <div className="absolute inset-0 z-[1000] flex items-center justify-center pointer-events-none animate-bounce-in">
+                <div className="bg-primary/95 text-primary-foreground px-8 py-4 rounded-xl shadow-2xl text-center">
+                  <div className="text-2xl font-bold">{celebration.placed} placed!</div>
+                  <div className="text-sm mt-1 opacity-90">
+                    {allPicked
+                      ? "All staging posts placed\u2026 Game on!"
+                      : celebration.next
+                        ? `Now place a staging post on a ${celebration.next}`
+                        : "Almost there!"}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!celebration && activeCategory && !allPicked && (
+              <div className="absolute bottom-0 left-0 right-0 z-[999] pointer-events-none">
+                <div className="bg-background/90 backdrop-blur-sm border-t px-4 py-3 flex items-center justify-center gap-3">
+                  <span
+                    className="shrink-0 flex items-center"
+                    dangerouslySetInnerHTML={{ __html: styledSvg(resolveIcon(
+                      activeCategory === "pub" ? PUB_ICON_OPTIONS
+                        : activeCategory === "spire" ? SPIRE_ICON_OPTIONS
+                        : activeCategory === "tower" ? TOWER_ICON_OPTIONS
+                        : activeCategory === "phone" ? PHONE_ICON_OPTIONS
+                        : SCHOOL_ICON_OPTIONS,
+                      activeCategory === "pub" ? pubIconStyle
+                        : activeCategory === "spire" ? spireIconStyle
+                        : activeCategory === "tower" ? towerIconStyle
+                        : activeCategory === "phone" ? phoneIconStyle
+                        : schoolIconStyle,
+                      iconDetailMode,
+                    ), POI_COLOURS[activeCategory as keyof typeof POI_COLOURS], 32) }}
+                  />
+                  <span className="text-base font-semibold">
+                    Tap a {POI_CATEGORY_LABELS[activeCategory as PoiCategory]?.replace(/s$/, "")} on the map to place your staging post!
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    ({pickedCategories.size}/{POI_CATEGORIES.length})
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

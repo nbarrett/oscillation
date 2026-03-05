@@ -41,6 +41,7 @@ export default function MapSearch() {
   const [results, setResults] = useState<SearchResult[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [searching, setSearching] = useState(false)
+  const [hasSearched, setHasSearched] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const markerRef = useRef<L.Marker | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
@@ -74,6 +75,7 @@ export default function MapSearch() {
     if (!query.trim() || !map) return
 
     setSearching(true)
+    setHasSearched(true)
     try {
       const { south, north, west, east } = UK_BOUNDS
       const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query.trim())}&bounded=1&viewbox=${west},${north},${east},${south}&limit=50&countrycodes=gb`
@@ -139,6 +141,7 @@ export default function MapSearch() {
     setQuery("")
     setResults([])
     setCurrentIndex(0)
+    setHasSearched(false)
     clearMarker()
   }
 
@@ -220,7 +223,7 @@ export default function MapSearch() {
         </div>
       )}
 
-      {results.length === 0 && query && !searching && (
+      {results.length === 0 && query && !searching && hasSearched && (
         <div className="bg-background/95 backdrop-blur-sm rounded-md shadow-md border px-2 py-1">
           <span className="text-xs text-muted-foreground">No results found</span>
         </div>

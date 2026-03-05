@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Dices, CheckCircle2, LocateFixed } from "lucide-react"
+import { Dices, CheckCircle2, LocateFixed, ChevronLeft, ChevronRight } from "lucide-react"
 import { GameTurnState, useCurrentPlayer, useGameStore } from "@/stores/game-store"
 import { gridKeyToLatLng, latLngToGridKey } from "@/lib/road-data"
 import { trpc } from "@/lib/trpc/client"
@@ -42,6 +42,10 @@ export default function DiceRoller() {
     cardTrigger,
     setCardTrigger,
     handleCardRelocation,
+    previewPaths,
+    previewPathIndex,
+    cyclePreviewPath,
+    confirmPreviewPath,
   } = useGameStore()
 
   const pubs = usePubStore(s => s.pubs)
@@ -295,9 +299,39 @@ export default function DiceRoller() {
                 <div className="text-lg font-bold text-primary whitespace-nowrap">
                   You rolled {total}!
                 </div>
-                {diceResult && (
+                {diceResult && movementPath.length === 0 && previewPaths.length > 0 && (
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <button
+                      className="p-0.5 rounded hover:bg-muted"
+                      onClick={() => cyclePreviewPath(-1)}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <span className="whitespace-nowrap">
+                      Move {previewPathIndex + 1}/{previewPaths.length}
+                    </span>
+                    <button
+                      className="p-0.5 rounded hover:bg-muted"
+                      onClick={() => cyclePreviewPath(1)}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                    <button
+                      className="ml-1 px-2 py-0.5 rounded bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90"
+                      onClick={() => confirmPreviewPath()}
+                    >
+                      Select
+                    </button>
+                  </div>
+                )}
+                {diceResult && movementPath.length > 0 && (
                   <div className="text-sm text-muted-foreground">
                     <div>Moves: {movementPath.length}/{diceResult}</div>
+                  </div>
+                )}
+                {diceResult && movementPath.length === 0 && previewPaths.length === 0 && (
+                  <div className="text-sm text-muted-foreground">
+                    <div>Click a square on the map to move</div>
                   </div>
                 )}
               </div>

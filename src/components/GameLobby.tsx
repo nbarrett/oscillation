@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+
 import { Users, Copy, Check, Play, LogOut, Loader2, Crown } from "lucide-react"
 import { trpc } from "@/lib/trpc/client"
 import { useGameStore } from "@/stores/game-store"
@@ -54,15 +55,42 @@ export default function GameLobby() {
   }
 
   const autoStartedRef = useRef(false)
+  const [autoStartFailed, setAutoStartFailed] = useState(false)
 
   useEffect(() => {
-    if (isCreator && sessionId && playerId && !autoStartedRef.current && !startGameMutation.isPending) {
+    if (isCreator && sessionId && playerId && !autoStartedRef.current && !startGameMutation.isPending && !autoStartFailed) {
       autoStartedRef.current = true
-      startGameMutation.mutate({ sessionId, playerId })
+      startGameMutation.mutate({ sessionId, playerId }, {
+        onError: () => {
+          setAutoStartFailed(true)
+        },
+      })
     }
   }, [isCreator, sessionId, playerId])
 
   const preset = AREA_SIZE_PRESETS[areaSize as AreaSize]
+  const isAutoStarting = isCreator && autoStartedRef.current && !autoStartFailed && (startGameMutation.isPending || !startGameMutation.isError)
+
+  if (isAutoStarting) {
+    return (
+      <div className="flex-1 flex items-center justify-center py-8">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6 space-y-6">
+            <div className="text-center space-y-4">
+              <Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" />
+              <h2 className="text-xl font-semibold">Setting up game area...</h2>
+              <p className="text-sm text-muted-foreground">
+                Fetching points of interest from the map. This can take up to a minute for larger areas.
+              </p>
+              <Button variant="outline" onClick={() => { setAutoStartFailed(true); leaveSession() }}>
+                Cancel
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="flex-1 flex items-center justify-center py-8">

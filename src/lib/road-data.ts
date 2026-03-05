@@ -415,7 +415,7 @@ function addAdjacency(adj: Map<string, Set<string>>, gridA: string, gridB: strin
   const [eB, nB] = gridB.split("-").map(Number);
   const de = Math.abs(eA - eB);
   const dn = Math.abs(nA - nB);
-  if ((de === 1000 && dn === 0) || (de === 0 && dn === 1000)) {
+  if (de <= 1000 && dn <= 1000 && (de + dn > 0)) {
     if (!adj.has(gridA)) adj.set(gridA, new Set());
     if (!adj.has(gridB)) adj.set(gridB, new Set());
     adj.get(gridA)!.add(gridB);
@@ -558,6 +558,10 @@ function allAdjacentGrids(gridKey: string): string[] {
     `${e}-${n - 1000}`,
     `${e + 1000}-${n}`,
     `${e - 1000}-${n}`,
+    `${e + 1000}-${n + 1000}`,
+    `${e + 1000}-${n - 1000}`,
+    `${e - 1000}-${n + 1000}`,
+    `${e - 1000}-${n - 1000}`,
   ];
 }
 
@@ -695,6 +699,43 @@ export function findExactPath(
     return [...path];
   }
   return null;
+}
+
+export function allPathsToEndpoints(
+  startGridKey: string,
+  exactSteps: number,
+  excludeKeys: Set<string> = new Set(),
+  maxPaths = 200
+): string[][] {
+  const paths: string[][] = [];
+  const hasRoads = isRoadDataLoaded();
+  const visited = new Set<string>([startGridKey]);
+  const currentPath: string[] = [];
+
+  function dfs(key: string, depth: number): boolean {
+    if (paths.length >= maxPaths) return true;
+    if (depth === exactSteps) {
+      paths.push([...currentPath]);
+      return false;
+    }
+
+    const neighbors = hasRoads
+      ? getAdjacentRoadGrids(key)
+      : allAdjacentGrids(key);
+
+    for (const neighbor of neighbors) {
+      if (visited.has(neighbor) || excludeKeys.has(neighbor)) continue;
+      visited.add(neighbor);
+      currentPath.push(neighbor);
+      if (dfs(neighbor, depth + 1)) return true;
+      currentPath.pop();
+      visited.delete(neighbor);
+    }
+    return false;
+  }
+
+  dfs(startGridKey, 0);
+  return paths;
 }
 
 export function isRoadDataLoaded(): boolean {

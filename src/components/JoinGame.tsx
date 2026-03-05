@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useSession, signIn } from "next-auth/react"
 import { Users, Plus, LogIn, Check, Loader2, UserPlus, ChevronLeft, ChevronRight, X, Shuffle, Search } from "lucide-react"
 import { trpc } from "@/lib/trpc/client"
@@ -131,8 +131,10 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
   const [confirmPin, setConfirmPin] = useState("")
   const [selectedLocationId, setSelectedLocationId] = useState<string>("")
   const [locationSearch, setLocationSearch] = useState("")
+  const [locationDropdownOpen, setLocationDropdownOpen] = useState(false)
+  const locationRef = useRef<HTMLDivElement>(null)
   const [areaSize, setAreaSize] = useState<AreaSize>(DEFAULT_AREA_SIZE)
-  const [botsEnabled, setBotsEnabled] = useState(true)
+  const [botsEnabled, setBotsEnabled] = useState(false)
 
   const { setSessionId, setPlayerId, setSessionCode, setCreatorPlayerId, showPreviewPaths, setShowPreviewPaths: showPreviewPathsSetter } = useGameStore()
   const { preferredCar } = useCarStore()
@@ -285,11 +287,18 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
   }
 
   function pickRandomLocation() {
-    if (filteredLocations.length === 0) return
-    const randomIndex = Math.floor(Math.random() * filteredLocations.length)
-    const picked = filteredLocations[randomIndex]
+    if (sortedLocations.length === 0) return
+    const randomIndex = Math.floor(Math.random() * sortedLocations.length)
+    const picked = sortedLocations[randomIndex]
     setSelectedLocationId(picked.id)
     setLocationSearch(asTitle(picked.name))
+    setLocationDropdownOpen(false)
+  }
+
+  function selectLocation(location: { id: string; name: string }) {
+    setSelectedLocationId(location.id)
+    setLocationSearch(asTitle(location.name))
+    setLocationDropdownOpen(false)
   }
 
   function validateStep(step: number): boolean {
@@ -379,8 +388,10 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
   if (mode === "create") {
     const preset = AREA_SIZE_PRESETS[areaSize]
     return (
-      <div className="w-full max-w-2xl lg:max-w-4xl mx-auto overflow-hidden rounded-lg border bg-card">
-        <MapPreviewHeader height="h-80" />
+      <div className="w-full max-w-2xl lg:max-w-4xl mx-auto rounded-lg border bg-card">
+        <div className="overflow-hidden rounded-t-lg">
+          <MapPreviewHeader height="h-80" />
+        </div>
         <div className="p-6 space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -417,14 +428,54 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
               <Label>Starting Point</Label>
               <p className="text-xs text-muted-foreground">Must be on an A road (pink) or B road (brown/yellow)</p>
               <div className="flex items-center gap-2">
-                <div className="relative flex-1">
+                <div className="relative flex-1" ref={locationRef}>
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search locations..."
+                    placeholder="Type to search locations..."
                     value={locationSearch}
-                    onChange={(e) => setLocationSearch(e.target.value)}
+                    onChange={(e) => {
+                      setLocationSearch(e.target.value)
+                      setLocationDropdownOpen(true)
+                      if (!e.target.value.trim()) {
+                        setSelectedLocationId("")
+                      }
+                    }}
+                    onFocus={() => setLocationDropdownOpen(true)}
+                    onBlur={() => setTimeout(() => setLocationDropdownOpen(false), 150)}
                     className="pl-9"
                   />
+                  {locationSearch && (
+                    <button
+                      className="absolute right-3 top-1/2 -translate-y-1/2"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setLocationSearch("")
+                        setSelectedLocationId("")
+                        setLocationDropdownOpen(true)
+                      }}
+                    >
+                      <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                    </button>
+                  )}
+                  {locationDropdownOpen && filteredLocations.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 max-h-80 overflow-y-auto rounded-md border bg-popover shadow-md">
+                      {filteredLocations.map((location) => (
+                        <button
+                          key={location.id}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => selectLocation(location)}
+                          className={cn(
+                            "w-full px-3 py-2 text-sm text-left transition-colors",
+                            "hover:bg-muted border-b last:border-b-0",
+                            selectedLocationId === location.id && "bg-primary/10 text-primary font-medium"
+                          )}
+                        >
+                          {asTitle(location.name)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <Button
                   variant="outline"
@@ -436,29 +487,6 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
                   <Shuffle className="h-4 w-4" />
                 </Button>
                 <AddStartingPointDialog onSuccess={refetchLocations} />
-              </div>
-              <div className="max-h-48 overflow-y-auto rounded-md border">
-                {filteredLocations.length === 0 ? (
-                  <div className="p-3 text-sm text-muted-foreground text-center">
-                    No locations found
-                  </div>
-                ) : (
-                  filteredLocations.map((location) => (
-                    <button
-                      key={location.id}
-                      type="button"
-                      data-location-id={location.id}
-                      onClick={() => setSelectedLocationId(location.id)}
-                      className={cn(
-                        "w-full px-3 py-2 text-sm text-left transition-colors",
-                        "hover:bg-muted border-b last:border-b-0",
-                        selectedLocationId === location.id && "bg-primary/10 text-primary font-medium"
-                      )}
-                    >
-                      {asTitle(location.name)}
-                    </button>
-                  ))
-                )}
               </div>
             </div>
           )}

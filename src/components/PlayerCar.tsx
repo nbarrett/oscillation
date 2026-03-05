@@ -90,6 +90,7 @@ export default function PlayerCar({ player }: PlayerCarProps) {
     gameTurnState,
     diceResult,
     currentPlayerName,
+    phase,
   } = useGameStore()
   const { carSize } = useCarStore()
 
@@ -117,6 +118,9 @@ export default function PlayerCar({ player }: PlayerCarProps) {
   }, [active, gameTurnState])
 
   function popupCaption() {
+    if (phase === "picking") {
+      return `${player.name} - placing staging posts`
+    }
     if (active && gameTurnState === GameTurnState.DICE_ROLLED) {
       return `Okay ${player.name} - move ${pluraliseWithCount(diceResult || 0, "square")}!`
     } else if (active) {

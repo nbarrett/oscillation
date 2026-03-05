@@ -56,7 +56,17 @@ These rules MUST be followed in EVERY session without exception:
 - **API types** are defined near tRPC routers or in shared type files
 - **Component prop types** can be defined inline for simple cases or extracted for complex/shared types
 
-### 8. ERROR HANDLING
+### 8. NEVER BUILD OR START DEV SERVERS
+- **A Claude Swarm orchestrator manages all builds and dev servers** — agents must NEVER run build or dev commands
+- **NEVER run**: `pnpm run build`, `next build`, `pnpm run dev`, `pnpm dev`, `npm run build`, `npm run dev`, or equivalent
+- **NEVER run**: `./run-dev.sh`, `./kill-dev.sh`, or any swarm lifecycle scripts
+- Running `next build` while the dev server is active **corrupts the `.next` cache** and breaks the app
+- The swarm automatically rebuilds on file changes — just edit files and check the logs
+- **To verify your changes compiled**: read the swarm logs at `logs/dev.log` or `logs/oscillation.log`
+- **To check swarm status**: read `.claude-swarm/registry.json`
+- **Type checking only** (`npx tsc --noEmit`) is safe — it doesn't write to `.next`
+
+### 9. ERROR HANDLING
 - **No empty catches**: Never add `catch {}` or `catch (e) {}` blocks without at least one of:
   - Logging a meaningful message through the log utility, or
   - Returning/falling back to a safe default value

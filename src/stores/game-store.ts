@@ -123,8 +123,13 @@ interface GameState {
   showPreviewPaths: boolean;
   cardTrigger: CardTrigger | null;
   activePickingCategory: PoiCategory | null;
-
+  previewPaths: string[][];
+  previewPathIndex: number;
   setShowPreviewPaths: (show: boolean) => void;
+  setPreviewPaths: (paths: string[][]) => void;
+  setPreviewPathIndex: (index: number) => void;
+  cyclePreviewPath: (direction: 1 | -1) => void;
+  confirmPreviewPath: () => void;
   setCardTrigger: (trigger: CardTrigger | null) => void;
   handleCardRelocation: (destinationGridKey: string, remainingMoves: number) => void;
   setReachableGrids: (grids: Map<string, number> | null) => void;
@@ -204,8 +209,34 @@ export const useGameStore = create<GameState>()(
       showPreviewPaths: true,
       cardTrigger: null,
       activePickingCategory: null,
+      previewPaths: [],
+      previewPathIndex: 0,
 
       setShowPreviewPaths: (showPreviewPaths) => set({ showPreviewPaths }),
+
+      setPreviewPaths: (previewPaths) => set({ previewPaths, previewPathIndex: 0 }),
+
+      setPreviewPathIndex: (previewPathIndex) => set({ previewPathIndex }),
+
+      cyclePreviewPath: (direction) => {
+        const { previewPaths, previewPathIndex } = get();
+        if (previewPaths.length === 0) return;
+        const next = (previewPathIndex + direction + previewPaths.length) % previewPaths.length;
+        set({ previewPathIndex: next });
+      },
+
+      confirmPreviewPath: () => {
+        const { previewPaths, previewPathIndex, diceResult } = get();
+        if (previewPaths.length === 0 || !diceResult) return;
+        const path = previewPaths[previewPathIndex];
+        if (!path) return;
+        set({
+          movementPath: path,
+          selectedEndpoint: path[path.length - 1] ?? null,
+          previewPaths: [],
+          previewPathIndex: 0,
+        });
+      },
 
       setCardTrigger: (cardTrigger) => set({ cardTrigger }),
 
@@ -329,6 +360,8 @@ export const useGameStore = create<GameState>()(
         movementPath: [],
         gridClearRequest: state.gridClearRequest + 1,
         selectedEndpoint: null,
+        previewPaths: [],
+        previewPathIndex: 0,
       })),
 
       updatePlayerPosition: (playerName, position) => {
@@ -429,6 +462,8 @@ export const useGameStore = create<GameState>()(
           gridClearRequest: updatedState.gridClearRequest + 1,
           reachableGrids: null,
           selectedEndpoint: null,
+          previewPaths: [],
+          previewPathIndex: 0,
         });
       },
 

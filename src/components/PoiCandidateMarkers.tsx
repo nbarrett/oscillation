@@ -23,11 +23,15 @@ function buildStyledIcon(svgTemplate: string, colour: string, size: number): L.D
     .replace(/currentColor/g, colour)
     .replace(/<svg /, `<svg width="${size}" height="${size}" `)
 
+  const pad = Math.round(size * 0.2)
+  const outer = size + pad * 2
+  const html = `<div style="width:${outer}px;height:${outer}px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.85);border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.3);border:2px solid ${colour}">${coloured}</div>`
+
   return L.divIcon({
-    html: coloured,
+    html,
     className: "poi-candidate-icon",
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size],
+    iconSize: [outer, outer],
+    iconAnchor: [outer / 2, outer / 2],
   })
 }
 

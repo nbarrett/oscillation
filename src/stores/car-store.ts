@@ -70,9 +70,9 @@ export function carLabelForStyle(style: string): string {
   return CAR_ICON_OPTIONS.find((option) => option.style === style)?.label ?? DEFAULT_CAR.label
 }
 
-export const CAR_SIZE_MIN = 40
-export const CAR_SIZE_MAX = 240
-export const CAR_SIZE_DEFAULT = 80
+export const CAR_SIZE_MIN = 30
+export const CAR_SIZE_MAX = 120
+export const CAR_SIZE_DEFAULT = 60
 
 interface CarState {
   preferredCar: CarStyle
@@ -95,6 +95,13 @@ export const useCarStore = create<CarState>()(
         preferredCar: state.preferredCar,
         carSize: state.carSize,
       }),
+      merge: (persisted, current) => {
+        const p = persisted as Partial<CarState> | null
+        const carSize = (p?.carSize != null && p.carSize >= CAR_SIZE_MIN && p.carSize <= CAR_SIZE_MAX)
+          ? p.carSize
+          : CAR_SIZE_DEFAULT
+        return { ...current, preferredCar: p?.preferredCar ?? current.preferredCar, carSize }
+      },
     }
   )
 )
