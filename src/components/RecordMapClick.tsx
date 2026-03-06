@@ -63,11 +63,18 @@ export default function RecordMapClick() {
       log.info("MAP CLICK at", formatLatLong({ lat: e.latlng.lat, lng: e.latlng.lng }));
       const gridReferenceData = gridReferenceDataFromLatLong(map, e.latlng);
       const gridSquareCorners = calculateGridSquareCorners(gridReferenceData);
-      setMapClickPosition({
+      const clickData = {
         latLng: { lat: e.latlng.lat, lng: e.latlng.lng },
         gridReferenceData,
         gridSquareCorners,
-      });
+      };
+      setMapClickPosition(clickData);
+      const handler = (window as unknown as Record<string, unknown>).__oscGridClickHandler as ((lat: number, lng: number) => void) | undefined;
+      if (handler) {
+        handler(e.latlng.lat, e.latlng.lng);
+      } else {
+        log.info("No grid click handler registered");
+      }
     };
 
     map.on('click', handleClick);

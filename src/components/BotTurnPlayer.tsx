@@ -409,6 +409,7 @@ export default function BotTurnPlayer() {
       },
       onError: () => {
         setPendingServerUpdate(false)
+        advanceToNextPlayer()
       },
     })
   }

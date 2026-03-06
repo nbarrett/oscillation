@@ -422,7 +422,6 @@ export const useGameStore = create<GameState>()(
           diceResult: result,
           gameTurnState: GameTurnState.DICE_ROLLED,
           playerStartGridKey: startGridKey,
-          playerZoomRequest: state.currentPlayerName,
           reachableGrids: reachable,
           selectedEndpoint: null,
         } as Partial<GameState> as GameState);

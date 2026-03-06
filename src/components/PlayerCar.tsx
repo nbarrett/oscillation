@@ -5,7 +5,6 @@ import L from "leaflet"
 import { Marker, Popup } from "react-leaflet"
 import { useGameStore, GameTurnState, Player } from "@/stores/game-store"
 import { carImageForStyle, useCarStore } from "@/stores/car-store"
-import { asTitle, pluraliseWithCount } from "@/lib/utils"
 import PlayerMoveRoute from "./PlayerMoveRoute"
 
 function createCarIcon(iconType: string, isActive: boolean, carWidth: number): L.DivIcon {
@@ -88,9 +87,7 @@ export default function PlayerCar({ player }: PlayerCarProps) {
   const markerRef = useRef<L.Marker>(null)
   const {
     gameTurnState,
-    diceResult,
     currentPlayerName,
-    phase,
   } = useGameStore()
   const { carSize } = useCarStore()
 
@@ -118,16 +115,7 @@ export default function PlayerCar({ player }: PlayerCarProps) {
   }, [active, gameTurnState])
 
   function popupCaption() {
-    if (phase === "picking") {
-      return `${player.name} - placing staging posts`
-    }
-    if (active && gameTurnState === GameTurnState.DICE_ROLLED) {
-      return `Okay ${player.name} - move ${pluraliseWithCount(diceResult || 0, "square")}!`
-    } else if (active) {
-      return `It's ${player.name}'s turn and it's time to ${asTitle(gameTurnState)}`
-    } else {
-      return `${player.name} - waiting for ${currentPlayerName ?? "..."} to finish`
-    }
+    return player.name
   }
 
   if (hide) {

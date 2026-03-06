@@ -5,7 +5,7 @@ import { useMap } from "react-leaflet";
 import L from "leaflet";
 import { useGameStore, occupiedGridKeys, GameTurnState } from "@/stores/game-store";
 import { useDeckStore } from "@/stores/deck-store";
-import { latLngToGridKey, getAdjacentRoadGrids, shortestPath, reachableRoadGrids, isRoadDataLoaded, onRoadDataReady } from "@/lib/road-data";
+import { latLngToGridKey, getAdjacentRoadGrids, shortestPath, reachableRoadGrids, isRoadDataLoaded, onRoadDataReady, gridHasABRoad, loadRoadData, gridKeyToLatLng, roadPathBetween } from "@/lib/road-data";
 import { gridKeyToLatLngs } from "@/lib/grid-polygon";
 import { isOnBoardEdge, isOnMotorwayOrRailway } from "@/lib/deck-triggers";
 import { type GameBounds } from "@/lib/area-size";
@@ -40,6 +40,12 @@ class EndpointPolygon extends L.Polygon {
   }
 }
 
+class RoutePolyline extends L.Polyline {
+  constructor(latlngs: L.LatLngExpression[], options?: L.PolylineOptions) {
+    super(latlngs, options);
+  }
+}
+
 function isIdentifiedPolygon(layer: L.Layer): layer is IdentifiedPolygon {
   return layer instanceof IdentifiedPolygon;
 }
@@ -50,6 +56,10 @@ function isPreviewPolygon(layer: L.Layer): layer is PreviewPolygon {
 
 function isEndpointPolygon(layer: L.Layer): layer is EndpointPolygon {
   return layer instanceof EndpointPolygon;
+}
+
+function isRoutePolyline(layer: L.Layer): layer is RoutePolyline {
+  return layer instanceof RoutePolyline;
 }
 
 export default function SelectGridSquares() {
@@ -88,7 +98,7 @@ export default function SelectGridSquares() {
 
   function clearPathPolygons() {
     map.eachLayer((layer) => {
-      if (isIdentifiedPolygon(layer)) {
+      if (isIdentifiedPolygon(layer) || isRoutePolyline(layer)) {
         layer.remove();
       }
     });
@@ -96,7 +106,7 @@ export default function SelectGridSquares() {
 
   function clearPreviewPolygons() {
     map.eachLayer((layer) => {
-      if (isPreviewPolygon(layer)) {
+      if (isPreviewPolygon(layer) || isRoutePolyline(layer)) {
         layer.remove();
       }
     });
@@ -127,6 +137,7 @@ export default function SelectGridSquares() {
 
   function drawPreviewPath(path: string[]) {
     clearPreviewPolygons();
+
     for (let i = 0; i < path.length - 1; i++) {
       const key = path[i];
       const latLngs = gridKeyToLatLngs(map, key);
@@ -137,6 +148,33 @@ export default function SelectGridSquares() {
         fillOpacity: 0.35,
       });
       polygon.addTo(map);
+    }
+
+    const { currentPlayerName, players } = useGameStore.getState();
+    const currentPlayer = players.find(p => p.name === currentPlayerName);
+    if (!currentPlayer || path.length === 0) return;
+
+    const waypoints: [number, number][] = [currentPlayer.position];
+    for (const key of path) {
+      waypoints.push(gridKeyToLatLng(key));
+    }
+
+    const routePoints: L.LatLngTuple[] = [];
+    for (let i = 0; i < waypoints.length - 1; i++) {
+      const [sLat, sLng] = waypoints[i];
+      const [eLat, eLng] = waypoints[i + 1];
+      const segment = roadPathBetween(sLat, sLng, eLat, eLng);
+      for (let j = i === 0 ? 0 : 1; j < segment.length; j++) {
+        routePoints.push([segment[j][0], segment[j][1]]);
+      }
+    }
+    if (routePoints.length >= 2) {
+      const routeLine = new RoutePolyline(routePoints, {
+        color: colours.osMapsPurple,
+        opacity: 0.8,
+        weight: 6,
+      });
+      routeLine.addTo(map);
     }
   }
 
@@ -179,10 +217,11 @@ export default function SelectGridSquares() {
       return;
     }
     if (!isRoadDataLoaded()) {
-      log.info("computeAndSetPaths: waiting for road data");
+      log.info("computeAndSetPaths: road data not loaded, triggering load");
+      const center = map.getCenter();
+      void loadRoadData(center.lat, center.lng, 10);
       return;
     }
-
     const { players, currentPlayerName, reachableGrids } = useGameStore.getState();
     const occupied = occupiedGridKeys(players, currentPlayerName ?? "");
     const obstructionKeys = useDeckStore.getState().obstructions.map((o) => o.gridKey);
@@ -193,7 +232,7 @@ export default function SelectGridSquares() {
     const reachable = reachableGrids ?? reachableRoadGrids(playerStartGridKey, diceResult, occupied);
     const endpoints: string[] = [];
     reachable.forEach((steps, gridKey) => {
-      if (steps === diceResult && !occupied.has(gridKey)) {
+      if (steps === diceResult && !occupied.has(gridKey) && gridHasABRoad(gridKey)) {
         endpoints.push(gridKey);
       }
     });
@@ -210,7 +249,7 @@ export default function SelectGridSquares() {
       const furthest: string[] = [];
       let maxDist = 0;
       reachable.forEach((steps, gridKey) => {
-        if (!occupied.has(gridKey)) {
+        if (!occupied.has(gridKey) && gridHasABRoad(gridKey)) {
           if (steps > maxDist) {
             maxDist = steps;
             furthest.length = 0;
@@ -231,6 +270,17 @@ export default function SelectGridSquares() {
 
     const allEndpointKeys = paths.map(p => p[p.length - 1]);
     drawEndpoints(allEndpointKeys);
+
+    if (allEndpointKeys.length > 0 && playerStartGridKey) {
+      const startLatLng = gridKeyToLatLng(playerStartGridKey);
+      const points: L.LatLng[] = [L.latLng(startLatLng[0], startLatLng[1])];
+      for (const key of allEndpointKeys) {
+        const [lat, lng] = gridKeyToLatLng(key);
+        points.push(L.latLng(lat, lng));
+      }
+      const bounds = L.latLngBounds(points);
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
+    }
 
     useGameStore.getState().setPreviewPaths(paths);
 
@@ -324,42 +374,36 @@ export default function SelectGridSquares() {
   }, [gameTurnState, movementPath.length, previewPaths.length]);
 
   useEffect(() => {
-    function handleMapClick(clickPos: { latLng: { lat: number; lng: number } }) {
+    const handler = (lat: number, lng: number) => {
       if (!map) return;
 
       const state = useGameStore.getState();
       const {
-        playerStartGridKey,
-        diceResult,
-        movementPath,
+        playerStartGridKey: startKey,
+        diceResult: dice,
+        movementPath: path,
         players,
         currentPlayerName,
-        gameTurnState,
-        previewPaths,
-        previewPathIndex,
-        cardTrigger,
-        gameBounds,
+        gameTurnState: turnState,
+        previewPaths: previews,
+        cardTrigger: trigger,
+        gameBounds: bounds,
       } = state;
 
-      if (cardTrigger) {
-        log.debug("click ignored: cardTrigger active");
+      if (trigger) {
+        log.info("click ignored: cardTrigger active");
         return;
       }
 
-      if (gameTurnState !== GameTurnState.DICE_ROLLED || !playerStartGridKey || !diceResult) {
-        log.debug("click ignored: turnState=", gameTurnState, "startGrid=", playerStartGridKey, "dice=", diceResult);
+      if (turnState !== GameTurnState.DICE_ROLLED || !startKey || !dice) {
+        log.info("click ignored: turnState=", turnState, "startGrid=", startKey, "dice=", dice);
         return;
       }
 
-      if (!isRoadDataLoaded()) {
-        log.info("click ignored: road data not yet loaded");
-        return;
-      }
+      const gridKey = latLngToGridKey(lat, lng);
+      log.info("click grid:", gridKey, "start:", startKey);
 
-      const gridKey = latLngToGridKey(clickPos.latLng.lat, clickPos.latLng.lng);
-      log.debug("click grid:", gridKey, "start:", playerStartGridKey);
-
-      if (gridKey === playerStartGridKey) return;
+      if (gridKey === startKey) return;
 
       const occupied = occupiedGridKeys(players, currentPlayerName ?? "");
       const clickObstructions = useDeckStore.getState().obstructions.map((o) => o.gridKey);
@@ -367,98 +411,86 @@ export default function SelectGridSquares() {
         occupied.add(key);
       }
 
-      if (movementPath.length > 0 && movementPath[movementPath.length - 1] === gridKey) {
-        const newPath = movementPath.slice(0, -1);
+      if (path.length > 0 && path[path.length - 1] === gridKey) {
+        const newPath = path.slice(0, -1);
         setMovementPath(newPath);
         setSelectedEndpoint(newPath.length > 0 ? newPath[newPath.length - 1] : null);
-        drawPath(newPath, diceResult);
+        drawPath(newPath, dice);
         if (newPath.length === 0) {
           computeAndSetPaths();
         }
         return;
       }
 
-      if (movementPath.includes(gridKey)) return;
+      if (path.includes(gridKey)) return;
 
-      if (movementPath.length === 0 && previewPaths.length > 0) {
-        const currentPreview = previewPaths[previewPathIndex];
-        if (currentPreview && currentPreview[currentPreview.length - 1] === gridKey) {
-          useGameStore.getState().confirmPreviewPath();
-          drawPath(currentPreview, diceResult);
-          checkMidMovementTrigger(currentPreview, gameBounds);
-          return;
-        }
-
-        const matchIdx = previewPaths.findIndex(p => p[p.length - 1] === gridKey);
+      if (path.length === 0 && previews.length > 0) {
+        const matchIdx = previews.findIndex(p => p[p.length - 1] === gridKey);
         if (matchIdx >= 0) {
-          const path = previewPaths[matchIdx];
           useGameStore.getState().setPreviewPathIndex(matchIdx);
-          useGameStore.getState().confirmPreviewPath();
-          drawPath(path, diceResult);
-          checkMidMovementTrigger(path, gameBounds);
+          drawPreviewPath(previews[matchIdx]);
           return;
         }
       }
 
-      if (movementPath.length === 0) {
-        const path = shortestPath(playerStartGridKey, gridKey, diceResult, occupied);
-        log.debug("shortestPath result:", path ? `length ${path.length}` : "null", "for grid", gridKey, "roadData:", isRoadDataLoaded());
-        if (path && path.length <= diceResult) {
-          setMovementPath(path);
+      if (path.length === 0) {
+        const found = shortestPath(startKey, gridKey, dice, occupied);
+        log.info("shortestPath result:", found ? `length ${found.length}` : "null", "for grid", gridKey, "roadData:", isRoadDataLoaded());
+        if (found && found.length <= dice) {
+          setMovementPath(found);
           setSelectedEndpoint(gridKey);
           useGameStore.getState().setPreviewPaths([]);
-          drawPath(path, diceResult);
-          checkMidMovementTrigger(path, gameBounds);
+          drawPath(found, dice);
+          checkMidMovementTrigger(found, bounds);
           return;
         }
       }
 
-      if (movementPath.length >= diceResult) {
-        log.debug("click ignored: path full", movementPath.length, ">=", diceResult);
+      if (path.length >= dice) {
+        log.info("click ignored: path full", path.length, ">=", dice);
         return;
       }
 
-      const lastKey = movementPath.length > 0
-        ? movementPath[movementPath.length - 1]
-        : playerStartGridKey;
+      const lastKey = path.length > 0
+        ? path[path.length - 1]
+        : startKey;
 
       const validNeighbors = getAdjacentRoadGrids(lastKey);
       if (!validNeighbors.includes(gridKey)) {
-        log.debug("click ignored: grid", gridKey, "not adjacent to", lastKey, "valid:", validNeighbors.slice(0, 5));
+        log.info("click ignored: grid", gridKey, "not adjacent to", lastKey, "valid:", validNeighbors.slice(0, 5));
         return;
       }
 
-      const wouldBeEndpoint = movementPath.length + 1 === diceResult;
+      const wouldBeEndpoint = path.length + 1 === dice;
       if (wouldBeEndpoint && occupied.has(gridKey)) return;
 
-      const newPath = [...movementPath, gridKey];
+      const newPath = [...path, gridKey];
       setMovementPath(newPath);
       setSelectedEndpoint(gridKey);
       useGameStore.getState().setPreviewPaths([]);
-      drawPath(newPath, diceResult);
-      checkMidMovementTrigger(newPath, gameBounds);
-    }
+      drawPath(newPath, dice);
+      checkMidMovementTrigger(newPath, bounds);
+    };
 
-    let prevClickPos = useGameStore.getState().mapClickPosition;
-    const unsub = useGameStore.subscribe((state) => {
-      if (state.mapClickPosition && state.mapClickPosition !== prevClickPos) {
-        prevClickPos = state.mapClickPosition;
-        handleMapClick(state.mapClickPosition);
-      }
-    });
-    return unsub;
+    (window as unknown as Record<string, unknown>).__oscGridClickHandler = handler;
+    log.info("Grid click handler registered");
+
+    return () => {
+      (window as unknown as Record<string, unknown>).__oscGridClickHandler = null;
+    };
   }, [map]);
 
   useEffect(() => {
     if (gridClearRequest > 0) {
       map.eachLayer((layer) => {
-        if (layer instanceof L.Polygon) {
+        if (layer instanceof L.Polygon || isRoutePolyline(layer)) {
           layer.remove();
         }
       });
       setSelectedGridSquares([]);
       setMovementPath([]);
       useGameStore.getState().setPreviewPaths([]);
+      setTimeout(() => computeAndSetPaths(), 50);
     }
   }, [gridClearRequest, map, setSelectedGridSquares, setMovementPath]);
 

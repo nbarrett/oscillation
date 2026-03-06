@@ -49,9 +49,7 @@ export default function GameSync() {
       const serverPhase = gameState.phase as GamePhase
       const prevPhase = previousPhaseRef.current
       if (prevPhase && prevPhase !== serverPhase) {
-        if (serverPhase === "playing" && prevPhase === "picking") {
-          addNotification("All Staging Posts placed — game on!", "success")
-        } else if (serverPhase === "ended") {
+        if (serverPhase === "ended") {
           addNotification("Game over!", "info")
         }
       }

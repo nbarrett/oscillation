@@ -24,9 +24,38 @@ import IconDetailToggle from "./IconDetailToggle"
 import AddStartingPointDialog from "./AddStartingPointDialog"
 import { asTitle, timeAgo } from "@/lib/utils"
 import { type AreaSize, AREA_SIZES, AREA_SIZE_PRESETS, DEFAULT_AREA_SIZE } from "@/lib/area-size"
-import { POI_CATEGORIES, POI_CATEGORY_LABELS, MIN_POIS_PER_CATEGORY } from "@/lib/poi-categories"
+import { POI_CATEGORIES, POI_CATEGORY_LABELS, MIN_POIS_PER_CATEGORY, type PoiValidationResult } from "@/lib/poi-categories"
 
 const STEP_LABELS = ["Player", "Location", "Settings", "Review"] as const
+
+const VALIDATION_CACHE_KEY = "oscillation-area-validation"
+const VALIDATION_CACHE_MAX_AGE = 24 * 60 * 60 * 1000
+
+function validationCacheKey(lat: number, lng: number, areaSize: string) {
+  return `${lat.toFixed(5)}_${lng.toFixed(5)}_${areaSize}`
+}
+
+function loadValidationCache(lat: number, lng: number, areaSize: string) {
+  try {
+    const raw = localStorage.getItem(VALIDATION_CACHE_KEY)
+    if (!raw) return undefined
+    const cache = JSON.parse(raw) as Record<string, { data: unknown; ts: number }>
+    const entry = cache[validationCacheKey(lat, lng, areaSize)]
+    if (entry && Date.now() - entry.ts < VALIDATION_CACHE_MAX_AGE) {
+      return entry.data
+    }
+  } catch { /* ignore */ }
+  return undefined
+}
+
+function saveValidationCache(lat: number, lng: number, areaSize: string, data: unknown) {
+  try {
+    const raw = localStorage.getItem(VALIDATION_CACHE_KEY)
+    const cache = raw ? JSON.parse(raw) as Record<string, { data: unknown; ts: number }> : {}
+    cache[validationCacheKey(lat, lng, areaSize)] = { data, ts: Date.now() }
+    localStorage.setItem(VALIDATION_CACHE_KEY, JSON.stringify(cache))
+  } catch { /* ignore */ }
+}
 
 interface JoinGameProps {
   startingPosition: [number, number] | null
@@ -151,10 +180,24 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
   )
   const selectedLocation = locations?.find(l => l.id === selectedLocationId)
 
+  const cachedValidation = selectedLocation
+    ? loadValidationCache(selectedLocation.lat, selectedLocation.lng, areaSize)
+    : undefined
+
   const validation = trpc.game.validateArea.useQuery(
     { lat: selectedLocation?.lat ?? 0, lng: selectedLocation?.lng ?? 0, areaSize },
-    { enabled: mode === "create" && !!selectedLocation, staleTime: 5 * 60 * 1000 },
+    {
+      enabled: mode === "create" && !!selectedLocation,
+      staleTime: 5 * 60 * 1000,
+      initialData: cachedValidation as PoiValidationResult | undefined,
+    },
   )
+
+  useEffect(() => {
+    if (validation.data && selectedLocation) {
+      saveValidationCache(selectedLocation.lat, selectedLocation.lng, areaSize, validation.data)
+    }
+  }, [validation.data, selectedLocation, areaSize])
 
   function setAuthTab(tab: AuthTab) {
     setAuthTabState(tab)

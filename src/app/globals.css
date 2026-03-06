@@ -74,11 +74,11 @@
 }
 
 .custom-popup .leaflet-popup-content-wrapper {
-  @apply bg-background/95 text-foreground rounded-md shadow-md border backdrop-blur-sm;
+  @apply bg-primary/95 text-primary-foreground rounded-xl shadow-2xl border-0;
 }
 
 .custom-popup .leaflet-popup-content {
-  @apply m-2 text-xs font-medium;
+  @apply m-3 text-sm font-bold text-center whitespace-nowrap;
 }
 
 .custom-popup .leaflet-popup-tip {

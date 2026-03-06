@@ -76,11 +76,22 @@ function serializeAdjacency(adj: Map<string, Set<string>>): Record<string, strin
   return result;
 }
 
+function isCardinalNeighbor(keyA: string, keyB: string): boolean {
+  const [eA, nA] = keyA.split("-").map(Number);
+  const [eB, nB] = keyB.split("-").map(Number);
+  const de = Math.abs(eA - eB);
+  const dn = Math.abs(nA - nB);
+  return de + dn === 1000;
+}
+
 function deserializeAdjacency(obj: Record<string, string[]> | undefined): Map<string, Set<string>> {
   const result = new Map<string, Set<string>>();
   if (!obj) return result;
   for (const [key, neighbors] of Object.entries(obj)) {
-    result.set(key, new Set(neighbors));
+    const cardinal = neighbors.filter(n => isCardinalNeighbor(key, n));
+    if (cardinal.length > 0) {
+      result.set(key, new Set(cardinal));
+    }
   }
   return result;
 }
@@ -119,12 +130,13 @@ function loadFromStorage(): RoadDataCache | null {
       localStorage.removeItem(STORAGE_KEY);
       return null;
     }
+    const gridSquaresWithRoads = new Set<string>(parsed.gridSquaresWithRoads);
     const cache: RoadDataCache = {
       bounds: parsed.bounds,
-      roads: parsed.roads,
+      roads: parsed.roads ?? [],
       motorways: parsed.motorways ?? [],
-      gridSquaresWithRoads: new Set(parsed.gridSquaresWithRoads),
-      gridSquaresWithABRoads: new Set(parsed.gridSquaresWithABRoads ?? []),
+      gridSquaresWithRoads: gridSquaresWithRoads,
+      gridSquaresWithABRoads: gridSquaresWithRoads,
       gridSquaresWithARoads: new Set(parsed.gridSquaresWithARoads),
       gridSquaresWithBRoads: new Set(parsed.gridSquaresWithBRoads),
       gridAdjacency: deserializeAdjacency(parsed.gridAdjacency),
@@ -434,7 +446,7 @@ function addAdjacency(adj: Map<string, Set<string>>, gridA: string, gridB: strin
   const [eB, nB] = gridB.split("-").map(Number);
   const de = Math.abs(eA - eB);
   const dn = Math.abs(nA - nB);
-  if (de <= 1000 && dn <= 1000 && (de + dn > 0)) {
+  if (de + dn === 1000) {
     if (!adj.has(gridA)) adj.set(gridA, new Set());
     if (!adj.has(gridB)) adj.set(gridB, new Set());
     adj.get(gridA)!.add(gridB);
@@ -509,7 +521,7 @@ export async function loadRoadData(
     const result = await queryOverpassForRoads(south, west, north, east);
     const { roads, motorways, motorwayJunctions, railwayStations } = result;
     const gridSquaresWithRoads = calculateGridSquaresWithRoads(roads);
-    const abRoads = roads.filter((r) => r.highway === "primary" || r.highway === "secondary");
+    const abRoads = roads.filter((r) => r.type === "A" || r.type === "B");
     const gridSquaresWithABRoads = calculateGridSquaresWithRoads(abRoads);
     const aRoads = roads.filter((r) => r.type === "A");
     const gridSquaresWithARoads = calculateGridSquaresWithRoads(aRoads);
@@ -561,15 +573,16 @@ export function getAdjacentRoadGrids(gridKey: string): string[] {
     return allAdjacentGrids(gridKey);
   }
   const cardinalWithRoads = allAdjacentGrids(gridKey).filter(
-    (g) => roadDataCache!.gridSquaresWithRoads.has(g)
+    (g) => roadDataCache!.gridSquaresWithABRoads.has(g)
   );
   if (roadDataCache.gridAdjacency.has(gridKey)) {
     const fromAdj = roadDataCache.gridAdjacency.get(gridKey)!;
     const merged = new Set(fromAdj);
     for (const g of cardinalWithRoads) merged.add(g);
-    return Array.from(merged);
+    if (merged.size > 0) return Array.from(merged);
   }
-  return cardinalWithRoads;
+  if (cardinalWithRoads.length > 0) return cardinalWithRoads;
+  return allAdjacentGrids(gridKey);
 }
 
 function allAdjacentGrids(gridKey: string): string[] {
@@ -579,10 +592,6 @@ function allAdjacentGrids(gridKey: string): string[] {
     `${e}-${n - 1000}`,
     `${e + 1000}-${n}`,
     `${e - 1000}-${n}`,
-    `${e + 1000}-${n + 1000}`,
-    `${e + 1000}-${n - 1000}`,
-    `${e - 1000}-${n + 1000}`,
-    `${e - 1000}-${n - 1000}`,
   ];
 }
 
@@ -592,7 +601,6 @@ export function reachableRoadGrids(
   excludeKeys: Set<string> = new Set()
 ): Map<string, number> {
   const visited = new Map<string, number>();
-  const hasRoads = isRoadDataLoaded();
 
   const queue: Array<{ key: string; depth: number }> = [{ key: startGridKey, depth: 0 }];
   visited.set(startGridKey, 0);
@@ -601,9 +609,7 @@ export function reachableRoadGrids(
     const current = queue.shift()!;
     if (current.depth >= maxSteps) continue;
 
-    const neighbors = hasRoads
-      ? getAdjacentRoadGrids(current.key)
-      : allAdjacentGrids(current.key);
+    const neighbors = getAdjacentRoadGrids(current.key);
 
     for (const neighbor of neighbors) {
       if (visited.has(neighbor) || excludeKeys.has(neighbor)) continue;
@@ -622,7 +628,6 @@ export function shortestPath(
   maxSteps: number,
   excludeKeys: Set<string> = new Set()
 ): string[] | null {
-  const hasRoads = isRoadDataLoaded();
   const cameFrom = new Map<string, string>();
   const queue: Array<{ key: string; depth: number }> = [{ key: startGridKey, depth: 0 }];
   const visited = new Set<string>([startGridKey]);
@@ -640,9 +645,7 @@ export function shortestPath(
     }
     if (current.depth >= maxSteps) continue;
 
-    const neighbors = hasRoads
-      ? getAdjacentRoadGrids(current.key)
-      : allAdjacentGrids(current.key);
+    const neighbors = getAdjacentRoadGrids(current.key);
 
     for (const neighbor of neighbors) {
       if (visited.has(neighbor) || excludeKeys.has(neighbor)) continue;
@@ -762,6 +765,7 @@ export function allPathsToEndpoints(
 export function isRoadDataLoaded(): boolean {
   return roadDataCache !== null;
 }
+
 
 const MOTORWAY_PROXIMITY_METRES = 150;
 

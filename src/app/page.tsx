@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic"
 import { useEffect, useState } from "react"
-import { Loader2, Gamepad2, ChevronDown, Settings, Users, LogOut, Copy, Check, Trophy } from "lucide-react"
+import { Loader2, Gamepad2, ChevronDown, ChevronLeft, ChevronRight, Settings, Users, LogOut, Copy, Check, Trophy } from "lucide-react"
 import { AuthDialog } from "@/components/auth/auth-dialog"
 import { UserMenu } from "@/components/auth/user-menu"
 import { useMapStore } from "@/stores/map-store"
@@ -57,20 +57,60 @@ function MovementOverlay() {
   const currentPlayerName = useGameStore((s) => s.currentPlayerName)
   const localPlayerName = useGameStore((s) => s.localPlayerName)
   const previewPaths = useGameStore((s) => s.previewPaths)
+  const previewPathIndex = useGameStore((s) => s.previewPathIndex)
+  const cyclePreviewPath = useGameStore((s) => s.cyclePreviewPath)
+  const confirmPreviewPath = useGameStore((s) => s.confirmPreviewPath)
 
   const isMyTurn = localPlayerName !== null && localPlayerName === currentPlayerName
-  const showOverlay = isMyTurn && gameTurnState === GameTurnState.DICE_ROLLED && diceResult && movementPath.length === 0
+  const showPreviews = isMyTurn && gameTurnState === GameTurnState.DICE_ROLLED && diceResult && movementPath.length === 0 && previewPaths.length > 0
+  const showRollDice = isMyTurn && gameTurnState === GameTurnState.ROLL_DICE
+  const showClickToMove = isMyTurn && gameTurnState === GameTurnState.DICE_ROLLED && diceResult && movementPath.length === 0 && previewPaths.length === 0
 
-  if (!showOverlay) return null
+  if (!showPreviews && !showRollDice && !showClickToMove) return null
 
   return (
-    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] pointer-events-none animate-bounce-in">
+    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] animate-bounce-in">
       <div className="bg-primary/95 text-primary-foreground px-6 py-3 rounded-xl shadow-2xl text-center">
-        <div className="text-lg font-bold">
-          {previewPaths.length > 0
-            ? `${previewPaths.length} possible moves — click a green square or use arrow keys`
-            : `Move ${diceResult} squares — click a square on the road`}
-        </div>
+        {showRollDice && (
+          <div className="text-lg font-bold pointer-events-none">
+            {currentPlayerName}&apos;s turn — Roll the dice!
+          </div>
+        )}
+        {showClickToMove && (
+          <div className="text-lg font-bold pointer-events-none">
+            Move {diceResult} squares — click a square on the road
+          </div>
+        )}
+        {showPreviews && (
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => cyclePreviewPath(-1)}
+              className="p-1.5 rounded-lg hover:bg-primary-foreground/20 transition-colors"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <div className="min-w-[120px]">
+              <div className="text-lg font-bold">
+                Possible Move {previewPathIndex + 1} of {previewPaths.length}
+              </div>
+              <div className="text-xs opacity-80">
+                or click a green square
+              </div>
+            </div>
+            <button
+              onClick={() => cyclePreviewPath(1)}
+              className="p-1.5 rounded-lg hover:bg-primary-foreground/20 transition-colors"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+            <button
+              onClick={() => confirmPreviewPath()}
+              className="ml-1 px-3 py-1.5 rounded-lg bg-primary-foreground text-primary text-sm font-bold hover:bg-primary-foreground/90 transition-colors"
+            >
+              Select
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -227,39 +267,32 @@ export default function GamePage() {
           <>
             <Card>
               <CardContent className="p-3 md:p-4">
-                <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-                  <div className="flex flex-col md:flex-row md:items-center gap-4 flex-1">
-                    <PlayerPositions />
-
-                    <div className="hidden md:block h-8 w-px bg-border" />
-
-                    <div className="py-2 md:py-0">
-                      <DiceRoller />
-                    </div>
-                  </div>
-
-                  <div className="hidden lg:block h-8 w-px bg-border" />
-
-                  <button
-                    onClick={() => setSettingsExpanded(!settingsExpanded)}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
-                      "hover:bg-muted border",
-                      settingsExpanded && "bg-muted"
-                    )}
-                  >
-                    <Settings className="h-4 w-4" />
-                    <span>Settings</span>
-                    <ChevronDown
+                <div className="flex flex-wrap items-center gap-4">
+                  <PlayerPositions />
+                  <div className="hidden md:block h-8 w-px bg-border" />
+                  <DiceRoller />
+                  <div className="hidden md:block h-8 w-px bg-border" />
+                  <GameObjectives />
+                  <div className="ml-auto">
+                    <button
+                      onClick={() => setSettingsExpanded(!settingsExpanded)}
                       className={cn(
-                        "h-3 w-3 transition-transform duration-200",
-                        settingsExpanded && "rotate-180"
+                        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                        "hover:bg-muted border",
+                        settingsExpanded && "bg-muted"
                       )}
-                    />
-                  </button>
+                    >
+                      <Settings className="h-4 w-4" />
+                      <span>Settings</span>
+                      <ChevronDown
+                        className={cn(
+                          "h-3 w-3 transition-transform duration-200",
+                          settingsExpanded && "rotate-180"
+                        )}
+                      />
+                    </button>
+                  </div>
                 </div>
-
-                <GameObjectives />
 
             <div
               className={cn(
