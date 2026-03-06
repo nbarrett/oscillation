@@ -15,9 +15,9 @@ const EDGE_PADDING = 50
 const INDICATOR_SIZE = 40
 const ARROW_SIZE = 10
 
-function resolveSimpleSvg<T extends string>(options: PoiIconOption<T>[], style: T): string {
+function resolveSvg<T extends string>(options: PoiIconOption<T>[], style: T, detailMode: string): string {
   const option = options.find((o) => o.style === style) ?? options[0]!
-  return option.simpleSvg
+  return detailMode === "simple" ? option.simpleSvg : option.svg
 }
 
 interface ArrowIndicator {
@@ -27,6 +27,7 @@ interface ArrowIndicator {
   angle: number
   colour: string
   svgHtml: string
+  isSimple: boolean
 }
 
 function categoryColour(category: string): string {
@@ -47,12 +48,12 @@ export default function ObjectiveArrows() {
   const iconDetailMode = usePoiSettingsStore((s) => s.iconDetailMode)
 
   const categorySvgs = useMemo(() => ({
-    pub: resolveSimpleSvg(PUB_ICON_OPTIONS, pubIconStyle),
-    spire: resolveSimpleSvg(SPIRE_ICON_OPTIONS, spireIconStyle),
-    tower: resolveSimpleSvg(TOWER_ICON_OPTIONS, towerIconStyle),
-    phone: resolveSimpleSvg(PHONE_ICON_OPTIONS, phoneIconStyle),
-    school: resolveSimpleSvg(SCHOOL_ICON_OPTIONS, schoolIconStyle),
-  }), [pubIconStyle, spireIconStyle, towerIconStyle, phoneIconStyle, schoolIconStyle])
+    pub: resolveSvg(PUB_ICON_OPTIONS, pubIconStyle, iconDetailMode),
+    spire: resolveSvg(SPIRE_ICON_OPTIONS, spireIconStyle, iconDetailMode),
+    tower: resolveSvg(TOWER_ICON_OPTIONS, towerIconStyle, iconDetailMode),
+    phone: resolveSvg(PHONE_ICON_OPTIONS, phoneIconStyle, iconDetailMode),
+    school: resolveSvg(SCHOOL_ICON_OPTIONS, schoolIconStyle, iconDetailMode),
+  }), [pubIconStyle, spireIconStyle, towerIconStyle, phoneIconStyle, schoolIconStyle, iconDetailMode])
 
   const visitedSet = useMemo(
     () => new Set(currentPlayer?.visitedPois ?? []),
@@ -120,9 +121,10 @@ export default function ObjectiveArrows() {
 
       const colour = categoryColour(poi.category)
       const svgTemplate = categorySvgs[poi.category as keyof typeof categorySvgs] ?? ""
-      const svgHtml = svgTemplate.replace(/currentColor/g, "#fff")
+      const isSimple = iconDetailMode === "simple"
+      const svgHtml = isSimple ? svgTemplate.replace(/currentColor/g, "#fff") : svgTemplate
 
-      arrows.push({ poi, x, y, angle, colour, svgHtml })
+      arrows.push({ poi, x, y, angle, colour, svgHtml, isSimple })
     }
 
     setIndicators(arrows)
@@ -177,8 +179,8 @@ export default function ObjectiveArrows() {
                 width: INDICATOR_SIZE,
                 height: INDICATOR_SIZE,
                 borderRadius: "50%",
-                backgroundColor: ind.colour,
-                border: "2px solid #fff",
+                backgroundColor: ind.isSimple ? ind.colour : "#fff",
+                border: ind.isSimple ? "2px solid #fff" : "2px solid #ccc",
                 boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
                 display: "flex",
                 alignItems: "center",
@@ -187,7 +189,7 @@ export default function ObjectiveArrows() {
               }}
               dangerouslySetInnerHTML={{
                 __html: ind.svgHtml
-                  .replace(/<svg /, `<svg width="${INDICATOR_SIZE - 12}" height="${INDICATOR_SIZE - 12}" `),
+                  .replace(/<svg /, `<svg width="${ind.isSimple ? INDICATOR_SIZE - 12 : INDICATOR_SIZE - 6}" height="${ind.isSimple ? INDICATOR_SIZE - 12 : INDICATOR_SIZE - 6}" `),
               }}
             />
 

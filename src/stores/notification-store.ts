@@ -3,13 +3,13 @@ import { create } from "zustand"
 interface Notification {
   id: string
   message: string
-  type: "info" | "success"
+  type: "info" | "success" | "error"
   timestamp: number
 }
 
 interface NotificationState {
   notifications: Notification[]
-  addNotification: (message: string, type?: "info" | "success") => void
+  addNotification: (message: string, type?: "info" | "success" | "error") => void
   removeNotification: (id: string) => void
   clearAll: () => void
 }

@@ -1,11 +1,12 @@
 "use client"
 
 import { useEffect } from "react"
-import { X, UserPlus } from "lucide-react"
+import { X, UserPlus, AlertTriangle } from "lucide-react"
 import { useNotificationStore } from "@/stores/notification-store"
 import { cn } from "@/lib/cn"
 
 const AUTO_DISMISS_MS = 4000
+const ERROR_DISMISS_MS = 8000
 
 export function NotificationBanner() {
   const { notifications, removeNotification } = useNotificationStore()
@@ -14,8 +15,9 @@ export function NotificationBanner() {
     if (notifications.length === 0) return
 
     const timers = notifications.map((notification) => {
+      const dismissMs = notification.type === "error" ? ERROR_DISMISS_MS : AUTO_DISMISS_MS
       const elapsed = Date.now() - notification.timestamp
-      const remaining = Math.max(AUTO_DISMISS_MS - elapsed, 0)
+      const remaining = Math.max(dismissMs - elapsed, 0)
 
       return setTimeout(() => {
         removeNotification(notification.id)
@@ -39,19 +41,29 @@ export function NotificationBanner() {
             "animate-in slide-in-from-top-2 fade-in-0 duration-200",
             notification.type === "success"
               ? "border-green-500/50 bg-green-500/10"
-              : "border-blue-500/50 bg-blue-500/10"
+              : notification.type === "error"
+                ? "border-red-500/50 bg-red-500/10"
+                : "border-blue-500/50 bg-blue-500/10"
           )}
         >
-          <UserPlus
-            className={cn(
-              "h-5 w-5 shrink-0",
-              notification.type === "success" ? "text-green-600" : "text-blue-600"
-            )}
-          />
+          {notification.type === "error" ? (
+            <AlertTriangle className="h-5 w-5 shrink-0 text-red-600" />
+          ) : (
+            <UserPlus
+              className={cn(
+                "h-5 w-5 shrink-0",
+                notification.type === "success" ? "text-green-600" : "text-blue-600"
+              )}
+            />
+          )}
           <p
             className={cn(
               "flex-1 text-sm font-medium",
-              notification.type === "success" ? "text-green-700" : "text-blue-700"
+              notification.type === "success"
+                ? "text-green-700"
+                : notification.type === "error"
+                  ? "text-red-700"
+                  : "text-blue-700"
             )}
           >
             {notification.message}
@@ -64,7 +76,11 @@ export function NotificationBanner() {
             <X
               className={cn(
                 "h-4 w-4",
-                notification.type === "success" ? "text-green-600" : "text-blue-600"
+                notification.type === "success"
+                  ? "text-green-600"
+                  : notification.type === "error"
+                    ? "text-red-600"
+                    : "text-blue-600"
               )}
             />
             <span className="sr-only">Close</span>

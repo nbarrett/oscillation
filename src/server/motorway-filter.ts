@@ -1,6 +1,6 @@
 import { type OverpassElement } from "./overpass";
 
-const MOTORWAY_PROXIMITY_METRES = 150;
+export const MOTORWAY_PROXIMITY_METRES = 150;
 
 export function distanceMetres(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;

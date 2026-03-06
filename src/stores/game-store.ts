@@ -395,6 +395,9 @@ export const useGameStore = create<GameState>()(
         }
 
         const startGridKey = latLngToGridKey(currentPlayer.position[0], currentPlayer.position[1]);
+        const allPositions = state.players.map(p => `${p.name}=[${p.position[0].toFixed(5)},${p.position[1].toFixed(5)}]`).join(" ");
+        log.info(`handleDiceRoll: player="${currentPlayer.name}" rolled=${result} startGrid=${startGridKey} position=[${currentPlayer.position[0].toFixed(5)},${currentPlayer.position[1].toFixed(5)}] roadDataLoaded=${isRoadDataLoaded()}`);
+        log.info(`handleDiceRoll: all players: ${allPositions}`);
 
         const occupied = occupiedGridKeys(state.players, state.currentPlayerName ?? "");
         const obstructionKeys = useDeckStore.getState().obstructions.map((o) => o.gridKey)
@@ -402,9 +405,10 @@ export const useGameStore = create<GameState>()(
           occupied.add(key)
         }
         const reachable = reachableRoadGrids(startGridKey, result, occupied);
+        log.info(`handleDiceRoll: reachable=${reachable.size} grids, occupied=${occupied.size} blocked`);
 
         if (!isRoadDataLoaded()) {
-          log.info("handleDiceRoll: road data not loaded yet, will recompute when ready");
+          log.warn("handleDiceRoll: road data not loaded yet, will recompute when ready");
           onRoadDataReady(() => {
             const s = get();
             if (s.gameTurnState === GameTurnState.DICE_ROLLED && s.diceResult === result && s.playerStartGridKey === startGridKey) {

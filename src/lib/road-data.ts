@@ -601,6 +601,12 @@ export function reachableRoadGrids(
   excludeKeys: Set<string> = new Set()
 ): Map<string, number> {
   const visited = new Map<string, number>();
+  const startNeighbors = getAdjacentRoadGrids(startGridKey);
+  const hasCache = roadDataCache !== null;
+  const abRoadCount = hasCache ? roadDataCache!.gridSquaresWithABRoads.size : 0;
+  const adjCount = hasCache ? roadDataCache!.gridAdjacency.size : 0;
+  const startHasRoad = hasCache ? roadDataCache!.gridSquaresWithABRoads.has(startGridKey) : false;
+  log.info(`reachableRoadGrids: start=${startGridKey} maxSteps=${maxSteps} excludeKeys=${excludeKeys.size} roadDataLoaded=${hasCache} abRoads=${abRoadCount} adjEntries=${adjCount} startHasRoad=${startHasRoad} startNeighbors=${startNeighbors.length} [${startNeighbors.slice(0, 4).join(", ")}]`);
 
   const queue: Array<{ key: string; depth: number }> = [{ key: startGridKey, depth: 0 }];
   visited.set(startGridKey, 0);
@@ -619,6 +625,7 @@ export function reachableRoadGrids(
   }
 
   visited.delete(startGridKey);
+  log.info(`reachableRoadGrids: found ${visited.size} reachable grids from ${startGridKey} in ${maxSteps} steps`);
   return visited;
 }
 

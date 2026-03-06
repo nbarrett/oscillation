@@ -240,7 +240,16 @@ export const gameRouter = createTRPCRouter({
       }
 
       const bounds = areaSizeBounds(session.startLat!, session.startLng!, session.areaSize as AreaSize)
-      const allCandidates = await fetchPoiCandidates(bounds.south, bounds.west, bounds.north, bounds.east)
+      let allCandidates: Awaited<ReturnType<typeof fetchPoiCandidates>>
+      try {
+        allCandidates = await fetchPoiCandidates(bounds.south, bounds.west, bounds.north, bounds.east)
+      } catch (err) {
+        log.error("Failed to fetch POI candidates from Overpass API", err)
+        throw new TRPCError({
+          code: "TIMEOUT",
+          message: "Could not fetch points of interest — the map data service is slow or unavailable. Please try again.",
+        })
+      }
 
       const startLat = session.startLat!
       const startLng = session.startLng!

@@ -302,7 +302,7 @@ export default function GamePage() {
             >
               <div className="overflow-hidden">
                 <div className="pt-4 pb-1 border-t">
-                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                     <ProfileSelector />
                     <MappingProviderSelector />
                     <MapLayerSelector />

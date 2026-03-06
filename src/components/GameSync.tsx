@@ -6,6 +6,7 @@ import { useGameStore, GameTurnState, type Player, type GamePhase } from "@/stor
 import { useNotificationStore } from "@/stores/notification-store"
 import { useDeckStore } from "@/stores/deck-store"
 import { areaSizeBounds, isWithinBounds, type AreaSize } from "@/lib/area-size"
+import { log } from "@/lib/utils"
 
 export default function GameSync() {
   const { sessionId, playerId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setPoiCandidates, setWinnerName, leaveSession } = useGameStore()
@@ -81,8 +82,12 @@ export default function GameSync() {
             hasReturnedToStart: p.hasReturnedToStart,
           }
         }
-        const position: [number, number] = bounds && startPos && !isWithinBounds(p.position[0], p.position[1], bounds)
-          ? startPos
+        const outOfBounds = bounds && startPos && !isWithinBounds(p.position[0], p.position[1], bounds)
+        if (outOfBounds) {
+          log.warn(`GameSync: player "${p.name}" position [${p.position[0].toFixed(5)},${p.position[1].toFixed(5)}] is outside bounds, snapping to startPos [${startPos![0].toFixed(5)},${startPos![1].toFixed(5)}]`)
+        }
+        const position: [number, number] = outOfBounds
+          ? startPos!
           : p.position
         return {
           name: p.name,

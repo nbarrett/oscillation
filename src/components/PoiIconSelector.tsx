@@ -26,7 +26,7 @@ export default function PoiIconSelector<T extends string>({
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
-      <div className="flex gap-1.5">
+      <div className="flex flex-nowrap gap-1.5">
         {options.map((option) => {
           const svgSource = iconDetailMode === "simple" ? option.simpleSvg : option.svg
           return (

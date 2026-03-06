@@ -1,15 +1,17 @@
 import { log } from "@/lib/utils";
 import { POI_CATEGORIES, MIN_POIS_PER_CATEGORY, classifyChurch, type PoiCategory, type PoiValidationResult } from "@/lib/poi-categories";
-import { isNearMotorway, motorwayOverpassClause } from "@/server/motorway-filter";
+import { MOTORWAY_PROXIMITY_METRES, motorwayOverpassClause } from "@/server/motorway-filter";
 
 const OVERPASS_ENDPOINTS = [
-  "https://overpass.kumi.systems/api/interpreter",
   "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+  "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+  "https://overpass.openstreetmap.ru/api/interpreter",
 ];
 
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 4;
 const RETRY_BASE_MS = 1000;
-const FETCH_TIMEOUT_MS = 30000;
+const FETCH_TIMEOUT_MS = 45000;
 
 const poiCache = new Map<string, { result: PoiValidationResult; expiresAt: number }>();
 const POI_CACHE_TTL_MS = 10 * 60 * 1000;
@@ -31,15 +33,21 @@ export interface OverpassResponse {
 export async function queryOverpass(query: string, timeoutMs = FETCH_TIMEOUT_MS): Promise<OverpassResponse> {
   let lastError: Error | null = null;
 
+  const queryPreview = query.slice(0, 120).replace(/\s+/g, " ");
+  log.debug(`Overpass: starting request (timeout=${timeoutMs}ms, maxRetries=${MAX_RETRIES}, query=${queryPreview}...)`);
+
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const endpoint = OVERPASS_ENDPOINTS[attempt % OVERPASS_ENDPOINTS.length]!;
 
     if (attempt > 0) {
       const delay = RETRY_BASE_MS * Math.pow(2, attempt - 1);
-      log.debug(`Overpass: retry ${attempt} after ${delay}ms (using ${endpoint})`);
+      log.debug(`Overpass: retry ${attempt}/${MAX_RETRIES - 1} after ${delay}ms (using ${endpoint})`);
       await new Promise((resolve) => setTimeout(resolve, delay));
+    } else {
+      log.debug(`Overpass: attempt ${attempt + 1}/${MAX_RETRIES} → ${endpoint}`);
     }
 
+    const startTime = Date.now();
     try {
       const response = await fetch(endpoint, {
         method: "POST",
@@ -48,24 +56,33 @@ export async function queryOverpass(query: string, timeoutMs = FETCH_TIMEOUT_MS)
         signal: AbortSignal.timeout(timeoutMs),
       });
 
+      const elapsed = Date.now() - startTime;
+
       if (response.status === 429 || response.status === 504) {
         lastError = new Error(`Overpass API ${response.status}: ${response.statusText}`);
+        log.warn(`Overpass: attempt ${attempt + 1} failed — HTTP ${response.status} after ${elapsed}ms (${endpoint})`);
         continue;
       }
 
       if (!response.ok) {
+        log.warn(`Overpass: attempt ${attempt + 1} failed — HTTP ${response.status} after ${elapsed}ms (${endpoint})`);
         throw new Error(`Overpass API error: ${response.statusText}`);
       }
 
       const text = await response.text();
       if (text.trimStart().startsWith("<")) {
         lastError = new Error("Overpass API returned XML instead of JSON");
+        log.warn(`Overpass: attempt ${attempt + 1} failed — got XML response after ${elapsed}ms (${endpoint})`);
         continue;
       }
 
-      return JSON.parse(text) as OverpassResponse;
+      const parsed = JSON.parse(text) as OverpassResponse;
+      log.debug(`Overpass: success after ${elapsed}ms — ${parsed.elements.length} elements (${endpoint})`);
+      return parsed;
     } catch (err) {
+      const elapsed = Date.now() - startTime;
       lastError = err instanceof Error ? err : new Error(String(err));
+      log.warn(`Overpass: attempt ${attempt + 1} failed — ${lastError.message} after ${elapsed}ms (${endpoint})`);
       if (err instanceof TypeError || (err as { code?: string }).code === "ECONNREFUSED" || err instanceof DOMException) {
         continue;
       }
@@ -76,6 +93,7 @@ export async function queryOverpass(query: string, timeoutMs = FETCH_TIMEOUT_MS)
     }
   }
 
+  log.error(`Overpass: all ${MAX_RETRIES} attempts exhausted — ${lastError?.message}`);
   throw lastError ?? new Error("Overpass API: all retries exhausted");
 }
 
@@ -101,6 +119,7 @@ export interface PoiCandidate {
 function buildCombinedQuery(bbox: string): string {
   return [
     "[out:json][timeout:30];",
+    `(${motorwayOverpassClause(bbox)})->.motorways;`,
     "(",
     `node["amenity"="pub"](${bbox});`,
     `node["amenity"="place_of_worship"]["religion"="christian"](${bbox});`,
@@ -112,13 +131,11 @@ function buildCombinedQuery(bbox: string): string {
     `way["amenity"="school"](${bbox});`,
     `node["amenity"="college"](${bbox});`,
     `way["amenity"="college"](${bbox});`,
-    ");",
+    ")->.allpois;",
+    `node.allpois(around.motorways:${MOTORWAY_PROXIMITY_METRES})->.nearmw;`,
+    `way.allpois(around.motorways:${MOTORWAY_PROXIMITY_METRES})->.nearmw_w;`,
+    "(.allpois; - .nearmw; - .nearmw_w;);",
     "out center tags;",
-    "(",
-    motorwayOverpassClause(bbox),
-    `way["railway"="rail"](${bbox});`,
-    ");",
-    "out geom;",
   ].join("");
 }
 
@@ -164,24 +181,9 @@ interface ClassifyResult {
   hasRailway: boolean;
 }
 
-function classifyElements(data: OverpassResponse, filterMotorways = true): ClassifyResult {
+function classifyElements(data: OverpassResponse): ClassifyResult {
   const counts: Record<PoiCategory, number> = { pub: 0, spire: 0, tower: 0, phone: 0, school: 0 };
   const candidates: PoiCandidate[] = [];
-  let hasMotorway = false;
-  let hasRailway = false;
-
-  const motorways: OverpassElement[] = [];
-  for (const el of data.elements) {
-    if (el.type !== "way") continue;
-    const hw = el.tags?.highway;
-    if (hw === "motorway" || hw === "motorway_link") {
-      motorways.push(el);
-      hasMotorway = true;
-    }
-    if (el.tags?.railway === "rail") {
-      hasRailway = true;
-    }
-  }
 
   for (const el of data.elements) {
     const category = classifyElement(el.tags ?? {}, el.id);
@@ -189,7 +191,6 @@ function classifyElements(data: OverpassResponse, filterMotorways = true): Class
     const lat = el.lat ?? el.center?.lat;
     const lng = el.lon ?? el.center?.lon;
     if (lat == null || lng == null) continue;
-    if (filterMotorways && isNearMotorway(lat, lng, motorways)) continue;
     counts[category]++;
     candidates.push({
       category,
@@ -200,7 +201,7 @@ function classifyElements(data: OverpassResponse, filterMotorways = true): Class
     });
   }
 
-  return { counts, candidates, hasMotorway, hasRailway };
+  return { counts, candidates, hasMotorway: false, hasRailway: false };
 }
 
 export async function validatePoiCoverage(
@@ -218,7 +219,7 @@ export async function validatePoiCoverage(
   }
 
   // Count-only query: returns 6 count elements (pubs, churches, phones, schools, motorways, railways)
-  const data = await queryOverpass(buildValidationQuery(bbox), 15_000);
+  const data = await queryOverpass(buildValidationQuery(bbox), 25_000);
   const countElements = data.elements.filter((el) => el.type === "count");
   const getCount = (idx: number) => parseInt(countElements[idx]?.tags?.["total"] ?? "0", 10);
 

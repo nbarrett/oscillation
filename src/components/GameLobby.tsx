@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 
-import { Users, Copy, Check, Play, LogOut, Loader2, Crown } from "lucide-react"
+import { Users, Copy, Check, Play, LogOut, Loader2, Crown, AlertTriangle, RotateCcw } from "lucide-react"
 import { trpc } from "@/lib/trpc/client"
 import { useGameStore } from "@/stores/game-store"
 import { useNotificationStore } from "@/stores/notification-store"
@@ -24,7 +24,7 @@ export default function GameLobby() {
       utils.game.state.invalidate()
     },
     onError: (err) => {
-      addNotification(err.message, "info")
+      addNotification(err.message, "error")
     },
   })
 
@@ -70,6 +70,49 @@ export default function GameLobby() {
 
   const preset = AREA_SIZE_PRESETS[areaSize as AreaSize]
   const isAutoStarting = isCreator && autoStartedRef.current && !autoStartFailed && (startGameMutation.isPending || !startGameMutation.isError)
+
+  function handleRetryStart() {
+    if (!sessionId || !playerId) return
+    setAutoStartFailed(false)
+    autoStartedRef.current = false
+    startGameMutation.reset()
+    setTimeout(() => {
+      autoStartedRef.current = true
+      startGameMutation.mutate({ sessionId: sessionId!, playerId: playerId! }, {
+        onError: () => {
+          setAutoStartFailed(true)
+        },
+      })
+    }, 0)
+  }
+
+  if (autoStartFailed && startGameMutation.isError) {
+    return (
+      <div className="flex-1 flex items-center justify-center py-8">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6 space-y-6">
+            <div className="text-center space-y-4">
+              <AlertTriangle className="h-10 w-10 mx-auto text-red-500" />
+              <h2 className="text-xl font-semibold">Failed to set up game</h2>
+              <p className="text-sm text-muted-foreground">
+                {startGameMutation.error.message}
+              </p>
+              <div className="flex gap-2 justify-center">
+                <Button variant="outline" onClick={() => { setAutoStartFailed(true); leaveSession() }}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Leave
+                </Button>
+                <Button onClick={handleRetryStart}>
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Try Again
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   if (isAutoStarting) {
     return (

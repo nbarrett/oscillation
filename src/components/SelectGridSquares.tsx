@@ -214,10 +214,11 @@ export default function SelectGridSquares() {
       return;
     }
     if (gameTurnState !== GameTurnState.DICE_ROLLED || !diceResult || !playerStartGridKey || movementPath.length > 0) {
+      log.debug(`computeAndSetPaths: skipped (turnState=${gameTurnState} dice=${diceResult} startGrid=${playerStartGridKey} pathLen=${movementPath.length})`);
       return;
     }
     if (!isRoadDataLoaded()) {
-      log.info("computeAndSetPaths: road data not loaded, triggering load");
+      log.warn("computeAndSetPaths: road data not loaded, triggering load");
       const center = map.getCenter();
       void loadRoadData(center.lat, center.lng, 10);
       return;
@@ -230,6 +231,7 @@ export default function SelectGridSquares() {
     }
 
     const reachable = reachableGrids ?? reachableRoadGrids(playerStartGridKey, diceResult, occupied);
+    log.info(`computeAndSetPaths: dice=${diceResult} start=${playerStartGridKey} reachable=${reachable.size} occupied=${occupied.size} fromStore=${reachableGrids !== null}`);
     const endpoints: string[] = [];
     reachable.forEach((steps, gridKey) => {
       if (steps === diceResult && !occupied.has(gridKey) && gridHasABRoad(gridKey)) {
@@ -266,7 +268,7 @@ export default function SelectGridSquares() {
         }
       }
     }
-    log.debug("computeAndSetPaths: found", paths.length, "possible moves from", endpoints.length, "endpoints");
+    log.info(`computeAndSetPaths: ${endpoints.length} exact-step endpoints → ${paths.length} valid paths (reachable=${reachable.size} dice=${diceResult})`);
 
     const allEndpointKeys = paths.map(p => p[p.length - 1]);
     drawEndpoints(allEndpointKeys);
