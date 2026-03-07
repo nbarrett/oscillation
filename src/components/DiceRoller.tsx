@@ -135,8 +135,13 @@ export default function DiceRoller() {
   }
 
   function handleEndTurnClick() {
-    const lastGridKey = movementPath.length > 0
-      ? movementPath[movementPath.length - 1]
+    if (movementPath.length === 0 && previewPaths.length > 0) {
+      confirmPreviewPath()
+    }
+    const store = useGameStore.getState()
+    const currentPath = store.movementPath
+    const lastGridKey = currentPath.length > 0
+      ? currentPath[currentPath.length - 1]
       : null
     const destination = lastGridKey
       ? gridKeyToLatLng(lastGridKey)
@@ -309,12 +314,6 @@ export default function DiceRoller() {
                     >
                       <ChevronRight className="h-4 w-4" />
                     </button>
-                    <button
-                      className="ml-1 px-2 py-0.5 rounded bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90"
-                      onClick={() => confirmPreviewPath()}
-                    >
-                      Select
-                    </button>
                   </div>
                 )}
                 {diceResult && movementPath.length > 0 && (
@@ -349,7 +348,6 @@ export default function DiceRoller() {
           </Button>
           <Button
             className="flex-1 sm:flex-none gap-2"
-            variant="secondary"
             onClick={handleEndTurnClick}
             disabled={!isMyTurn || !isPlaying || gameTurnState !== GameTurnState.DICE_ROLLED}
           >

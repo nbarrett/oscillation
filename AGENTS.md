@@ -2,7 +2,7 @@
 
 This document provides guidance for AI code assistants working in this repository.
 
-## ⚠️ CRITICAL RULES - READ FIRST
+## CRITICAL RULES - READ FIRST
 
 These rules MUST be followed in EVERY session without exception:
 
@@ -14,7 +14,7 @@ These rules MUST be followed in EVERY session without exception:
 ### 2. NO AI ATTRIBUTION IN COMMITS
 - **NEVER add AI attribution to commit messages**
 - This means NO:
-  - `🤖 Generated with [Claude Code](https://claude.ai/code)`
+  - `Generated with [Claude Code]`
   - `Co-Authored-By: Claude <noreply@anthropic.com>`
   - Any similar AI tool attribution lines
 - Commits should appear as if written by a human developer
@@ -74,23 +74,25 @@ These rules MUST be followed in EVERY session without exception:
 
 ## Project Overview
 
-Oscillation is a Next.js-based board game application using the T3 Stack architecture.
+Oscillation is a multiplayer board game played on real OS Maps of Britain. Players roll dice, move cars along A/B roads on a 1km grid, visit POIs (pubs, churches, phone boxes, schools), and draw cards.
 
 - **Repository**: https://github.com/nbarrett/oscillation
 - **Hosting**: Fly.io (https://oscillation.fly.dev)
-- **Architecture**: Next.js 14 (App Router) + tRPC + Drizzle ORM + Zustand
+- **Dev port**: 3002
 
 ## Tech Stack
 
 | Component | Technology |
 |-----------|------------|
 | **Framework** | Next.js 14 (App Router) |
-| **API Layer** | tRPC |
+| **API Layer** | tRPC (via `@trpc/server` + `@trpc/react-query`) |
 | **ORM** | Prisma |
 | **Database** | PostgreSQL (Neon) |
-| **State Management** | Zustand |
-| **UI Framework** | Material UI |
-| **Maps** | Leaflet with OS Maps |
+| **Auth** | NextAuth.js (credentials provider, optional) |
+| **State Management** | Zustand (with `persist` middleware using sessionStorage) |
+| **UI** | Tailwind CSS + shadcn/ui components |
+| **Maps** | Leaflet with OS Maps API tiles |
+| **Package Manager** | pnpm |
 
 ## Project Structure
 
@@ -100,67 +102,103 @@ Oscillation is a Next.js-based board game application using the T3 Stack archite
 │   ├── app/                    # Next.js App Router
 │   │   ├── layout.tsx          # Root layout with providers
 │   │   ├── page.tsx            # Main game page
-│   │   ├── providers.tsx       # tRPC + React Query + MUI providers
+│   │   ├── providers.tsx       # tRPC + React Query providers
 │   │   └── api/trpc/[trpc]/route.ts  # tRPC API handler
 │   ├── components/             # React components
+│   │   ├── ui/                 # shadcn/ui primitives (button, input, etc.)
+│   │   ├── DiceRoller.tsx      # Dice rolling + turn management
+│   │   ├── SelectGridSquares.tsx # Map click handling + path preview
+│   │   ├── GameSync.tsx        # Server polling + state sync
+│   │   ├── JoinGame.tsx        # Game creation/joining stepper
+│   │   ├── GameLobby.tsx       # Pre-game lobby
+│   │   └── PoiPicker.tsx       # POI selection during picking phase
 │   ├── server/
 │   │   ├── db/
 │   │   │   └── index.ts        # Prisma client
-│   │   └── api/
-│   │       ├── routers/        # tRPC routers
-│   │       ├── root.ts         # Root router
-│   │       └── trpc.ts         # tRPC setup
+│   │   ├── api/
+│   │   │   ├── routers/        # tRPC routers (game.ts, locations.ts, auth.ts)
+│   │   │   ├── root.ts         # Root router
+│   │   │   └── trpc.ts         # tRPC setup
+│   │   └── overpass.ts         # Overpass API for POI data
 │   ├── lib/
-│   │   ├── trpc/client.ts      # tRPC client
-│   │   └── utils.ts            # Shared utilities (including log)
+│   │   ├── trpc/client.ts      # tRPC client setup
+│   │   ├── road-data.ts        # Road grid BFS, pathfinding, grid utilities
+│   │   ├── poi-categories.ts   # POI type definitions + validation
+│   │   ├── card-decks.ts       # Chance/Edge/Motorway card definitions
+│   │   ├── area-size.ts        # Game area bounds calculation
+│   │   ├── cn.ts               # Tailwind class merging utility
+│   │   └── utils.ts            # Shared utilities (log, formatting)
 │   └── stores/                 # Zustand stores
+│       ├── game-store.ts       # Main game state (players, turns, movement)
+│       ├── deck-store.ts       # Card deck state
+│       ├── car-store.ts        # Car icon styles
+│       ├── pub-store.ts        # Pub POI data
+│       ├── church-store.ts     # Church spire/tower POI data
+│       ├── phone-store.ts      # Phone box POI data
+│       ├── school-store.ts     # School POI data
+│       ├── error-store.ts      # Error notification state
+│       └── notification-store.ts # Toast notifications
 ├── prisma/
-│   └── schema.prisma           # Prisma schema
-├── public/                     # Static assets
+│   └── schema.prisma           # Prisma schema (GameSession, GamePlayer, etc.)
+├── public/                     # Static assets (car images, icons)
 └── package.json
 ```
 
-## Development Commands
+## Key Architecture Patterns
 
-### Dev Scripts
+### State Management (Zustand)
+- Game state persists to **sessionStorage** (per-tab isolation for multiplayer testing)
+- Access store outside React: `useGameStore.getState()`
+- Subscribe to changes: `useGameStore.subscribe(callback)`
 
-The project includes cross-platform scripts to start/stop the dev environment:
+```typescript
+import { useGameStore } from "@/stores/game-store";
 
-```bash
-# Start dev server (handles deps, prisma generate, schema push, port 3002)
-./run-dev.sh        # macOS / Linux
-.\run-dev.ps1       # Windows PowerShell
-run-dev.bat         # Windows Command Prompt
-
-# Stop all dev processes
-./kill-dev.sh       # macOS / Linux
-.\kill-dev.ps1      # Windows PowerShell
-kill-dev.bat        # Windows Command Prompt
+function MyComponent() {
+  const players = useGameStore((s) => s.players);
+  const setPlayers = useGameStore((s) => s.setPlayers);
+}
 ```
 
-### Manual Commands
+### tRPC Usage
+```typescript
+import { trpc } from "@/lib/trpc/client";
 
-```bash
-# Install dependencies
-pnpm install
+function MyComponent() {
+  const { data } = trpc.game.state.useQuery({ sessionId });
+  const mutation = trpc.game.rollDice.useMutation();
+}
+```
 
-# Generate Prisma client
-pnpm run db:generate
+### Map / Grid System
+- **Projection**: British National Grid (EPSG:27700) via proj4
+- **Grid resolution**: 1km squares (keys like `"549000-217000"`)
+- **Road data**: A/B roads loaded via tRPC, stored in `roadDataCache`
+- **Pathfinding**: BFS through road-connected grid adjacency
+- **Movement**: Player clicks grid → `shortestPath()` → `movementPath` in store
+- **Leaflet SSR**: Components use `dynamic(() => import(...), { ssr: false })`
 
-# Push schema to PostgreSQL
-pnpm run db:push
+### Game Flow
+1. **JoinGame** (4-step stepper): Player → Location → Settings → Review
+2. **GameLobby**: Wait for players, start game
+3. **PoiPicker**: Each player picks POIs to visit
+4. **Playing**: Roll dice → preview paths → click to move → end turn
+5. **Cards**: Chance (doubles), Edge/Motorway (triggered mid-movement)
 
-# Start development server
-pnpm run dev
+### Turn State Machine
+```
+ROLL_DICE → DICE_ROLLED → (player moves on map) → END_TURN → ROLL_DICE
+```
+Managed by `GameTurnState` enum in `game-store.ts`.
 
-# Build for production
-pnpm run build
+### Logging
+```typescript
+import { log } from "@/lib/utils";
 
-# Start production server
-pnpm start
-
-# Type checking
-pnpm run typecheck
+log.debug("Debug message", someData);
+log.info("Info message");
+log.warn("Warning message");
+log.error("Error message", error);
 ```
 
 ## Git Workflow
@@ -179,14 +217,13 @@ Use [Conventional Commits](https://www.conventionalcommits.org/) format:
 - `style` - Code formatting changes
 - `build` - Build system or dependency changes
 
-**Scopes (common for this project):**
-- `game`, `map`, `dice` - Feature areas
+**Scopes:**
+- `game`, `map`, `dice`, `movement` - Feature areas
 - `ui`, `store`, `api` - Technical components
 - `db`, `trpc` - Backend areas
 
 **Issue Reference:**
 - Always include the issue reference at the end of the first line: `(ref: #4)`
-- Use this format even for multi-line commit messages
 
 **Examples:**
 ```
@@ -202,57 +239,14 @@ refactor(store): consolidate player state updates (ref: #15)
 - **NEVER force push to main** - this is not allowed under any circumstances
 - Writing/editing files is allowed without permission, but git operations require explicit approval
 
-## Development Patterns
-
-### State Management (Zustand)
-```typescript
-import { useGameStore } from "@/stores/game-store";
-
-function MyComponent() {
-  const { players, setPlayers } = useGameStore();
-
-  const handleUpdate = () => {
-    setPlayers(updatedPlayers);
-  };
-}
-```
-
-### tRPC Usage
-```typescript
-import { api } from "@/lib/trpc/client";
-
-function MyComponent() {
-  const { data, isLoading } = api.locations.all.useQuery();
-  const createMutation = api.locations.create.useMutation();
-}
-```
-
-### Logging
-```typescript
-import { log } from "@/lib/utils";
-
-log.debug("Debug message", someData);
-log.info("Info message");
-log.warn("Warning message");
-log.error("Error message", error);
-```
-
-## Map Integration
-
-The app uses Leaflet with OS Maps API for British mapping:
-- **Projection**: British National Grid (EPSG:27700)
-- **Tiles**: OS Maps API (requires API key)
-- **SSR**: Leaflet components use dynamic imports with `ssr: false`
-
 ## Summary for AI Assistants
 
 When working on this project:
 
-1. **Remember the commit message rule**: Never add AI attribution lines
-2. **Follow existing patterns**: Use double quotes, no code comments, minimal changes
-3. **Use the log utility**: Never use `console.log()` directly
-4. **Embrace the T3 stack**: Use tRPC for APIs, Zustand for state, Drizzle for database
-5. **Handle SSR carefully**: Leaflet components must use dynamic imports
-6. **Keep it simple**: This is a game app - don't over-engineer solutions
-
-The project has a clear architecture - work with it, not against it.
+1. **No comments, no AI attribution** in code or commits
+2. **Double quotes, no `get` prefixes, `null` not `undefined`**
+3. **Use `log` utility** from `@/lib/utils` — never `console.log()`
+4. **Never build or run dev** — the swarm handles it, use `npx tsc --noEmit` for type checks
+5. **Embrace the stack**: tRPC for APIs, Zustand for state, Prisma for database, shadcn for UI
+6. **SSR safety**: Leaflet components must use `dynamic(() => import(...), { ssr: false })`
+7. **Search before creating** — reuse existing components, hooks, and utilities

@@ -60,6 +60,7 @@ function MovementOverlay() {
   const previewPathIndex = useGameStore((s) => s.previewPathIndex)
   const cyclePreviewPath = useGameStore((s) => s.cyclePreviewPath)
   const confirmPreviewPath = useGameStore((s) => s.confirmPreviewPath)
+  const handleEndTurn = useGameStore((s) => s.handleEndTurn)
 
   const isMyTurn = localPlayerName !== null && localPlayerName === currentPlayerName
   const showPreviews = isMyTurn && gameTurnState === GameTurnState.DICE_ROLLED && diceResult && movementPath.length === 0 && previewPaths.length > 0
@@ -105,9 +106,18 @@ function MovementOverlay() {
             </button>
             <button
               onClick={() => confirmPreviewPath()}
-              className="ml-1 px-3 py-1.5 rounded-lg bg-primary-foreground text-primary text-sm font-bold hover:bg-primary-foreground/90 transition-colors"
+              className="ml-2 px-3 py-1.5 rounded-lg bg-primary-foreground text-primary text-sm font-bold hover:bg-primary-foreground/90 transition-colors"
             >
               Select
+            </button>
+            <button
+              onClick={() => {
+                confirmPreviewPath()
+                handleEndTurn()
+              }}
+              className="px-3 py-1.5 rounded-lg bg-primary-foreground text-primary text-sm font-bold hover:bg-primary-foreground/90 transition-colors"
+            >
+              Select &amp; End Turn
             </button>
           </div>
         )}

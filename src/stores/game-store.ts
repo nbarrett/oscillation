@@ -1,5 +1,5 @@
 import { create } from "zustand"
-import { persist } from "zustand/middleware"
+import { persist, createJSONStorage } from "zustand/middleware"
 import { log } from "@/lib/utils"
 import { latLngToGridKey, gridKeyToLatLng, isRoadDataLoaded, reachableRoadGrids, onRoadDataReady } from "@/lib/road-data"
 import { CAR_STYLES } from "@/stores/car-store"
@@ -571,6 +571,7 @@ export const useGameStore = create<GameState>()(
     }),
     {
       name: "oscillation-game",
+      storage: createJSONStorage(() => sessionStorage),
       partialize: (state) => ({
         mapZoom: state.mapZoom,
         mapCentre: state.mapCentre,

@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useRef } from "react"
-import { X, AlertCircle, Trash2, ChevronDown } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { X, AlertCircle, Trash2, ChevronDown, Copy, ClipboardCheck } from "lucide-react"
 import { useErrorStore, type ErrorItem } from "@/stores/error-store"
 import { cn } from "@/lib/cn"
 
@@ -12,6 +12,27 @@ function formatTime(timestamp: number): string {
   return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
 }
 
+function CopyButton({ text, className }: { text: string; className?: string }) {
+  const [copied, setCopied] = useState(false)
+
+  function handleCopy() {
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
+
+  return (
+    <button
+      onClick={handleCopy}
+      className={cn("shrink-0 opacity-50 hover:opacity-100 transition-opacity", className)}
+      title={copied ? "Copied!" : "Copy"}
+    >
+      {copied ? <ClipboardCheck className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+    </button>
+  )
+}
+
 function ErrorHistoryRow({ error, onRemove }: { error: ErrorItem; onRemove: (id: string) => void }) {
   return (
     <div className="flex items-start gap-2 px-3 py-2 border-b border-border/50 last:border-b-0 text-xs">
@@ -20,6 +41,7 @@ function ErrorHistoryRow({ error, onRemove }: { error: ErrorItem; onRemove: (id:
         <p className="text-foreground break-words">{error.message}</p>
         <p className="text-muted-foreground mt-0.5">{formatTime(error.timestamp)}</p>
       </div>
+      <CopyButton text={`[${formatTime(error.timestamp)}] ${error.message}`} />
       <button
         onClick={() => onRemove(error.id)}
         className="shrink-0 opacity-50 hover:opacity-100 transition-opacity"
@@ -75,6 +97,7 @@ export function ErrorSnackbar() {
           >
             <AlertCircle className="h-4 w-4 shrink-0 text-destructive mt-0.5" />
             <p className="flex-1 text-sm text-destructive">{latestUndismissed.message}</p>
+            <CopyButton text={latestUndismissed.message} className="opacity-70 hover:opacity-100" />
             <button
               onClick={() => dismissError(latestUndismissed.id)}
               className="shrink-0 opacity-70 hover:opacity-100 transition-opacity"
@@ -111,14 +134,20 @@ export function ErrorSnackbar() {
               <span className="text-xs font-medium text-foreground">
                 Errors ({errorCount})
               </span>
-              <button
-                onClick={clearAll}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                title="Clear all"
-              >
-                <Trash2 className="h-3 w-3" />
-                Clear
-              </button>
+              <div className="flex items-center gap-2">
+                <CopyButton
+                  text={errors.map((e) => `[${formatTime(e.timestamp)}] ${e.message}`).join("\n")}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                />
+                <button
+                  onClick={clearAll}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  title="Clear all"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Clear
+                </button>
+              </div>
             </div>
             <div className="max-h-64 overflow-y-auto">
               {errors.length === 0 ? (

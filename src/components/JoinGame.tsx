@@ -5,7 +5,7 @@ import { useSession, signIn } from "next-auth/react"
 import { Users, Plus, LogIn, Check, Loader2, UserPlus, ChevronLeft, ChevronRight, X, Shuffle, Search } from "lucide-react"
 import { trpc } from "@/lib/trpc/client"
 import { useGameStore } from "@/stores/game-store"
-import { useCarStore, carLabelForStyle } from "@/stores/car-store"
+import { useCarStore, carLabelForStyle, CAR_ICON_OPTIONS, type CarStyle } from "@/stores/car-store"
 import CarIconSelector from "./CarIconSelector"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -166,7 +166,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
   const [botsEnabled, setBotsEnabled] = useState(false)
 
   const { setSessionId, setPlayerId, setSessionCode, setCreatorPlayerId, showPreviewPaths, setShowPreviewPaths: showPreviewPathsSetter } = useGameStore()
-  const { preferredCar } = useCarStore()
+  const { preferredCar, setPreferredCar } = useCarStore()
   const { data: locations, refetch: refetchLocations } = trpc.locations.getAll.useQuery()
   const { data: availableGames } = trpc.game.list.useQuery()
 
@@ -222,6 +222,16 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
       setPlayerName(session.user.nickname)
     }
   }, [session?.user?.nickname, playerName])
+
+  const joinGameTakenCars = availableGames?.find(g => g.code === joinCode)?.takenCars ?? []
+  useEffect(() => {
+    if (mode === "join" && joinGameTakenCars.includes(preferredCar)) {
+      const free = CAR_ICON_OPTIONS.find(o => !joinGameTakenCars.includes(o.style))
+      if (free) {
+        setPreferredCar(free.style as CarStyle)
+      }
+    }
+  }, [joinCode, joinGameTakenCars, preferredCar, mode, setPreferredCar])
 
   const register = trpc.auth.register.useMutation({
     onSuccess: async (_, variables) => {
@@ -694,9 +704,88 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
                         </div>
                       </div>
                       {!validation.data.valid && (
-                        <p className="text-xs text-destructive mt-1">
-                          Missing requirements — choose a different location or larger area
-                        </p>
+                        <div className="space-y-3 mt-2">
+                          <p className="text-xs text-destructive">
+                            Missing requirements — choose a different location or larger area
+                          </p>
+                          <div className="space-y-2">
+                            <Label className="text-xs">Change Location</Label>
+                            <div className="flex items-center gap-2">
+                              <div className="relative flex-1" ref={locationRef}>
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                  placeholder="Type to search locations..."
+                                  value={locationSearch}
+                                  onChange={(e) => {
+                                    setLocationSearch(e.target.value)
+                                    setLocationDropdownOpen(true)
+                                    if (!e.target.value.trim()) {
+                                      setSelectedLocationId("")
+                                    }
+                                  }}
+                                  onFocus={() => setLocationDropdownOpen(true)}
+                                  onBlur={() => setTimeout(() => setLocationDropdownOpen(false), 150)}
+                                  className="pl-9 h-8 text-sm"
+                                />
+                                {locationDropdownOpen && filteredLocations.length > 0 && (
+                                  <div className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto rounded-md border bg-popover shadow-md">
+                                    {filteredLocations.map((location) => (
+                                      <button
+                                        key={location.id}
+                                        type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => selectLocation(location)}
+                                        className={cn(
+                                          "w-full px-3 py-1.5 text-xs text-left transition-colors",
+                                          "hover:bg-muted border-b last:border-b-0",
+                                          selectedLocationId === location.id && "bg-primary/10 text-primary font-medium"
+                                        )}
+                                      >
+                                        {asTitle(location.name)}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={pickRandomLocation}
+                                disabled={sortedLocations.length === 0}
+                                title="Random starting point"
+                              >
+                                <Shuffle className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs">Change Area Size</Label>
+                            <div className="grid grid-cols-4 gap-1">
+                              {AREA_SIZES.map((size) => {
+                                const sizePreset = AREA_SIZE_PRESETS[size];
+                                return (
+                                  <button
+                                    key={size}
+                                    type="button"
+                                    onClick={() => setAreaSize(size)}
+                                    className={cn(
+                                      "px-2 py-1.5 rounded border text-center transition-colors",
+                                      areaSize === size
+                                        ? "border-primary bg-primary/5 font-medium"
+                                        : "border-input hover:bg-muted"
+                                    )}
+                                  >
+                                    <div className="text-xs font-medium">{sizePreset.label}</div>
+                                    <div className="text-[10px] text-muted-foreground">
+                                      {sizePreset.widthKm}x{sizePreset.heightKm}
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
                       )}
                     </div>
                   ) : null}
@@ -759,14 +848,12 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
             />
           </div>
 
-          <CarIconSelector />
-
           <div className="space-y-4">
-            {availableGames && availableGames.filter(g => g.phase === "lobby").length > 0 && (
+            {availableGames && availableGames.filter(g => g.phase !== "ended").length > 0 && (
               <div className="space-y-2">
                 <Label>Available Games</Label>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {availableGames.filter(g => g.phase === "lobby").map((game) => (
+                  {availableGames.filter(g => g.phase !== "ended").map((game) => (
                     <button
                       key={game.id}
                       type="button"
@@ -795,7 +882,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
             )}
             <div className="space-y-2">
               <Label htmlFor="game-code">
-                {availableGames && availableGames.filter(g => g.phase === "lobby").length > 0 ? "Or enter code manually" : "Game Code"}
+                {availableGames && availableGames.filter(g => g.phase !== "ended").length > 0 ? "Or enter code manually" : "Game Code"}
               </Label>
               <Input
                 id="game-code"
@@ -806,6 +893,8 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
               />
             </div>
           </div>
+
+          <CarIconSelector takenCars={availableGames?.find(g => g.code === joinCode)?.takenCars ?? []} />
 
           {error && <ErrorMessage message={error} />}
 

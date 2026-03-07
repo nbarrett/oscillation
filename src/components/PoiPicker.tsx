@@ -12,6 +12,7 @@ import { usePhoneStore } from "@/stores/phone-store"
 import { useSchoolStore } from "@/stores/school-store"
 import { usePoiSettingsStore } from "@/stores/poi-settings-store"
 import { type PoiIconOption } from "@/stores/poi-types"
+import { carImageForStyle } from "@/stores/car-store"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/cn"
@@ -48,7 +49,7 @@ function firstUnpickedCategory(pickedCategories: Set<string>): PoiCategory | nul
 }
 
 export default function PoiPicker() {
-  const { selectedPois, playerId, creatorPlayerId, setPlayerZoomRequest, activePickingCategory, setActivePickingCategory } = useGameStore()
+  const { selectedPois, playerId, creatorPlayerId, setPlayerZoomRequest, activePickingCategory, setActivePickingCategory, players } = useGameStore()
   const player = useCurrentPlayer()
   const { iconDetailMode, setIconDetailMode } = usePoiSettingsStore()
   const pubIconStyle = usePubStore((s) => s.pubIconStyle)
@@ -96,59 +97,104 @@ export default function PoiPicker() {
 
   return (
     <>
-      <Card>
-        <CardContent className="p-3 md:p-4">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">
-                {allPicked
-                  ? "All Staging Posts placed"
-                  : isCreator
-                    ? "Place the Staging Posts"
-                    : "Waiting for host to place Staging Posts..."}
-              </span>
-              <div className="flex items-center gap-3">
-                <div className="flex rounded-md border overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => setIconDetailMode("detailed")}
-                    className={cn(
-                      "px-2 py-1 text-xs font-medium transition-colors",
-                      iconDetailMode === "detailed"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-background hover:bg-muted text-muted-foreground"
-                    )}
-                  >
-                    Detailed
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIconDetailMode("simple")}
-                    className={cn(
-                      "px-2 py-1 text-xs font-medium transition-colors",
-                      iconDetailMode === "simple"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-background hover:bg-muted text-muted-foreground"
-                    )}
-                  >
-                    Simple
-                  </button>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => setPlayerZoomRequest(player?.name ?? "")}
-                  disabled={!player?.name}
-                >
-                  <LocateFixed className="h-3.5 w-3.5" />
-                  Find My Car
-                </Button>
-                <span className="text-xs text-muted-foreground">
-                  {pickedCategories.size} / {POI_CATEGORIES.length}
+      <div className="flex gap-4 items-stretch">
+        {!allPicked && (
+          <Card className="flex-1 basis-0 min-w-[20rem]">
+            <CardContent className="p-3 space-y-1">
+              <div className="text-sm font-semibold">What are Staging Posts?</div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Checkpoints you must visit during the game. Place one on each type of point of interest — a pub, church spire, church tower, phone box, and school. Navigate your car along roads to visit each one and return to the start to win.
+              </p>
+              <div className="flex items-center justify-between gap-3 pt-1 border-t">
+                {activeCategory && (
+                  <p className="text-xs font-medium text-primary flex items-center gap-1.5">
+                    <span
+                      className="shrink-0 flex items-center"
+                      dangerouslySetInnerHTML={{ __html: categoryIcons[activeCategory] ?? "" }}
+                    />
+                    {pickedCategories.size === 0
+                      ? `Tap a ${POI_CATEGORY_LABELS[activeCategory as PoiCategory]?.replace(/s$/, "")} on the map`
+                      : `Now place a ${POI_CATEGORY_LABELS[activeCategory as PoiCategory]?.replace(/s$/, "")}`}
+                  </p>
+                )}
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  {pickedCategories.size} of {POI_CATEGORIES.length} placed
                 </span>
               </div>
-            </div>
+            </CardContent>
+          </Card>
+        )}
+        <Card className="flex-[3] basis-0 min-w-0">
+          <CardContent className="p-3 md:p-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-4 w-full">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Players:</span>
+                  {players.map((p) => (
+                    <button
+                      key={p.name}
+                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs border bg-card hover:bg-muted/50"
+                      onClick={() => setPlayerZoomRequest(p.name)}
+                    >
+                      <img
+                        src={carImageForStyle(p.iconType)}
+                        alt="car"
+                        className="h-4 w-6 object-contain"
+                      />
+                      <span className="font-medium">{p.name}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="hidden md:block h-6 w-px bg-border" />
+                <span className="text-sm font-medium whitespace-nowrap">
+                  {allPicked
+                    ? "All Staging Posts placed"
+                    : isCreator
+                      ? "Place the Staging Posts"
+                      : "Waiting for host to place Staging Posts..."}
+                </span>
+                <div className="flex items-center gap-3 ml-auto shrink-0">
+                  <div className="flex rounded-md border overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setIconDetailMode("detailed")}
+                      className={cn(
+                        "px-2 py-1 text-xs font-medium transition-colors",
+                        iconDetailMode === "detailed"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-background hover:bg-muted text-muted-foreground"
+                      )}
+                    >
+                      Detailed
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIconDetailMode("simple")}
+                      className={cn(
+                        "px-2 py-1 text-xs font-medium transition-colors",
+                        iconDetailMode === "simple"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-background hover:bg-muted text-muted-foreground"
+                      )}
+                    >
+                      Simple
+                    </button>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => setPlayerZoomRequest(player?.name ?? "")}
+                    disabled={!player?.name}
+                  >
+                    <LocateFixed className="h-3.5 w-3.5" />
+                    Find My Car
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    {pickedCategories.size} / {POI_CATEGORIES.length}
+                  </span>
+                </div>
+              </div>
 
             <div className="grid grid-cols-5 items-center w-full">
               {POI_CATEGORIES.map((category, index) => {
@@ -222,22 +268,12 @@ export default function PoiPicker() {
           </div>
         </CardContent>
       </Card>
+      </div>
 
       <Card className="overflow-hidden">
         <CardContent className="p-0">
           <div className="h-[calc(100vh-300px)] min-h-[400px] relative">
             <MapWithCars />
-
-            {!celebration && pickedCategories.size === 0 && activeCategory && (
-              <div className="absolute inset-0 z-[1000] flex items-center justify-center pointer-events-none animate-bounce-in">
-                <div className="bg-primary/95 text-primary-foreground px-8 py-5 rounded-xl shadow-2xl text-center">
-                  <div className="text-2xl font-bold">Place your Staging Posts</div>
-                  <div className="text-sm mt-1.5 opacity-90">
-                    Tap a {POI_CATEGORY_LABELS[activeCategory as PoiCategory]?.replace(/s$/, "")} on the map to begin
-                  </div>
-                </div>
-              </div>
-            )}
 
             {celebration && (
               <div className="absolute inset-0 z-[1000] flex items-center justify-center pointer-events-none animate-bounce-in">

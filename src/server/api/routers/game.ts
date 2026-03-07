@@ -10,6 +10,10 @@ import { POI_CATEGORIES } from "@/lib/poi-categories"
 import { EDGE_DECK, MOTORWAY_DECK, CHANCE_DECK, shuffleDeck, cardById, type ObstructionToken } from "@/lib/card-decks"
 import { log } from "@/lib/utils"
 
+function capitalizeName(name: string): string {
+  return name.trim().replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
 function generateSessionCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
   let code = ""
@@ -43,6 +47,7 @@ export const gameRouter = createTRPCRouter({
         phase: session.phase,
         playerCount: session.players.length,
         playerNames: session.players.map(p => p.name),
+        takenCars: session.players.map(p => p.iconType),
         createdAt: session.createdAt,
         updatedAt: session.updatedAt,
       }))
@@ -102,7 +107,7 @@ export const gameRouter = createTRPCRouter({
           botsEnabled: input.botsEnabled,
           players: {
             create: {
-              name: input.playerName,
+              name: capitalizeName(input.playerName),
               iconType: input.iconType ?? CAR_STYLES[0],
               positionLat: snapped.lat,
               positionLng: snapped.lng,
@@ -146,10 +151,10 @@ export const gameRouter = createTRPCRouter({
         })
       }
 
-      if (session.phase !== "lobby") {
+      if (session.phase === "ended") {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Game has already started.",
+          message: "Game has ended.",
         })
       }
 
@@ -179,7 +184,7 @@ export const gameRouter = createTRPCRouter({
 
       const player = await ctx.db.gamePlayer.create({
         data: {
-          name: input.playerName,
+          name: capitalizeName(input.playerName),
           iconType,
           positionLat: offsetLat,
           positionLng: offsetLng,

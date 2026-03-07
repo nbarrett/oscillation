@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState } from "react"
 
 import { Users, Copy, Check, Play, LogOut, Loader2, Crown, AlertTriangle, RotateCcw } from "lucide-react"
 import { trpc } from "@/lib/trpc/client"
@@ -54,39 +54,9 @@ export default function GameLobby() {
     }
   }
 
-  const autoStartedRef = useRef(false)
-  const [autoStartFailed, setAutoStartFailed] = useState(false)
-
-  useEffect(() => {
-    if (isCreator && sessionId && playerId && !autoStartedRef.current && !startGameMutation.isPending && !autoStartFailed) {
-      autoStartedRef.current = true
-      startGameMutation.mutate({ sessionId, playerId }, {
-        onError: () => {
-          setAutoStartFailed(true)
-        },
-      })
-    }
-  }, [isCreator, sessionId, playerId])
-
   const preset = AREA_SIZE_PRESETS[areaSize as AreaSize]
-  const isAutoStarting = isCreator && autoStartedRef.current && !autoStartFailed && (startGameMutation.isPending || !startGameMutation.isError)
 
-  function handleRetryStart() {
-    if (!sessionId || !playerId) return
-    setAutoStartFailed(false)
-    autoStartedRef.current = false
-    startGameMutation.reset()
-    setTimeout(() => {
-      autoStartedRef.current = true
-      startGameMutation.mutate({ sessionId: sessionId!, playerId: playerId! }, {
-        onError: () => {
-          setAutoStartFailed(true)
-        },
-      })
-    }, 0)
-  }
-
-  if (autoStartFailed && startGameMutation.isError) {
+  if (startGameMutation.isError) {
     return (
       <div className="flex-1 flex items-center justify-center py-8">
         <Card className="w-full max-w-md">
@@ -98,11 +68,11 @@ export default function GameLobby() {
                 {startGameMutation.error.message}
               </p>
               <div className="flex gap-2 justify-center">
-                <Button variant="outline" onClick={() => { setAutoStartFailed(true); leaveSession() }}>
+                <Button variant="outline" onClick={() => leaveSession()}>
                   <LogOut className="h-4 w-4 mr-2" />
                   Leave
                 </Button>
-                <Button onClick={handleRetryStart}>
+                <Button onClick={() => { startGameMutation.reset() }}>
                   <RotateCcw className="h-4 w-4 mr-2" />
                   Try Again
                 </Button>
@@ -114,7 +84,7 @@ export default function GameLobby() {
     )
   }
 
-  if (isAutoStarting) {
+  if (startGameMutation.isPending) {
     return (
       <div className="flex-1 flex items-center justify-center py-8">
         <Card className="w-full max-w-md">
@@ -125,7 +95,7 @@ export default function GameLobby() {
               <p className="text-sm text-muted-foreground">
                 Fetching points of interest from the map. This can take up to a minute for larger areas.
               </p>
-              <Button variant="outline" onClick={() => { setAutoStartFailed(true); leaveSession() }}>
+              <Button variant="outline" onClick={() => leaveSession()}>
                 Cancel
               </Button>
             </div>

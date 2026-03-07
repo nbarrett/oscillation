@@ -6,36 +6,43 @@ import { Slider } from "@/components/ui/slider"
 import { cn } from "@/lib/cn"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
-export default function CarIconSelector() {
+export default function CarIconSelector({ takenCars = [] }: { takenCars?: string[] }) {
   const { preferredCar, setPreferredCar, carSize, setCarSize } = useCarStore()
+  const takenSet = new Set(takenCars)
 
   return (
     <div className="space-y-4">
       <div className="space-y-2">
         <Label>Choose Your Car</Label>
         <div className="flex flex-wrap gap-2">
-          {CAR_ICON_OPTIONS.map((option) => (
-            <Tooltip key={option.style}>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => setPreferredCar(option.style as CarStyle)}
-                  className={cn(
-                    "flex items-center justify-center w-16 h-10 rounded-md border-2 transition-all hover:scale-110 overflow-hidden p-1",
-                    preferredCar === option.style
-                      ? "border-primary bg-primary/10 shadow-sm"
-                      : "border-muted bg-background hover:border-muted-foreground/30"
-                  )}
-                >
-                  <img
-                    src={option.image}
-                    alt={option.label}
-                    className="w-full h-full object-contain"
-                  />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>{option.label}</TooltipContent>
-            </Tooltip>
-          ))}
+          {CAR_ICON_OPTIONS.map((option) => {
+            const isTaken = takenSet.has(option.style)
+            return (
+              <Tooltip key={option.style}>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => !isTaken && setPreferredCar(option.style as CarStyle)}
+                    disabled={isTaken}
+                    className={cn(
+                      "flex items-center justify-center w-16 h-10 rounded-md border-2 transition-all overflow-hidden p-1",
+                      isTaken
+                        ? "border-muted bg-muted opacity-30 cursor-not-allowed"
+                        : preferredCar === option.style
+                          ? "border-primary bg-primary/10 shadow-sm"
+                          : "border-muted bg-background hover:border-muted-foreground/30 hover:scale-110"
+                    )}
+                  >
+                    <img
+                      src={option.image}
+                      alt={option.label}
+                      className="w-full h-full object-contain"
+                    />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{isTaken ? `${option.label} (taken)` : option.label}</TooltipContent>
+              </Tooltip>
+            )
+          })}
         </div>
       </div>
       <div className="space-y-2">
