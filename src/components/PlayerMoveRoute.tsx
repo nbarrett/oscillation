@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Polyline } from "react-leaflet";
 import { useGameStore, Player } from "@/stores/game-store";
-import { roadPathBetween } from "@/lib/road-data";
+import { roadPathThroughGrids, latLngToGridKey } from "@/lib/road-data";
 import { colours, log } from "@/lib/utils";
 import type { LatLngTuple } from "leaflet";
 
@@ -17,17 +17,14 @@ export default function PlayerMoveRoute({ player }: PlayerMoveRouteProps) {
 
   useEffect(() => {
     if (player.completedRoute && player.completedRoute.length >= 2) {
-      const fullPath: LatLngTuple[] = [];
-
-      for (let i = 0; i < player.completedRoute.length - 1; i++) {
-        const [startLat, startLng] = player.completedRoute[i];
-        const [endLat, endLng] = player.completedRoute[i + 1];
-        const segment = roadPathBetween(startLat, startLng, endLat, endLng);
-
-        for (let j = i === 0 ? 0 : 1; j < segment.length; j++) {
-          fullPath.push([segment[j][0], segment[j][1]] as LatLngTuple);
-        }
-      }
+      const startPos: [number, number] = player.completedRoute[0];
+      const gridKeys = player.completedRoute.slice(1).map(
+        ([lat, lng]) => latLngToGridKey(lat, lng)
+      );
+      const roadPoints = roadPathThroughGrids(startPos, gridKeys);
+      const fullPath: LatLngTuple[] = roadPoints.map(
+        ([lat, lng]) => [lat, lng] as LatLngTuple
+      );
 
       log.debug("PlayerMoveRoute: showing", fullPath.length, "road points for player:", player.name);
       setPositions(fullPath);

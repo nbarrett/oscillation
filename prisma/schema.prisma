@@ -47,6 +47,8 @@ model GameSession {
   railwayStations    Json         @default("[]")
   deckState          Json?
   obstructions       Json         @default("[]")
+  lastMovePath       Json?
+  lastMovePlayer     String?
   botsEnabled        Boolean      @default(true)
   mapZoom            Int          @default(7)
   mapCentreLat       Float?

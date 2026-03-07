@@ -86,12 +86,14 @@ export default function BotTurnPlayer() {
     gameTurnState,
     selectedPois,
     setDiceResult,
+    setDiceValues,
+    setDiceRolling,
     setGameTurnState,
     setCurrentPlayer,
     clearGridSelections,
     setPlayerStartGridKey,
+    setMovementPath,
     setPendingServerUpdate,
-    updatePlayerPosition,
     gameBounds,
   } = useGameStore()
   const { addNotification } = useNotificationStore()
@@ -112,23 +114,31 @@ export default function BotTurnPlayer() {
   const placeObstructionMutation = trpc.game.placeObstruction.useMutation()
   const removeObstructionMutation = trpc.game.removeObstruction.useMutation()
 
-  const isBotTurn = phase === "playing"
+  const isBotNeedingRoll = phase === "playing"
     && currentPlayerName?.startsWith("Bot ")
     && gameTurnState === GameTurnState.ROLL_DICE
 
+  const isBotNeedingMove = phase === "playing"
+    && currentPlayerName?.startsWith("Bot ")
+    && gameTurnState === GameTurnState.DICE_ROLLED
+
   useEffect(() => {
-    if (!isBotTurn || !sessionId || !playerId) return
+    if ((!isBotNeedingRoll && !isBotNeedingMove) || !sessionId || !playerId) return
 
     if (botTimerRef.current) clearTimeout(botTimerRef.current)
 
     botTimerRef.current = setTimeout(() => {
-      playBotTurn()
+      if (isBotNeedingMove) {
+        resumeBotMove()
+      } else {
+        playBotTurn()
+      }
     }, 1500)
 
     return () => {
       if (botTimerRef.current) clearTimeout(botTimerRef.current)
     }
-  }, [isBotTurn, currentPlayerName, sessionId, playerId])
+  }, [isBotNeedingRoll, isBotNeedingMove, currentPlayerName, sessionId, playerId])
 
   function advanceToNextPlayer() {
     const state = useGameStore.getState()
@@ -139,6 +149,9 @@ export default function BotTurnPlayer() {
     clearGridSelections()
     setPlayerStartGridKey(null)
     setDiceResult(null)
+    setDiceValues(null)
+    setDiceRolling(false)
+    setMovementPath([])
     setGameTurnState(GameTurnState.ROLL_DICE)
     if (nextPlayer) {
       setCurrentPlayer(nextPlayer.name)
@@ -159,7 +172,6 @@ export default function BotTurnPlayer() {
           effectType: "miss_turn",
           missedTurns: effect.turns,
         })
-        addNotification(`${currentPlayerName} must miss ${effect.turns} turn(s)!`, "info")
         break
 
       case "return_to_start":
@@ -168,12 +180,10 @@ export default function BotTurnPlayer() {
           playerId,
           effectType: "return_to_start",
         })
-        addNotification(`${currentPlayerName} returns to start!`, "info")
         break
 
       case "extra_throw":
         deckStore.setExtraThrow(true)
-        addNotification(`${currentPlayerName} gets an extra throw!`, "success")
         break
 
       case "place_obstruction": {
@@ -188,7 +198,6 @@ export default function BotTurnPlayer() {
             const gridKey = keys[Math.floor(Math.random() * keys.length)]
             deckStore.addObstruction({ gridKey, color: effect.color, placedByPlayerId: playerId })
             placeObstructionMutation.mutate({ sessionId, playerId, gridKey, color: effect.color })
-            addNotification(`${currentPlayerName} placed a ${effect.color} obstruction`, "info")
           }
         }
         break
@@ -200,9 +209,6 @@ export default function BotTurnPlayer() {
           const target = matching[Math.floor(Math.random() * matching.length)]
           deckStore.removeObstruction(target.gridKey)
           removeObstructionMutation.mutate({ sessionId, gridKey: target.gridKey })
-          addNotification(`${currentPlayerName} removed a ${effect.color} obstruction`, "info")
-        } else {
-          addNotification(`No ${effect.color} obstructions to remove`, "info")
         }
         break
       }
@@ -226,26 +232,9 @@ export default function BotTurnPlayer() {
     return null
   }
 
-  function playBotTurn() {
-    if (!sessionId || !playerId || !currentPlayerName) return
-
-    const botMissed = missedTurns[currentPlayerName] ?? 0
-    if (botMissed > 0) {
-      addNotification(`${currentPlayerName} misses this turn!`, "info")
-      decrementMissedTurns(currentPlayerName)
-      skipMissedTurnMutation.mutate({ sessionId, playerId })
-      advanceToNextPlayer()
-      return
-    }
-
-    const botPlayer = players.find(p => p.name === currentPlayerName)
-    if (!botPlayer) return
-
-    const dice1 = Math.floor(Math.random() * 6) + 1
-    const dice2 = Math.floor(Math.random() * 6) + 1
-    const total = dice1 + dice2
-
-    addNotification(`${currentPlayerName} rolled ${total}`, "info")
+  function computeBotPath(botName: string, total: number) {
+    const botPlayer = players.find(p => p.name === botName)
+    if (!botPlayer) return null
 
     const snapped = nearestRoadPosition(botPlayer.position[0], botPlayer.position[1])
     const pos = snapped ?? botPlayer.position
@@ -257,8 +246,7 @@ export default function BotTurnPlayer() {
     }
 
     const reachable = reachableRoadGrids(startGridKey, total, excluded)
-
-    const occupied = occupiedGridKeys(players, currentPlayerName)
+    const occupied = occupiedGridKeys(players, botName)
     let destinationGridKey: string | null = null
     let destination: [number, number] | null = null
 
@@ -286,7 +274,197 @@ export default function BotTurnPlayer() {
       }
     }
 
+    let finalDestination = destination
+    let finalDestinationGridKey = destinationGridKey
+
+    if (destinationGridKey) {
+      const path = shortestPath(startGridKey, destinationGridKey, total, excluded)
+      if (path) {
+        const midResult = findBotMidMovementTrigger(path, gameBounds)
+        if (midResult) {
+          const deckStore = useDeckStore.getState()
+          deckStore.queueDraw(midResult.type)
+          const card = deckStore.processNextDraw()
+          if (card) {
+            let resolvedGridKey: string | null = null
+            if (card.deck === "edge" && gameBounds) {
+              resolvedGridKey = resolveEdgeCard(card as EdgeCard, midResult.gridKey, gameBounds)
+            } else if (card.deck === "motorway") {
+              resolvedGridKey = resolveMotorwayCard(card as MotorwayCard, midResult.gridKey)
+            }
+
+            if (resolvedGridKey) {
+              const remaining = total - midResult.stepsUsed
+
+              if (remaining > 0) {
+                const newReachable = reachableRoadGrids(resolvedGridKey, remaining, excluded)
+                const newExact = [...newReachable.entries()]
+                  .filter(([, steps]) => steps === remaining)
+                  .map(([key]) => key)
+
+                if (newExact.length > 0) {
+                  const newPicked = newExact[Math.floor(Math.random() * newExact.length)]
+                  finalDestination = gridKeyToLatLng(newPicked)
+                  finalDestinationGridKey = newPicked
+                } else {
+                  finalDestination = gridKeyToLatLng(resolvedGridKey)
+                  finalDestinationGridKey = resolvedGridKey
+                }
+              } else {
+                finalDestination = gridKeyToLatLng(resolvedGridKey)
+                finalDestinationGridKey = resolvedGridKey
+              }
+            }
+            deckStore.clearDrawnCard()
+          }
+        }
+      }
+    }
+
+    const movePath = finalDestinationGridKey
+      ? shortestPath(startGridKey, finalDestinationGridKey, total, excluded) ?? undefined
+      : undefined
+
+    return { finalDestination, finalDestinationGridKey, movePath, startGridKey, excluded }
+  }
+
+  function botMoveAndEndTurn(botName: string, total: number, dice1: number, dice2: number) {
+    if (!sessionId || !playerId) return
+
+    const botPlayer = players.find(p => p.name === botName)
+    if (!botPlayer) return
+
+    const result = computeBotPath(botName, total)
+    if (!result) return
+    const { finalDestination, finalDestinationGridKey, movePath } = result
+
+    if (movePath && movePath.length > 0) {
+      setMovementPath(movePath)
+    }
+
+    botTimerRef.current = setTimeout(() => {
+      botExecuteMove(botName, dice1, dice2, finalDestination, finalDestinationGridKey, movePath)
+    }, 2500)
+  }
+
+  function botExecuteMove(
+    botName: string,
+    dice1: number,
+    dice2: number,
+    finalDestination: [number, number] | null,
+    finalDestinationGridKey: string | null,
+    movePath: string[] | undefined,
+  ) {
+    if (!sessionId || !playerId) return
+
+    const botPlayer = players.find(p => p.name === botName)
+    if (!botPlayer) return
+
+    if (finalDestination) {
+      const routeWaypoints: [number, number][] = [botPlayer.position]
+      if (movePath) {
+        for (const key of movePath) {
+          routeWaypoints.push(gridKeyToLatLng(key))
+        }
+      } else {
+        routeWaypoints.push(finalDestination)
+      }
+      useGameStore.getState().setPlayers(
+        players.map(p =>
+          p.name === botName
+            ? { ...p, previousPosition: p.position, position: finalDestination!, completedRoute: routeWaypoints }
+            : p
+        )
+      )
+    }
+
+    let visitedPoiIds: string[] = []
+    if (finalDestinationGridKey) {
+      const visits = detectPoiVisits(finalDestinationGridKey, pubs, spires, towers, phones, schools, selectedPois)
+      visitedPoiIds = visits.map(v => v.id)
+
+      if (visits.length > 0) {
+        const categoryLabel = POI_CATEGORY_LABELS[visits[0].category as PoiCategory] ?? visits[0].category
+        addNotification(`${botName} visited ${categoryLabel}`, "success")
+        drawCardMutation.mutate({
+          sessionId,
+          playerId,
+          poiCategory: visits[0].category,
+          gridKey: finalDestinationGridKey,
+        })
+      }
+    }
+
+    if (dice1 === dice2) {
+      const deckStore = useDeckStore.getState()
+      deckStore.queueDraw("chance")
+      let drawnCard = deckStore.processNextDraw()
+      while (drawnCard) {
+        if (drawnCard.deck === "chance") {
+          processBotCardEffect(drawnCard as ChanceCard)
+        }
+        drawnCard = useDeckStore.getState().processNextDraw()
+      }
+    }
+
+    endTurnMutation.mutate({
+      sessionId,
+      playerId,
+      newLat: finalDestination?.[0],
+      newLng: finalDestination?.[1],
+      visitedPoiIds: visitedPoiIds.length > 0 ? visitedPoiIds : undefined,
+      movePath,
+    }, {
+      onSettled: () => {
+        setPendingServerUpdate(false)
+      },
+    })
+
+    if (useDeckStore.getState().extraThrow) {
+      useDeckStore.getState().setExtraThrow(false)
+      clearGridSelections()
+      setPlayerStartGridKey(null)
+      setDiceResult(null)
+      setDiceValues(null)
+      setGameTurnState(GameTurnState.ROLL_DICE)
+      botTimerRef.current = setTimeout(() => playBotTurn(), 1500)
+    } else {
+      advanceToNextPlayer()
+    }
+  }
+
+  function resumeBotMove() {
+    if (!sessionId || !playerId || !currentPlayerName) return
+
+    const state = useGameStore.getState()
+    const storedDiceValues = state.diceValues
+    const total = state.diceResult
+    if (!total || !storedDiceValues) {
+      advanceToNextPlayer()
+      return
+    }
+
     setPendingServerUpdate(true)
+    botMoveAndEndTurn(currentPlayerName, total, storedDiceValues[0], storedDiceValues[1])
+  }
+
+  function playBotTurn() {
+    if (!sessionId || !playerId || !currentPlayerName) return
+
+    const botMissed = missedTurns[currentPlayerName] ?? 0
+    if (botMissed > 0) {
+      decrementMissedTurns(currentPlayerName)
+      skipMissedTurnMutation.mutate({ sessionId, playerId })
+      advanceToNextPlayer()
+      return
+    }
+
+    const dice1 = Math.floor(Math.random() * 6) + 1
+    const dice2 = Math.floor(Math.random() * 6) + 1
+    const total = dice1 + dice2
+
+    setPendingServerUpdate(true)
+    setDiceRolling(true)
 
     rollDiceMutation.mutate({
       sessionId,
@@ -294,124 +472,22 @@ export default function BotTurnPlayer() {
       dice1,
       dice2,
     }, {
-      onSuccess: () => {
-        setTimeout(() => {
-          let finalDestination = destination
-          let finalDestinationGridKey = destinationGridKey
-
-          if (destinationGridKey) {
-            const path = shortestPath(startGridKey, destinationGridKey, total, excluded)
-            if (path) {
-              const midResult = findBotMidMovementTrigger(path, gameBounds)
-              if (midResult) {
-                addNotification(`${currentPlayerName} triggered a ${midResult.type} card mid-movement!`, "info")
-                const deckStore = useDeckStore.getState()
-                deckStore.queueDraw(midResult.type)
-                const card = deckStore.processNextDraw()
-                if (card) {
-                  addNotification(`${currentPlayerName} drew: ${card.title}`, "info")
-                  let resolvedGridKey: string | null = null
-                  if (card.deck === "edge" && gameBounds) {
-                    resolvedGridKey = resolveEdgeCard(card as EdgeCard, midResult.gridKey, gameBounds)
-                  } else if (card.deck === "motorway") {
-                    resolvedGridKey = resolveMotorwayCard(card as MotorwayCard, midResult.gridKey)
-                  }
-
-                  if (resolvedGridKey) {
-                    const remaining = total - midResult.stepsUsed
-                    addNotification(`${currentPlayerName} relocated with ${remaining} moves remaining`, "info")
-
-                    if (remaining > 0) {
-                      const newReachable = reachableRoadGrids(resolvedGridKey, remaining, excluded)
-                      const newExact = [...newReachable.entries()]
-                        .filter(([, steps]) => steps === remaining)
-                        .map(([key]) => key)
-
-                      if (newExact.length > 0) {
-                        const newPicked = newExact[Math.floor(Math.random() * newExact.length)]
-                        finalDestination = gridKeyToLatLng(newPicked)
-                        finalDestinationGridKey = newPicked
-                      } else {
-                        finalDestination = gridKeyToLatLng(resolvedGridKey)
-                        finalDestinationGridKey = resolvedGridKey
-                      }
-                    } else {
-                      finalDestination = gridKeyToLatLng(resolvedGridKey)
-                      finalDestinationGridKey = resolvedGridKey
-                    }
-                  }
-                  deckStore.clearDrawnCard()
-                }
-              }
-            }
-          }
-
-          if (finalDestination) {
-            updatePlayerPosition(currentPlayerName!, finalDestination)
-          }
-
-          let visitedPoiIds: string[] = []
-          if (finalDestinationGridKey) {
-            const visits = detectPoiVisits(finalDestinationGridKey, pubs, spires, towers, phones, schools, selectedPois)
-            visitedPoiIds = visits.map(v => v.id)
-            visits.forEach(v => {
-              const categoryLabel = POI_CATEGORY_LABELS[v.category as PoiCategory] ?? v.category
-              addNotification(`${currentPlayerName} visited ${categoryLabel}: ${v.name ?? "Unknown"}`, "success")
-            })
-
-            if (visits.length > 0) {
-              drawCardMutation.mutate({
-                sessionId: sessionId!,
-                playerId: playerId!,
-                poiCategory: visits[0].category,
-                gridKey: finalDestinationGridKey,
-              })
-            }
-          }
-
-          if (dice1 === dice2) {
-            const deckStore = useDeckStore.getState()
-            deckStore.queueDraw("chance")
-            let drawnCard = deckStore.processNextDraw()
-            while (drawnCard) {
-              addNotification(`${currentPlayerName} drew: ${drawnCard.title}`, "info")
-              if (drawnCard.deck === "chance") {
-                processBotCardEffect(drawnCard as ChanceCard)
-              }
-              drawnCard = useDeckStore.getState().processNextDraw()
-            }
-          }
-
-          endTurnMutation.mutate({
-            sessionId: sessionId!,
-            playerId: playerId!,
-            newLat: finalDestination?.[0],
-            newLng: finalDestination?.[1],
-            visitedPoiIds: visitedPoiIds.length > 0 ? visitedPoiIds : undefined,
-          }, {
-            onSettled: () => {
-              setPendingServerUpdate(false)
-            },
-          })
-
-          if (useDeckStore.getState().extraThrow) {
-            useDeckStore.getState().setExtraThrow(false)
-            addNotification(`${currentPlayerName} takes an extra throw!`, "success")
-            clearGridSelections()
-            setPlayerStartGridKey(null)
-            setDiceResult(null)
-            setGameTurnState(GameTurnState.ROLL_DICE)
-            botTimerRef.current = setTimeout(() => playBotTurn(), 1500)
-          } else {
-            advanceToNextPlayer()
-          }
-        }, 1000)
-      },
       onError: () => {
+        setDiceRolling(false)
         setPendingServerUpdate(false)
         advanceToNextPlayer()
       },
     })
+
+    botTimerRef.current = setTimeout(() => {
+      setDiceRolling(false)
+      setDiceValues([dice1, dice2])
+      useGameStore.getState().handleDiceRoll(total)
+
+      botTimerRef.current = setTimeout(() => {
+        botMoveAndEndTurn(currentPlayerName!, total, dice1, dice2)
+      }, 3000)
+    }, 2000)
   }
 
   return null

@@ -13,7 +13,7 @@ import { useNotificationStore } from "@/stores/notification-store"
 import { useDeckStore } from "@/stores/deck-store"
 import { detectPoiVisits } from "@/lib/poi-detection"
 import { POI_CATEGORY_LABELS, type PoiCategory } from "@/lib/poi-categories"
-import { type DeckType, type ChanceCard, type EdgeCard, type MotorwayCard } from "@/lib/card-decks"
+import { type ChanceCard, type EdgeCard, type MotorwayCard } from "@/lib/card-decks"
 import { resolveEdgeCard, resolveMotorwayCard } from "@/lib/card-resolution"
 import { Button } from "@/components/ui/button"
 import { DiceDisplay } from "@/components/ui/dice"
@@ -44,6 +44,9 @@ export default function DiceRoller() {
     previewPathIndex,
     cyclePreviewPath,
     confirmPreviewPath,
+    diceValues,
+    setDiceValues,
+    diceRolling: storeDiceRolling,
   } = useGameStore()
 
   const pubs = usePubStore(s => s.pubs)
@@ -63,16 +66,32 @@ export default function DiceRoller() {
     setExtraThrow,
   } = useDeckStore()
 
-  const [isRolling, setRolling] = useState(false)
-  const [hasRolled, setHasRolled] = useState(false)
-  const [dice1Value, setDice1Value] = useState(1)
-  const [dice2Value, setDice2Value] = useState(1)
+  const [localRolling, setRolling] = useState(false)
+  const isRolling = localRolling || storeDiceRolling
+  const [hasRolled, setHasRolled] = useState(diceValues !== null)
+  const [dice1Value, setDice1Value] = useState(diceValues?.[0] ?? 1)
+  const [dice2Value, setDice2Value] = useState(diceValues?.[1] ?? 1)
+
+  useEffect(() => {
+    if (diceValues) {
+      setDice1Value(diceValues[0])
+      setDice2Value(diceValues[1])
+      setHasRolled(true)
+    } else if (storeDiceRolling) {
+      setHasRolled(true)
+    } else {
+      setHasRolled(false)
+    }
+  }, [diceValues, storeDiceRolling])
   const [drawnCard, setDrawnCard] = useState<{ title: string; body: string; type: string } | null>(null)
   const [processingDeckDraws, setProcessingDeckDraws] = useState(false)
   const total = dice1Value + dice2Value
   const playerName = player?.name || ""
   const isMyTurn = localPlayerName !== null && localPlayerName === currentPlayerName
   const isPlaying = phase === "playing"
+
+  const pendingEndTurn = useGameStore((s) => s.pendingEndTurn)
+  const setPendingEndTurn = useGameStore((s) => s.setPendingEndTurn)
 
   const rollDiceMutation = trpc.game.rollDice.useMutation()
   const endTurnMutation = trpc.game.endTurn.useMutation()
@@ -81,18 +100,32 @@ export default function DiceRoller() {
   const skipMissedTurnMutation = trpc.game.skipMissedTurn.useMutation()
 
   useEffect(() => {
+    if (pendingEndTurn && isMyTurn && gameTurnState === GameTurnState.DICE_ROLLED) {
+      setPendingEndTurn(false)
+      handleEndTurnClick()
+    }
+  }, [pendingEndTurn])
+
+  useEffect(() => {
+    if (!isMyTurn) {
+      if (drawnCard) setDrawnCard(null)
+      if (processingDeckDraws) setProcessingDeckDraws(false)
+      if (drawnDeckCard) clearDrawnCard()
+      if (cardTrigger) setCardTrigger(null)
+      return
+    }
     if (cardTrigger && !processingDeckDraws && !drawnDeckCard) {
       queueDraw(cardTrigger.type)
       setProcessingDeckDraws(true)
       processNextDraw()
     }
-  }, [cardTrigger, processingDeckDraws, drawnDeckCard, queueDraw, processNextDraw])
+  }, [isMyTurn, cardTrigger, processingDeckDraws, drawnDeckCard, queueDraw, processNextDraw])
 
   function rollDice() {
     if (isRolling) return
 
     if (currentPlayerName && (missedTurns[currentPlayerName] ?? 0) > 0) {
-      addNotification(`${currentPlayerName} must miss this turn!`, "info")
+      addNotification(isMyTurn ? "You must miss this turn!" : `${currentPlayerName} must miss this turn!`, "info")
       decrementMissedTurns(currentPlayerName)
       if (sessionId && playerId) {
         skipMissedTurnMutation.mutate({ sessionId, playerId })
@@ -112,6 +145,7 @@ export default function DiceRoller() {
       const d2 = Math.floor(Math.random() * 6) + 1
       setDice1Value(d1)
       setDice2Value(d2)
+      setDiceValues([d1, d2])
       setRolling(false)
 
       const store = useGameStore.getState()
@@ -168,7 +202,7 @@ export default function DiceRoller() {
           gridKey: lastGridKey,
         }, {
           onSuccess: (card) => {
-            if (card) {
+            if (card && useGameStore.getState().localPlayerName === useGameStore.getState().currentPlayerName) {
               setDrawnCard(card)
             }
           },
@@ -176,20 +210,15 @@ export default function DiceRoller() {
       }
     }
 
-    const triggeredDecks: DeckType[] = []
-
     if (dice1Value === dice2Value) {
-      triggeredDecks.push("chance")
-    }
-
-    if (triggeredDecks.length > 0) {
-      triggeredDecks.forEach((deck) => queueDraw(deck))
+      setPendingServerUpdate(true)
+      queueDraw("chance")
       setProcessingDeckDraws(true)
       processNextDraw()
       return
     }
 
-    finishEndTurn(destination, visitedPoiIds)
+    finishEndTurn(destination, visitedPoiIds, currentPath)
   }
 
   function handleDeckCardClose() {
@@ -249,17 +278,18 @@ export default function DiceRoller() {
         setHasRolled(false)
         return
       }
-      const lastGridKey = movementPath.length > 0
-        ? movementPath[movementPath.length - 1]
+      const currentPath = movementPath
+      const lastGridKey = currentPath.length > 0
+        ? currentPath[currentPath.length - 1]
         : null
       const destination = lastGridKey
         ? gridKeyToLatLng(lastGridKey)
         : null
-      finishEndTurn(destination, [])
+      finishEndTurn(destination, [], currentPath)
     }
   }
 
-  function finishEndTurn(destination: [number, number] | null, visitedPoiIds: string[]) {
+  function finishEndTurn(destination: [number, number] | null, visitedPoiIds: string[], movePath: string[]) {
     setPendingServerUpdate(true)
     handleEndTurn()
     if (sessionId && playerId) {
@@ -269,6 +299,7 @@ export default function DiceRoller() {
         newLat: destination?.[0],
         newLng: destination?.[1],
         visitedPoiIds: visitedPoiIds.length > 0 ? visitedPoiIds : undefined,
+        movePath: movePath.length > 0 ? movePath : undefined,
       }, {
         onSettled: () => setPendingServerUpdate(false),
       })
@@ -295,7 +326,7 @@ export default function DiceRoller() {
             {showResult && (
               <div className="flex flex-col">
                 <div className="text-lg font-bold text-primary whitespace-nowrap">
-                  You rolled {total}!
+                  {isMyTurn ? `You threw ${total}!` : `${playerName} threw ${total}!`}
                 </div>
                 {diceResult && movementPath.length === 0 && previewPaths.length > 0 && (
                   <div className="flex items-center gap-1 text-sm text-muted-foreground">
@@ -333,7 +364,7 @@ export default function DiceRoller() {
 
         {showResult && (
           <p className="text-sm text-muted-foreground sm:hidden">
-            {playerName} rolled {total}
+            {isMyTurn ? `You threw ${total}` : `${playerName} threw ${total}`}
           </p>
         )}
 
@@ -344,7 +375,7 @@ export default function DiceRoller() {
             disabled={isRolling || !isMyTurn || !isPlaying || gameTurnState !== GameTurnState.ROLL_DICE}
           >
             <Dices className="h-4 w-4" />
-            {isRolling ? "Rolling..." : "Roll Dice"}
+            {isRolling ? "Rolling..." : isMyTurn ? "Roll Dice" : `${playerName}'s Turn`}
           </Button>
           <Button
             className="flex-1 sm:flex-none gap-2"
@@ -367,12 +398,14 @@ export default function DiceRoller() {
         </div>
       </div>
 
-      <CardDrawDialog
-        card={drawnCard}
-        deckCard={drawnDeckCard}
-        onClose={() => setDrawnCard(null)}
-        onDeckCardClose={handleDeckCardClose}
-      />
+      {isMyTurn && (
+        <CardDrawDialog
+          card={drawnCard}
+          deckCard={drawnDeckCard}
+          onClose={() => setDrawnCard(null)}
+          onDeckCardClose={handleDeckCardClose}
+        />
+      )}
     </>
   )
 }

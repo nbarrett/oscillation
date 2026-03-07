@@ -1,54 +1,16 @@
 "use client"
 
-import { useEffect } from "react"
-import { useGameStore, useCurrentPlayer, GameTurnState } from "@/stores/game-store"
+import { useGameStore, useCurrentPlayer } from "@/stores/game-store"
 import { carImageForStyle } from "@/stores/car-store"
-import { log } from "@/lib/utils"
 import { cn } from "@/lib/cn"
 
 export default function PlayerPositions() {
   const {
     players,
-    gameTurnState,
-    setCurrentPlayer,
+    localPlayerName,
     setPlayerZoomRequest,
-    setGameTurnState,
   } = useGameStore()
   const currentPlayer = useCurrentPlayer()
-
-  useEffect(() => {
-    if (players.length > 0 && !currentPlayer) {
-      log.debug("initialising current player to:", players[0])
-      setCurrentPlayer(players[0].name)
-    }
-  }, [currentPlayer, players, setCurrentPlayer])
-
-  useEffect(() => {
-    log.debug("gameTurnState received:", gameTurnState)
-    if (gameTurnState === GameTurnState.END_TURN) {
-      selectNextPlayer()
-    }
-  }, [gameTurnState])
-
-  function selectNextPlayer() {
-    if (!currentPlayer) return
-
-    const currentPlayerIndex = players.findIndex(
-      (player) => player.name === currentPlayer.name
-    )
-    const newIndex =
-      currentPlayerIndex < players.length - 1 ? currentPlayerIndex + 1 : 0
-    const newPlayer = players[newIndex]
-
-    if (newPlayer) {
-      log.debug("setting current player to:", newPlayer)
-      setCurrentPlayer(newPlayer.name)
-      setPlayerZoomRequest(newPlayer.name)
-      setGameTurnState(GameTurnState.ROLL_DICE)
-    } else {
-      log.error("unable to find next player")
-    }
-  }
 
   function handlePlayerClick(playerName: string) {
     setPlayerZoomRequest(playerName)
@@ -65,6 +27,7 @@ export default function PlayerPositions() {
       </span>
       {players.map((player) => {
         const isCurrentPlayer = currentPlayer?.name === player.name
+        const isLocalPlayer = localPlayerName === player.name
         const isBot = player.name.startsWith("Bot ")
 
         return (
@@ -93,9 +56,14 @@ export default function PlayerPositions() {
                 Bot
               </span>
             )}
+            {isLocalPlayer && !isCurrentPlayer && (
+              <span className="text-[10px] bg-muted-foreground/20 text-muted-foreground px-1.5 py-0.5 rounded-full">
+                You
+              </span>
+            )}
             {isCurrentPlayer && (
               <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full">
-                Turn
+                {isLocalPlayer ? "Your Turn" : "Turn"}
               </span>
             )}
           </button>

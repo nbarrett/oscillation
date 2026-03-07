@@ -6,15 +6,17 @@ import { useGameStore, GameTurnState, type Player, type GamePhase } from "@/stor
 import { useNotificationStore } from "@/stores/notification-store"
 import { useDeckStore } from "@/stores/deck-store"
 import { areaSizeBounds, isWithinBounds, type AreaSize } from "@/lib/area-size"
+import { gridKeyToLatLng, setPathfindingBounds } from "@/lib/road-data"
 import { log } from "@/lib/utils"
 
 export default function GameSync() {
-  const { sessionId, playerId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setPoiCandidates, setWinnerName, leaveSession } = useGameStore()
+  const { sessionId, playerId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setDiceValues, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setPoiCandidates, setWinnerName, leaveSession } = useGameStore()
   const { addNotification } = useNotificationStore()
   const { initDecks, setObstructions, setMissedTurns } = useDeckStore()
   const hasCheckedSession = useRef(false)
   const previousPlayerNamesRef = useRef<string[]>([])
   const previousPhaseRef = useRef<string | null>(null)
+  const lastProcessedMoveRef = useRef<string | null>(null)
 
   const phase = useGameStore((s) => s.phase)
   const pollInterval = phase === "playing" ? 3000 : phase === "lobby" ? 5000 : 5000
@@ -73,6 +75,17 @@ export default function GameSync() {
         ? areaSizeBounds(startPos[0], startPos[1], gameState.areaSize)
         : null
 
+      const moveKey = gameState.lastMovePlayer && gameState.lastMovePath
+        ? `${gameState.lastMovePlayer}:${gameState.currentTurn}:${gameState.updatedAt}`
+        : null
+      const isNewRemoteMove = moveKey !== null
+        && moveKey !== lastProcessedMoveRef.current
+        && gameState.lastMovePlayer !== useGameStore.getState().localPlayerName
+
+      if (moveKey !== null && moveKey !== lastProcessedMoveRef.current) {
+        lastProcessedMoveRef.current = moveKey
+      }
+
       const players: Player[] = gameState.players.map(p => {
         const localPlayer = localPlayers.find(lp => lp.name === p.name)
         if (localPlayer?.previousPosition) {
@@ -93,6 +106,26 @@ export default function GameSync() {
         const position: [number, number] = outOfBounds
           ? startPos!
           : p.position
+
+        if (isNewRemoteMove && p.name === gameState.lastMovePlayer && gameState.lastMovePath && gameState.lastMovePath.length > 0) {
+          const prevPlayer = localPlayers.find(lp => lp.name === p.name)
+          const prevPos: [number, number] = prevPlayer?.position ?? position
+          const routeWaypoints: [number, number][] = [
+            prevPos,
+            ...gameState.lastMovePath.map((key: string) => gridKeyToLatLng(key)),
+          ]
+          log.info(`GameSync: remote move by "${p.name}" — ${gameState.lastMovePath.length} grid steps`)
+          return {
+            name: p.name,
+            iconType: p.iconType,
+            position,
+            previousPosition: prevPos,
+            completedRoute: routeWaypoints,
+            visitedPois: p.visitedPois,
+            hasReturnedToStart: p.hasReturnedToStart,
+          }
+        }
+
         return {
           name: p.name,
           iconType: p.iconType,
@@ -126,7 +159,9 @@ export default function GameSync() {
       if (gameState.areaSize) {
         setAreaSize(gameState.areaSize)
         if (gameState.startLat != null && gameState.startLng != null) {
-          setGameBounds(areaSizeBounds(gameState.startLat, gameState.startLng, gameState.areaSize))
+          const bounds = areaSizeBounds(gameState.startLat, gameState.startLng, gameState.areaSize)
+          setGameBounds(bounds)
+          setPathfindingBounds(bounds)
         }
       }
 
@@ -147,6 +182,7 @@ export default function GameSync() {
 
         if (gameState.dice1 !== null && gameState.dice2 !== null) {
           const total = gameState.dice1 + gameState.dice2
+          setDiceValues([gameState.dice1, gameState.dice2])
           const freshState = useGameStore.getState()
           if (!freshState.playerStartGridKey) {
             freshState.handleDiceRoll(total)
@@ -156,6 +192,7 @@ export default function GameSync() {
           }
         } else if (turnChanged || !localState.diceResult) {
           setDiceResult(null)
+          setDiceValues(null)
           setGameTurnState(GameTurnState.ROLL_DICE)
         }
       }

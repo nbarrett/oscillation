@@ -48,38 +48,63 @@ const GameSync = dynamic(() => import("@/components/GameSync"), { ssr: false })
 const GameLobby = dynamic(() => import("@/components/GameLobby"), { ssr: false })
 const BotTurnPlayer = dynamic(() => import("@/components/BotTurnPlayer"), { ssr: false })
 const PoiPicker = dynamic(() => import("@/components/PoiPicker"), { ssr: false })
-const CarSizeControl = dynamic(() => import("@/components/CarSizeControl"), { ssr: false })
+
 
 function MovementOverlay() {
   const gameTurnState = useGameStore((s) => s.gameTurnState)
   const diceResult = useGameStore((s) => s.diceResult)
   const movementPath = useGameStore((s) => s.movementPath)
   const currentPlayerName = useGameStore((s) => s.currentPlayerName)
-  const localPlayerName = useGameStore((s) => s.localPlayerName)
   const previewPaths = useGameStore((s) => s.previewPaths)
   const previewPathIndex = useGameStore((s) => s.previewPathIndex)
   const cyclePreviewPath = useGameStore((s) => s.cyclePreviewPath)
   const confirmPreviewPath = useGameStore((s) => s.confirmPreviewPath)
-  const handleEndTurn = useGameStore((s) => s.handleEndTurn)
+  const setPendingEndTurn = useGameStore((s) => s.setPendingEndTurn)
 
+  const diceRolling = useGameStore((s) => s.diceRolling)
+  const diceValues = useGameStore((s) => s.diceValues)
+  const localPlayerName = useGameStore((s) => s.localPlayerName)
   const isMyTurn = localPlayerName !== null && localPlayerName === currentPlayerName
+  const isBotTurn = currentPlayerName?.startsWith("Bot ") ?? false
   const showPreviews = isMyTurn && gameTurnState === GameTurnState.DICE_ROLLED && diceResult && movementPath.length === 0 && previewPaths.length > 0
   const showRollDice = isMyTurn && gameTurnState === GameTurnState.ROLL_DICE
-  const showClickToMove = isMyTurn && gameTurnState === GameTurnState.DICE_ROLLED && diceResult && movementPath.length === 0 && previewPaths.length === 0
+  const showFreeSelection = isMyTurn && gameTurnState === GameTurnState.DICE_ROLLED && diceResult && previewPaths.length === 0
+  const showBotRolling = isBotTurn && diceRolling
+  const showBotResult = isBotTurn && !diceRolling && diceValues && gameTurnState === GameTurnState.DICE_ROLLED
 
-  if (!showPreviews && !showRollDice && !showClickToMove) return null
+  if (!showPreviews && !showRollDice && !showFreeSelection && !showBotRolling && !showBotResult) return null
 
   return (
     <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] animate-bounce-in">
       <div className="bg-primary/95 text-primary-foreground px-6 py-3 rounded-xl shadow-2xl text-center">
-        {showRollDice && (
+        {showBotRolling && (
           <div className="text-lg font-bold pointer-events-none">
-            {currentPlayerName}&apos;s turn — Roll the dice!
+            {currentPlayerName} is rolling the dice...
           </div>
         )}
-        {showClickToMove && (
+        {showBotResult && (
           <div className="text-lg font-bold pointer-events-none">
-            Move {diceResult} squares — click a square on the road
+            {currentPlayerName} threw {diceValues[0] + diceValues[1]}!
+          </div>
+        )}
+        {showRollDice && (
+          <div className="text-lg font-bold pointer-events-none">
+            {isMyTurn ? "Your" : `${currentPlayerName}\u2019s`} turn — Roll the dice!
+          </div>
+        )}
+        {showFreeSelection && (
+          <div className="flex items-center gap-3">
+            <div className="text-lg font-bold">
+              {movementPath.length > 0
+                ? `Moves: ${movementPath.length}/${diceResult} — click to extend`
+                : `Move ${diceResult} squares — click a square on the road`}
+            </div>
+            <button
+              onClick={() => useGameStore.getState().clearGridSelections()}
+              className="px-3 py-1.5 rounded-lg bg-primary-foreground text-primary text-sm font-bold hover:bg-primary-foreground/90 transition-colors"
+            >
+              Show Routes
+            </button>
           </div>
         )}
         {showPreviews && (
@@ -113,11 +138,17 @@ function MovementOverlay() {
             <button
               onClick={() => {
                 confirmPreviewPath()
-                handleEndTurn()
+                setPendingEndTurn(true)
               }}
               className="px-3 py-1.5 rounded-lg bg-primary-foreground text-primary text-sm font-bold hover:bg-primary-foreground/90 transition-colors"
             >
               Select &amp; End Turn
+            </button>
+            <button
+              onClick={() => useGameStore.getState().setPreviewPaths([])}
+              className="px-3 py-1.5 rounded-lg bg-primary-foreground text-primary text-sm font-bold hover:bg-primary-foreground/90 transition-colors"
+            >
+              Free Selection
             </button>
           </div>
         )}
@@ -337,7 +368,7 @@ export default function GamePage() {
                 <div className="h-[calc(100vh-280px)] min-h-[400px] relative">
                   <MapWithCars />
                   <MapPositions />
-                  <CarSizeControl />
+
                   <MovementOverlay />
                 </div>
               </CardContent>

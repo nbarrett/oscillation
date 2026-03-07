@@ -88,6 +88,7 @@ export default function PlayerCar({ player }: PlayerCarProps) {
   const {
     gameTurnState,
     currentPlayerName,
+    localPlayerName,
   } = useGameStore()
   const { carSize } = useCarStore()
 
@@ -114,8 +115,10 @@ export default function PlayerCar({ player }: PlayerCarProps) {
     }
   }, [active, gameTurnState])
 
+  const isLocalPlayer = localPlayerName === player.name
+
   function popupCaption() {
-    return player.name
+    return isLocalPlayer ? `${player.name} (You)` : player.name
   }
 
   if (hide) {

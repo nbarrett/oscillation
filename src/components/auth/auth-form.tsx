@@ -62,7 +62,16 @@ export function AuthForm({ onSuccess, showMapPreview = true }: AuthFormProps) {
       setIsLoading(false)
     },
     onError: (err) => {
-      setError(err.message)
+      try {
+        const parsed = JSON.parse(err.message)
+        if (Array.isArray(parsed) && parsed[0]?.message) {
+          setError(parsed[0].message)
+        } else {
+          setError(err.message)
+        }
+      } catch {
+        setError(err.message)
+      }
       setIsLoading(false)
     },
   })

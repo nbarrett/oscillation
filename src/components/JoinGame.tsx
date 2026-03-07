@@ -868,12 +868,15 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
                       <div className="flex items-center justify-between">
                         <span className="font-mono font-semibold tracking-wider">{game.code}</span>
                         <span className="text-sm text-muted-foreground">
-                          {game.playerCount}/4 players
+                          {game.playerCount} {game.playerCount === 1 ? "player" : "players"}
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-sm text-muted-foreground mt-1">
                         <span>{game.playerNames.join(", ")}</span>
-                        <span>{timeAgo(game.updatedAt)}</span>
+                        <div className="flex flex-col items-end text-xs">
+                          <span>Created {timeAgo(game.createdAt)}</span>
+                          <span>Last played {timeAgo(game.updatedAt)}</span>
+                        </div>
                       </div>
                     </button>
                   ))}

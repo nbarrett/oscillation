@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import { persist, createJSONStorage } from "zustand/middleware"
 import { log } from "@/lib/utils"
-import { latLngToGridKey, gridKeyToLatLng, isRoadDataLoaded, reachableRoadGrids, onRoadDataReady } from "@/lib/road-data"
+import { latLngToGridKey, gridKeyToLatLng, isRoadDataLoaded, reachableRoadGrids, onRoadDataReady, setPathfindingBounds } from "@/lib/road-data"
 import { CAR_STYLES } from "@/stores/car-store"
 import { type AreaSize, type GameBounds, DEFAULT_AREA_SIZE } from "@/lib/area-size"
 import { useDeckStore } from "@/stores/deck-store"
@@ -98,6 +98,8 @@ interface GameState {
   gameTurnState: GameTurnState;
   currentPlayerName: string | null;
   diceResult: number | null;
+  diceValues: [number, number] | null;
+  diceRolling: boolean;
   mapCentre: [number, number] | null;
   mapClickPosition: MapClickPosition | null;
   mapZoom: number;
@@ -125,6 +127,7 @@ interface GameState {
   activePickingCategory: PoiCategory | null;
   previewPaths: string[][];
   previewPathIndex: number;
+  pendingEndTurn: boolean;
   setShowPreviewPaths: (show: boolean) => void;
   setPreviewPaths: (paths: string[][]) => void;
   setPreviewPathIndex: (index: number) => void;
@@ -140,6 +143,8 @@ interface GameState {
   setGameTurnState: (state: GameTurnState) => void;
   setCurrentPlayer: (name: string) => void;
   setDiceResult: (result: number | null) => void;
+  setDiceValues: (values: [number, number] | null) => void;
+  setDiceRolling: (rolling: boolean) => void;
   setMapCentre: (centre: [number, number]) => void;
   setMapClickPosition: (position: MapClickPosition | null) => void;
   setMapZoom: (zoom: number) => void;
@@ -170,6 +175,7 @@ interface GameState {
   setSelectedPois: (pois: SelectedPoi[] | null) => void;
   setPoiCandidates: (candidates: SelectedPoi[] | null) => void;
   setWinnerName: (name: string | null) => void;
+  setPendingEndTurn: (pending: boolean) => void;
   setActivePickingCategory: (category: PoiCategory | null) => void;
   isCreator: () => boolean;
   leaveSession: () => void;
@@ -184,6 +190,8 @@ export const useGameStore = create<GameState>()(
       gameTurnState: GameTurnState.ROLL_DICE,
       currentPlayerName: null,
       diceResult: null,
+      diceValues: null,
+      diceRolling: false,
       mapCentre: null,
       mapClickPosition: null,
       mapZoom: defaultZoom,
@@ -211,6 +219,7 @@ export const useGameStore = create<GameState>()(
       activePickingCategory: null,
       previewPaths: [],
       previewPathIndex: 0,
+      pendingEndTurn: false,
 
       setShowPreviewPaths: (showPreviewPaths) => set({ showPreviewPaths }),
 
@@ -290,6 +299,9 @@ export const useGameStore = create<GameState>()(
       setCurrentPlayer: (currentPlayerName) => set({ currentPlayerName }),
 
       setDiceResult: (diceResult) => set({ diceResult }),
+
+      setDiceValues: (diceValues) => set({ diceValues }),
+      setDiceRolling: (diceRolling) => set({ diceRolling }),
 
       setMapCentre: (mapCentre) => set({ mapCentre }),
 
@@ -474,6 +486,8 @@ export const useGameStore = create<GameState>()(
           gameTurnState: GameTurnState.ROLL_DICE,
           currentPlayerName: nextPlayer?.name ?? null,
           diceResult: null,
+          diceValues: null,
+          diceRolling: false,
           selectedGridSquares: [],
           movementPath: [],
           playerStartGridKey: null,
@@ -482,6 +496,8 @@ export const useGameStore = create<GameState>()(
           selectedEndpoint: null,
           previewPaths: [],
           previewPathIndex: 0,
+          cardTrigger: null,
+          pendingEndTurn: false,
         });
       },
 
@@ -542,6 +558,8 @@ export const useGameStore = create<GameState>()(
 
       setWinnerName: (winnerName) => set({ winnerName }),
 
+      setPendingEndTurn: (pendingEndTurn) => set({ pendingEndTurn }),
+
       setActivePickingCategory: (activePickingCategory) => set({ activePickingCategory }),
 
       isCreator: () => {
@@ -549,25 +567,28 @@ export const useGameStore = create<GameState>()(
         return state.playerId !== null && state.playerId === state.creatorPlayerId;
       },
 
-      leaveSession: () => set({
-        sessionId: null,
-        playerId: null,
-        sessionCode: null,
-        localPlayerName: null,
-        areaSize: DEFAULT_AREA_SIZE,
-        gameBounds: null,
-        players: [],
-        currentPlayerName: null,
-        gameTurnState: GameTurnState.ROLL_DICE,
-        reachableGrids: null,
-        selectedEndpoint: null,
-        phase: "lobby" as GamePhase,
-        creatorPlayerId: null,
-        selectedPois: null,
-        poiCandidates: null,
-        winnerName: null,
-        activePickingCategory: null,
-      }),
+      leaveSession: () => {
+        setPathfindingBounds(null);
+        return set({
+          sessionId: null,
+          playerId: null,
+          sessionCode: null,
+          localPlayerName: null,
+          areaSize: DEFAULT_AREA_SIZE,
+          gameBounds: null,
+          players: [],
+          currentPlayerName: null,
+          gameTurnState: GameTurnState.ROLL_DICE,
+          reachableGrids: null,
+          selectedEndpoint: null,
+          phase: "lobby" as GamePhase,
+          creatorPlayerId: null,
+          selectedPois: null,
+          poiCandidates: null,
+          winnerName: null,
+          activePickingCategory: null,
+        });
+      },
     }),
     {
       name: "oscillation-game",
@@ -584,6 +605,7 @@ export const useGameStore = create<GameState>()(
         phase: state.phase,
         creatorPlayerId: state.creatorPlayerId,
         showPreviewPaths: state.showPreviewPaths,
+        diceValues: state.diceValues,
       }),
     }
   )

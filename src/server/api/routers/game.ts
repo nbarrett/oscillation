@@ -158,10 +158,10 @@ export const gameRouter = createTRPCRouter({
         })
       }
 
-      if (session.players.length >= 4) {
+      if (session.players.length >= 8) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Game is full (maximum 4 players).",
+          message: "Game is full (maximum 8 players).",
         })
       }
 
@@ -227,9 +227,10 @@ export const gameRouter = createTRPCRouter({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Need at least 1 player to start." })
       }
 
-      if (session.botsEnabled && session.players.length < 4) {
+      const minPlayersForGame = 4
+      if (session.botsEnabled && session.players.length < minPlayersForGame) {
         const botNames = ["Bot Alice", "Bot Bob", "Bot Charlie"]
-        const botsNeeded = 4 - session.players.length
+        const botsNeeded = minPlayersForGame - session.players.length
         for (let i = 0; i < botsNeeded; i++) {
           const turnOrder = session.players.length + i
           const iconType = CAR_STYLES[turnOrder % CAR_STYLES.length]
@@ -370,6 +371,8 @@ export const gameRouter = createTRPCRouter({
         poiCandidates: session.poiCandidates as Array<{ category: string; osmId: number; name: string | null; lat: number; lng: number }> | null,
         deckState: session.deckState as { edgeDeck: string[]; motorwayDeck: string[]; chanceDeck: string[]; edgeDrawIndex: number; motorwayDrawIndex: number; chanceDrawIndex: number } | null,
         obstructions: (session.obstructions as unknown as ObstructionToken[]) ?? [],
+        lastMovePath: (session.lastMovePath as string[] | null) ?? null,
+        lastMovePlayer: session.lastMovePlayer ?? null,
         players: session.players.map(p => ({
           id: p.id,
           name: p.name,
@@ -429,6 +432,7 @@ export const gameRouter = createTRPCRouter({
       newLat: z.number().optional(),
       newLng: z.number().optional(),
       visitedPoiIds: z.array(z.string()).optional(),
+      movePath: z.array(z.string()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const session = await ctx.db.gameSession.findUnique({
@@ -510,6 +514,8 @@ export const gameRouter = createTRPCRouter({
             currentTurn: nextTurn,
             dice1: null,
             dice2: null,
+            lastMovePath: input.movePath ? JSON.parse(JSON.stringify(input.movePath)) : Prisma.DbNull,
+            lastMovePlayer: currentPlayer.name,
           },
         })
       }

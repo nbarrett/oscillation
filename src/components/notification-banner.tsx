@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { X, UserPlus, AlertTriangle } from "lucide-react"
+import { X, Info, CheckCircle2, AlertTriangle } from "lucide-react"
 import { useNotificationStore } from "@/stores/notification-store"
 import { cn } from "@/lib/cn"
 
@@ -32,58 +32,34 @@ export function NotificationBanner() {
   if (notifications.length === 0) return null
 
   return (
-    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9998] flex flex-col gap-2 w-full max-w-md px-4">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9998] flex flex-col gap-2 w-full max-w-sm px-4">
       {notifications.map((notification) => (
         <div
           key={notification.id}
           className={cn(
-            "flex items-center gap-3 rounded-lg border p-3 shadow-lg",
-            "animate-in slide-in-from-top-2 fade-in-0 duration-200",
-            notification.type === "success"
-              ? "border-green-500/50 bg-green-500/10"
-              : notification.type === "error"
-                ? "border-red-500/50 bg-red-500/10"
-                : "border-blue-500/50 bg-blue-500/10"
+            "flex items-center gap-3 rounded-lg border px-4 py-2.5 shadow-lg backdrop-blur-sm",
+            "animate-in slide-in-from-bottom-2 fade-in-0 duration-200",
+            notification.type === "error"
+              ? "border-[#d40058]/40 bg-[#d40058]/10 text-[#d40058]"
+              : "border-[#453c90]/40 bg-[#453c90]/10 text-[#453c90]"
           )}
         >
           {notification.type === "error" ? (
-            <AlertTriangle className="h-5 w-5 shrink-0 text-red-600" />
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+          ) : notification.type === "success" ? (
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
           ) : (
-            <UserPlus
-              className={cn(
-                "h-5 w-5 shrink-0",
-                notification.type === "success" ? "text-green-600" : "text-blue-600"
-              )}
-            />
+            <Info className="h-4 w-4 shrink-0" />
           )}
-          <p
-            className={cn(
-              "flex-1 text-sm font-medium",
-              notification.type === "success"
-                ? "text-green-700"
-                : notification.type === "error"
-                  ? "text-red-700"
-                  : "text-blue-700"
-            )}
-          >
+          <p className="flex-1 text-sm font-medium">
             {notification.message}
           </p>
           <button
             onClick={() => removeNotification(notification.id)}
-            className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            className="rounded-sm opacity-70 transition-opacity hover:opacity-100"
             title="Dismiss"
           >
-            <X
-              className={cn(
-                "h-4 w-4",
-                notification.type === "success"
-                  ? "text-green-600"
-                  : notification.type === "error"
-                    ? "text-red-600"
-                    : "text-blue-600"
-              )}
-            />
-            <span className="sr-only">Close</span>
+            <X className="h-3.5 w-3.5" />
           </button>
         </div>
       ))}

@@ -1,5 +1,6 @@
 import proj4 from "proj4";
 import { log } from "@/lib/utils";
+import { type GameBounds } from "@/lib/area-size";
 
 const BNG = "+proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy +towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 +units=m +no_defs";
 
@@ -49,6 +50,10 @@ const STORAGE_MAX_AGE = 24 * 60 * 60 * 1000;
 
 let roadDataCache: RoadDataCache | null = null;
 const roadDataListeners: Array<() => void> = [];
+let gridRoadIndex: Map<string, Array<{roadIdx: number, coordIdx: number}>> | null = null;
+
+export function setPathfindingBounds(_bounds: GameBounds | null): void {
+}
 
 export function onRoadDataReady(callback: () => void): () => void {
   if (roadDataCache) {
@@ -341,6 +346,246 @@ export function nearestRoadPosition(lat: number, lng: number): [number, number] 
   return bestCoord;
 }
 
+function ensureGridRoadIndex(): Map<string, Array<{roadIdx: number, coordIdx: number}>> {
+  if (gridRoadIndex) return gridRoadIndex;
+  gridRoadIndex = new Map();
+  if (!roadDataCache) return gridRoadIndex;
+
+  for (let r = 0; r < roadDataCache.roads.length; r++) {
+    const road = roadDataCache.roads[r];
+    for (let c = 0; c < road.coordinates.length; c++) {
+      const [lat, lng] = road.coordinates[c];
+      const key = latLngToGridKey(lat, lng);
+      if (!gridRoadIndex.has(key)) gridRoadIndex.set(key, []);
+      gridRoadIndex.get(key)!.push({ roadIdx: r, coordIdx: c });
+    }
+  }
+
+  return gridRoadIndex;
+}
+
+export function roadPathBetweenGrids(
+  gridKeyA: string,
+  gridKeyB: string
+): [number, number][] {
+  if (!roadDataCache) return [];
+
+  const index = ensureGridRoadIndex();
+  const entriesA = index.get(gridKeyA);
+  const entriesB = index.get(gridKeyB);
+  if (!entriesA || !entriesB) return [];
+
+  const roadsInA = new Map<number, number[]>();
+  for (const { roadIdx, coordIdx } of entriesA) {
+    if (!roadsInA.has(roadIdx)) roadsInA.set(roadIdx, []);
+    roadsInA.get(roadIdx)!.push(coordIdx);
+  }
+
+  let bestRoad: RoadSegment | null = null;
+  let bestIdxA = 0;
+  let bestIdxB = 0;
+  let bestSpan = Infinity;
+
+  for (const { roadIdx, coordIdx: idxB } of entriesB) {
+    const aIndices = roadsInA.get(roadIdx);
+    if (!aIndices) continue;
+
+    for (const idxA of aIndices) {
+      const span = Math.abs(idxA - idxB);
+      if (span < bestSpan) {
+        bestSpan = span;
+        bestRoad = roadDataCache.roads[roadIdx];
+        bestIdxA = idxA;
+        bestIdxB = idxB;
+      }
+    }
+  }
+
+  if (!bestRoad) return [];
+
+  const from = Math.min(bestIdxA, bestIdxB);
+  const to = Math.max(bestIdxA, bestIdxB);
+  const segment = bestRoad.coordinates.slice(from, to + 1);
+
+  if (bestIdxA > bestIdxB) {
+    segment.reverse();
+  }
+
+  return segment;
+}
+
+function crossGridRoadPath(
+  startLat: number,
+  startLng: number,
+  gridA: string,
+  endLat: number,
+  endLng: number,
+  gridB: string
+): [number, number][] {
+  if (!roadDataCache) return [];
+
+  const index = ensureGridRoadIndex();
+  const entriesA = index.get(gridA);
+  const entriesB = index.get(gridB);
+  if (!entriesA?.length || !entriesB?.length) return [];
+
+  let bestDistA = Infinity;
+  let bestRoadIdxA = -1;
+  for (const { roadIdx, coordIdx } of entriesA) {
+    const [rLat, rLng] = roadDataCache.roads[roadIdx].coordinates[coordIdx];
+    const d = (rLat - startLat) ** 2 + (rLng - startLng) ** 2;
+    if (d < bestDistA) {
+      bestDistA = d;
+      bestRoadIdxA = roadIdx;
+    }
+  }
+
+  let bestDistB = Infinity;
+  let bestRoadIdxB = -1;
+  for (const { roadIdx, coordIdx } of entriesB) {
+    const [rLat, rLng] = roadDataCache.roads[roadIdx].coordinates[coordIdx];
+    const d = (rLat - endLat) ** 2 + (rLng - endLng) ** 2;
+    if (d < bestDistB) {
+      bestDistB = d;
+      bestRoadIdxB = roadIdx;
+    }
+  }
+
+  if (bestRoadIdxA < 0 || bestRoadIdxB < 0) return [];
+
+  const coordsA: [number, number][] = entriesA
+    .filter(e => e.roadIdx === bestRoadIdxA)
+    .sort((a, b) => a.coordIdx - b.coordIdx)
+    .map(e => roadDataCache!.roads[bestRoadIdxA].coordinates[e.coordIdx]);
+
+  const coordsB: [number, number][] = entriesB
+    .filter(e => e.roadIdx === bestRoadIdxB)
+    .sort((a, b) => a.coordIdx - b.coordIdx)
+    .map(e => roadDataCache!.roads[bestRoadIdxB].coordinates[e.coordIdx]);
+
+  if (coordsA.length === 0 || coordsB.length === 0) return [];
+
+  if (coordsA.length > 1) {
+    const dFirst = (coordsA[0][0] - startLat) ** 2 + (coordsA[0][1] - startLng) ** 2;
+    const dLast = (coordsA[coordsA.length - 1][0] - startLat) ** 2 + (coordsA[coordsA.length - 1][1] - startLng) ** 2;
+    if (dLast < dFirst) coordsA.reverse();
+  }
+
+  if (coordsB.length > 1) {
+    const dFirst = (coordsB[0][0] - endLat) ** 2 + (coordsB[0][1] - endLng) ** 2;
+    const dLast = (coordsB[coordsB.length - 1][0] - endLat) ** 2 + (coordsB[coordsB.length - 1][1] - endLng) ** 2;
+    if (dFirst < dLast) coordsB.reverse();
+  }
+
+  return [...coordsA, ...coordsB];
+}
+
+export function roadPathThroughGrids(
+  startPos: [number, number],
+  gridKeys: string[]
+): [number, number][] {
+  if (!roadDataCache || gridKeys.length === 0) return [];
+
+  const startGrid = latLngToGridKey(startPos[0], startPos[1]);
+  const allGrids = [startGrid, ...gridKeys].filter((g, i, arr) => i === 0 || g !== arr[i - 1]);
+
+  if (allGrids.length < 2) {
+    const dest = gridKeyToLatLng(gridKeys[gridKeys.length - 1]);
+    return [startPos, ...roadPathBetween(startPos[0], startPos[1], dest[0], dest[1])];
+  }
+
+  const pairsNeeded = new Set<string>();
+  for (let i = 0; i < allGrids.length - 1; i++) {
+    pairsNeeded.add(`${allGrids[i]}|${allGrids[i + 1]}`);
+  }
+
+  interface Crossing {
+    exitPos: [number, number];
+    entryPos: [number, number];
+  }
+  const found = new Map<string, Crossing>();
+
+  for (const road of roadDataCache.roads) {
+    if (found.size === pairsNeeded.size) break;
+
+    for (let c = 0; c < road.coordinates.length - 1; c++) {
+      const [lat1, lng1] = road.coordinates[c];
+      const [lat2, lng2] = road.coordinates[c + 1];
+      const key1 = latLngToGridKey(lat1, lng1);
+      const key2 = latLngToGridKey(lat2, lng2);
+
+      if (key1 !== key2) {
+        const fwd = `${key1}|${key2}`;
+        if (pairsNeeded.has(fwd) && !found.has(fwd)) {
+          found.set(fwd, { exitPos: road.coordinates[c], entryPos: road.coordinates[c + 1] });
+        }
+        const rev = `${key2}|${key1}`;
+        if (pairsNeeded.has(rev) && !found.has(rev)) {
+          found.set(rev, { exitPos: road.coordinates[c + 1], entryPos: road.coordinates[c] });
+        }
+      }
+
+      const dLat = lat2 - lat1;
+      const dLng = lng2 - lng1;
+      const steps = Math.ceil(Math.sqrt(dLat * dLat + dLng * dLng) * 1000);
+      if (steps <= 1) continue;
+
+      let prevKey = key1;
+      let prevT = 0;
+      for (let j = 1; j <= steps; j++) {
+        const t = j / steps;
+        const curKey = j < steps
+          ? latLngToGridKey(lat1 + t * dLat, lng1 + t * dLng)
+          : key2;
+
+        if (curKey !== prevKey) {
+          const exitT = (prevT + t) * 0.5;
+          const exitPos: [number, number] = [lat1 + exitT * dLat, lng1 + exitT * dLng];
+          const fwd = `${prevKey}|${curKey}`;
+          if (pairsNeeded.has(fwd) && !found.has(fwd)) {
+            found.set(fwd, { exitPos, entryPos: exitPos });
+          }
+          const rev = `${curKey}|${prevKey}`;
+          if (pairsNeeded.has(rev) && !found.has(rev)) {
+            found.set(rev, { exitPos, entryPos: exitPos });
+          }
+          prevKey = curKey;
+        }
+        prevT = t;
+      }
+    }
+  }
+
+  const result: [number, number][] = [startPos];
+
+  for (let i = 0; i < allGrids.length - 1; i++) {
+    const crossing = found.get(`${allGrids[i]}|${allGrids[i + 1]}`);
+    if (!crossing) {
+      result.push(gridKeyToLatLng(allGrids[i + 1]));
+      continue;
+    }
+
+    const lastPoint = result[result.length - 1];
+    const withinGrid = roadPathBetween(lastPoint[0], lastPoint[1], crossing.exitPos[0], crossing.exitPos[1]);
+    for (let j = 1; j < withinGrid.length; j++) {
+      result.push(withinGrid[j]);
+    }
+
+    if (crossing.exitPos[0] !== crossing.entryPos[0] || crossing.exitPos[1] !== crossing.entryPos[1]) {
+      result.push(crossing.entryPos);
+    }
+  }
+
+  const lastPoint = result[result.length - 1];
+  const finalDest = gridKeyToLatLng(gridKeys[gridKeys.length - 1]);
+  const lastSeg = roadPathBetween(lastPoint[0], lastPoint[1], finalDest[0], finalDest[1]);
+  for (let j = 1; j < lastSeg.length; j++) {
+    result.push(lastSeg[j]);
+  }
+
+  return result.length >= 2 ? result : [startPos, finalDest];
+}
+
 export function roadPathBetween(
   startLat: number,
   startLng: number,
@@ -348,6 +593,19 @@ export function roadPathBetween(
   endLng: number
 ): [number, number][] {
   if (!roadDataCache) return [[startLat, startLng], [endLat, endLng]];
+
+  const gridA = latLngToGridKey(startLat, startLng);
+  const gridB = latLngToGridKey(endLat, endLng);
+
+  if (gridA !== gridB) {
+    const gridSegment = roadPathBetweenGrids(gridA, gridB);
+    if (gridSegment.length >= 2) return gridSegment;
+
+    const crossPath = crossGridRoadPath(startLat, startLng, gridA, endLat, endLng, gridB);
+    if (crossPath.length >= 2) return crossPath;
+
+    return [[startLat, startLng], [endLat, endLng]];
+  }
 
   let bestRoad: RoadSegment | null = null;
   let bestStartIdx = 0;
@@ -529,6 +787,7 @@ export async function loadRoadData(
     const gridSquaresWithBRoads = calculateGridSquaresWithRoads(bRoads);
     const gridAdjacency = calculateGridAdjacency(roads);
 
+    gridRoadIndex = null;
     roadDataCache = {
       bounds: { south, west, north, east },
       roads,
