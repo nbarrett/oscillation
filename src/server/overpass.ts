@@ -1,16 +1,14 @@
 import { log } from "@/lib/utils";
 import { POI_CATEGORIES, MIN_POIS_PER_CATEGORY, classifyChurch, type PoiCategory, type PoiValidationResult } from "@/lib/poi-categories";
-import { MOTORWAY_PROXIMITY_METRES, motorwayOverpassClause } from "@/server/motorway-filter";
+import { motorwayOverpassClause } from "@/server/motorway-filter";
 
 const OVERPASS_ENDPOINTS = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
-  "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
-  "https://overpass.openstreetmap.ru/api/interpreter",
 ];
 
-const MAX_RETRIES = 4;
-const RETRY_BASE_MS = 1000;
+const MAX_RETRIES = 3;
+const RETRY_BASE_MS = 2000;
 const FETCH_TIMEOUT_MS = 45000;
 
 const poiCache = new Map<string, { result: PoiValidationResult; expiresAt: number }>();
@@ -118,8 +116,7 @@ export interface PoiCandidate {
 
 function buildCombinedQuery(bbox: string): string {
   return [
-    "[out:json][timeout:30];",
-    `(${motorwayOverpassClause(bbox)})->.motorways;`,
+    "[out:json][timeout:25];",
     "(",
     `node["amenity"="pub"](${bbox});`,
     `node["amenity"="place_of_worship"]["religion"="christian"](${bbox});`,
@@ -131,10 +128,7 @@ function buildCombinedQuery(bbox: string): string {
     `way["amenity"="school"](${bbox});`,
     `node["amenity"="college"](${bbox});`,
     `way["amenity"="college"](${bbox});`,
-    ")->.allpois;",
-    `node.allpois(around.motorways:${MOTORWAY_PROXIMITY_METRES})->.nearmw;`,
-    `way.allpois(around.motorways:${MOTORWAY_PROXIMITY_METRES})->.nearmw_w;`,
-    "(.allpois; - .nearmw; - .nearmw_w;);",
+    ");",
     "out center tags;",
   ].join("");
 }
@@ -282,4 +276,22 @@ export async function fetchPoiCandidates(
   poiCandidateCache.set(bbox, { candidates, expiresAt: Date.now() + POI_CACHE_TTL_MS });
 
   return candidates;
+}
+
+export function prewarmPoiCandidates(
+  south: number,
+  west: number,
+  north: number,
+  east: number,
+): void {
+  const bbox = `${south},${west},${north},${east}`;
+  const cached = poiCandidateCache.get(bbox);
+  if (cached && cached.expiresAt > Date.now()) {
+    log.debug("POI prewarm: cache already warm for", bbox);
+    return;
+  }
+  log.info("POI prewarm: fetching candidates in background for", bbox);
+  fetchPoiCandidates(south, west, north, east).catch((err) => {
+    log.warn("POI prewarm: background fetch failed —", err instanceof Error ? err.message : String(err));
+  });
 }

@@ -34,6 +34,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
     () =>
       new QueryClient({
+        defaultOptions: {
+          queries: {
+            staleTime: 10_000,
+            refetchOnWindowFocus: false,
+            retry: 1,
+          },
+        },
         queryCache: new QueryCache({
           onError: handleTRPCError,
         }),

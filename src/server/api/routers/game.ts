@@ -5,7 +5,7 @@ import { createTRPCRouter, publicProcedure } from "../trpc"
 import { CAR_STYLES } from "@/stores/car-store"
 import { AREA_SIZES, DEFAULT_AREA_SIZE, areaSizeBounds, isWithinBounds, type AreaSize } from "@/lib/area-size"
 import { snapToGridCenter } from "@/lib/road-data"
-import { validatePoiCoverage, fetchPoiCandidates } from "@/server/overpass"
+import { validatePoiCoverage, fetchPoiCandidates, prewarmPoiCandidates } from "@/server/overpass"
 import { POI_CATEGORIES } from "@/lib/poi-categories"
 import { EDGE_DECK, MOTORWAY_DECK, CHANCE_DECK, shuffleDeck, cardById, type ObstructionToken } from "@/lib/card-decks"
 import { log } from "@/lib/utils"
@@ -56,7 +56,11 @@ export const gameRouter = createTRPCRouter({
     }))
     .query(async ({ input }) => {
       const bounds = areaSizeBounds(input.lat, input.lng, input.areaSize as AreaSize)
-      return validatePoiCoverage(bounds.south, bounds.west, bounds.north, bounds.east)
+      const result = await validatePoiCoverage(bounds.south, bounds.west, bounds.north, bounds.east)
+      if (result.valid) {
+        prewarmPoiCandidates(bounds.south, bounds.west, bounds.north, bounds.east)
+      }
+      return result
     }),
 
   validLocationIds: publicProcedure

@@ -25,12 +25,10 @@ export default function DiceRoller() {
   const player = useCurrentPlayer()
   const {
     gameTurnState,
-    handleDiceRoll,
     handleEndTurn,
     setPlayerZoomRequest,
     sessionId,
     playerId,
-    players,
     currentPlayerName,
     diceResult,
     movementPath,
@@ -57,9 +55,7 @@ export default function DiceRoller() {
   const {
     missedTurns,
     decrementMissedTurns,
-    pendingDraws,
     drawnDeckCard,
-    drawFromDeck,
     queueDraw,
     processNextDraw,
     clearDrawnCard,
@@ -68,7 +64,6 @@ export default function DiceRoller() {
   } = useDeckStore()
 
   const [isRolling, setRolling] = useState(false)
-  const [hasSettled, setHasSettled] = useState(false)
   const [hasRolled, setHasRolled] = useState(false)
   const [dice1Value, setDice1Value] = useState(1)
   const [dice2Value, setDice2Value] = useState(1)
@@ -82,7 +77,6 @@ export default function DiceRoller() {
   const rollDiceMutation = trpc.game.rollDice.useMutation()
   const endTurnMutation = trpc.game.endTurn.useMutation()
   const drawCardMutation = trpc.game.drawCard.useMutation()
-  const drawDeckCardMutation = trpc.game.drawDeckCard.useMutation()
   const applyChanceEffectMutation = trpc.game.applyChanceEffect.useMutation()
   const skipMissedTurnMutation = trpc.game.skipMissedTurn.useMutation()
 
@@ -93,26 +87,6 @@ export default function DiceRoller() {
       processNextDraw()
     }
   }, [cardTrigger, processingDeckDraws, drawnDeckCard, queueDraw, processNextDraw])
-
-  useEffect(() => {
-    if (hasSettled && !isRolling) {
-      setPendingServerUpdate(true)
-      handleDiceRoll(total)
-      if (sessionId && playerId) {
-        rollDiceMutation.mutate({
-          sessionId,
-          playerId,
-          dice1: dice1Value,
-          dice2: dice2Value,
-        }, {
-          onSettled: () => setPendingServerUpdate(false),
-        })
-      } else {
-        setPendingServerUpdate(false)
-      }
-      setHasSettled(false)
-    }
-  }, [hasSettled, isRolling, total, handleDiceRoll, sessionId, playerId, dice1Value, dice2Value, rollDiceMutation, setPendingServerUpdate])
 
   function rollDice() {
     if (isRolling) return
@@ -130,14 +104,33 @@ export default function DiceRoller() {
     }
 
     setRolling(true)
-    setHasSettled(false)
     setHasRolled(true)
+    setPendingServerUpdate(true)
 
     setTimeout(() => {
-      setDice1Value(Math.floor(Math.random() * 6) + 1)
-      setDice2Value(Math.floor(Math.random() * 6) + 1)
+      const d1 = Math.floor(Math.random() * 6) + 1
+      const d2 = Math.floor(Math.random() * 6) + 1
+      setDice1Value(d1)
+      setDice2Value(d2)
       setRolling(false)
-      setHasSettled(true)
+
+      const store = useGameStore.getState()
+      store.handleDiceRoll(d1 + d2)
+
+      const sid = store.sessionId
+      const pid = store.playerId
+      if (sid && pid) {
+        rollDiceMutation.mutate({
+          sessionId: sid,
+          playerId: pid,
+          dice1: d1,
+          dice2: d2,
+        }, {
+          onSettled: () => useGameStore.getState().setPendingServerUpdate(false),
+        })
+      } else {
+        store.setPendingServerUpdate(false)
+      }
     }, 2000)
   }
 

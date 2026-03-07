@@ -16,11 +16,15 @@ export default function GameSync() {
   const previousPlayerNamesRef = useRef<string[]>([])
   const previousPhaseRef = useRef<string | null>(null)
 
+  const phase = useGameStore((s) => s.phase)
+  const pollInterval = phase === "playing" ? 3000 : phase === "lobby" ? 5000 : 5000
+
   const { data: gameState, isFetched } = trpc.game.state.useQuery(
     { sessionId: sessionId! },
     {
       enabled: !!sessionId,
-      refetchInterval: 2000,
+      refetchInterval: pollInterval,
+      refetchOnWindowFocus: false,
     }
   )
 

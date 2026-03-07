@@ -601,11 +601,11 @@ export function reachableRoadGrids(
   excludeKeys: Set<string> = new Set()
 ): Map<string, number> {
   const visited = new Map<string, number>();
-  const startNeighbors = getAdjacentRoadGrids(startGridKey);
   const hasCache = roadDataCache !== null;
+  const startHasRoad = hasCache ? roadDataCache!.gridSquaresWithABRoads.has(startGridKey) : false;
   const abRoadCount = hasCache ? roadDataCache!.gridSquaresWithABRoads.size : 0;
   const adjCount = hasCache ? roadDataCache!.gridAdjacency.size : 0;
-  const startHasRoad = hasCache ? roadDataCache!.gridSquaresWithABRoads.has(startGridKey) : false;
+  const startNeighbors = getAdjacentRoadGrids(startGridKey);
   log.info(`reachableRoadGrids: start=${startGridKey} maxSteps=${maxSteps} excludeKeys=${excludeKeys.size} roadDataLoaded=${hasCache} abRoads=${abRoadCount} adjEntries=${adjCount} startHasRoad=${startHasRoad} startNeighbors=${startNeighbors.length} [${startNeighbors.slice(0, 4).join(", ")}]`);
 
   const queue: Array<{ key: string; depth: number }> = [{ key: startGridKey, depth: 0 }];
@@ -646,7 +646,9 @@ export function shortestPath(
       let step = targetGridKey;
       while (step !== startGridKey) {
         path.unshift(step);
-        step = cameFrom.get(step)!;
+        const prev = cameFrom.get(step);
+        if (!prev) break;
+        step = prev;
       }
       return path;
     }
