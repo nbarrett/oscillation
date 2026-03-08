@@ -168,7 +168,10 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
   const { setSessionId, setPlayerId, setSessionCode, setCreatorPlayerId, showPreviewPaths, setShowPreviewPaths: showPreviewPathsSetter } = useGameStore()
   const { preferredCar, setPreferredCar } = useCarStore()
   const { data: locations, refetch: refetchLocations } = trpc.locations.getAll.useQuery()
-  const { data: availableGames } = trpc.game.list.useQuery()
+  const { data: availableGames } = trpc.game.list.useQuery(undefined, {
+    refetchInterval: 5000,
+    refetchOnWindowFocus: false,
+  })
 
   const [authTab, setAuthTabState] = useState<AuthTab>(AuthTab.PLAY)
 

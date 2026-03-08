@@ -49,7 +49,7 @@ function firstUnpickedCategory(pickedCategories: Set<string>): PoiCategory | nul
 }
 
 export default function PoiPicker() {
-  const { selectedPois, playerId, creatorPlayerId, setPlayerZoomRequest, activePickingCategory, setActivePickingCategory, players } = useGameStore()
+  const { selectedPois, setPlayerZoomRequest, activePickingCategory, setActivePickingCategory, players, pickingPlayerIndex } = useGameStore()
   const player = useCurrentPlayer()
   const { iconDetailMode, setIconDetailMode } = usePoiSettingsStore()
   const pubIconStyle = usePubStore((s) => s.pubIconStyle)
@@ -57,7 +57,8 @@ export default function PoiPicker() {
   const towerIconStyle = useTowerStore((s) => s.towerIconStyle)
   const phoneIconStyle = usePhoneStore((s) => s.phoneIconStyle)
   const schoolIconStyle = useSchoolStore((s) => s.schoolIconStyle)
-  const isCreator = playerId !== null && playerId === creatorPlayerId
+  const currentPicker = players[pickingPlayerIndex % players.length]
+  const isMyPick = currentPicker?.name === player?.name
   const pickedCategories = new Set((selectedPois ?? []).map(p => p.category))
   const allPicked = pickedCategories.size === POI_CATEGORIES.length
 
@@ -149,9 +150,9 @@ export default function PoiPicker() {
                 <span className="text-sm font-medium whitespace-nowrap">
                   {allPicked
                     ? "All Staging Posts placed"
-                    : isCreator
-                      ? "Place the Staging Posts"
-                      : "Waiting for host to place Staging Posts..."}
+                    : isMyPick
+                      ? "Your turn to place a Staging Post"
+                      : `${currentPicker?.name ?? "Another player"}'s turn to pick`}
                 </span>
                 <div className="flex items-center gap-3 ml-auto shrink-0">
                   <div className="flex rounded-md border overflow-hidden">

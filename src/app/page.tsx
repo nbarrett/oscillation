@@ -2,11 +2,12 @@
 
 import dynamic from "next/dynamic"
 import { useEffect, useState } from "react"
-import { Loader2, Gamepad2, ChevronDown, ChevronLeft, ChevronRight, Settings, Users, LogOut, Copy, Check, Trophy } from "lucide-react"
+import { Loader2, Gamepad2, ChevronDown, ChevronLeft, ChevronRight, Settings, Users, LogOut, Copy, Check, Trophy, MessageCircle } from "lucide-react"
 import { AuthDialog } from "@/components/auth/auth-dialog"
 import { UserMenu } from "@/components/auth/user-menu"
 import { useMapStore } from "@/stores/map-store"
 import { useGameStore, GameTurnState } from "@/stores/game-store"
+import { useChatStore } from "@/stores/chat-store"
 import { carImageForStyle } from "@/stores/car-store"
 import { trpc } from "@/lib/trpc/client"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
@@ -47,6 +48,7 @@ const JoinGame = dynamic(() => import("@/components/JoinGame"), { ssr: false })
 const GameSync = dynamic(() => import("@/components/GameSync"), { ssr: false })
 const GameLobby = dynamic(() => import("@/components/GameLobby"), { ssr: false })
 const BotTurnPlayer = dynamic(() => import("@/components/BotTurnPlayer"), { ssr: false })
+const ChatPanel = dynamic(() => import("@/components/ChatPanel"), { ssr: false })
 const PoiPicker = dynamic(() => import("@/components/PoiPicker"), { ssr: false })
 
 
@@ -157,6 +159,23 @@ function MovementOverlay() {
   )
 }
 
+function ChatToggleButton({ onClick }: { onClick: () => void }) {
+  const unreadCount = useChatStore((s) => s.unreadCount)
+  return (
+    <button
+      onClick={onClick}
+      className="absolute bottom-4 right-4 z-[1000] p-2.5 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors"
+    >
+      <MessageCircle className="h-5 w-5" />
+      {unreadCount > 0 && (
+        <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+          {unreadCount > 9 ? "9+" : unreadCount}
+        </span>
+      )}
+    </button>
+  )
+}
+
 export default function GamePage() {
   const setAccessToken = useMapStore((state) => state.setAccessToken)
   const { sessionId, sessionCode, playerId, phase, winnerName, leaveSession } = useGameStore()
@@ -165,6 +184,8 @@ export default function GamePage() {
   const [settingsExpanded, setSettingsExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
   const [showVictory, setShowVictory] = useState(false)
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatWidth, setChatWidth] = useState(320)
 
   const sessionCheck = trpc.game.state.useQuery(
     { sessionId: sessionId! },
@@ -365,11 +386,22 @@ export default function GamePage() {
 
             <Card className="overflow-hidden">
               <CardContent className="p-0">
-                <div className="h-[calc(100vh-280px)] min-h-[400px] relative">
-                  <MapWithCars />
-                  <MapPositions />
-
-                  <MovementOverlay />
+                <div className="h-[calc(100vh-280px)] min-h-[400px] flex">
+                  <div className="flex-1 relative min-w-0">
+                    <MapWithCars />
+                    <MapPositions />
+                    <MovementOverlay />
+                    {!chatOpen && <ChatToggleButton onClick={() => setChatOpen(true)} />}
+                  </div>
+                  <ChatPanel
+                    isOpen={chatOpen}
+                    onClose={() => {
+                      setChatOpen(false)
+                      setTimeout(() => window.dispatchEvent(new Event("resize")), 50)
+                    }}
+                    width={chatWidth}
+                    onWidthChange={setChatWidth}
+                  />
                 </div>
               </CardContent>
             </Card>

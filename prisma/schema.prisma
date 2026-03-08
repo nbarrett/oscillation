@@ -29,10 +29,11 @@ model NamedLocation {
 }
 
 model GameSession {
-  id                 String       @id @default(cuid())
-  code               String       @unique
+  id                 String         @id @default(cuid())
+  code               String         @unique
   players            GamePlayer[]
   cardDraws          CardDraw[]
+  chatMessages       ChatMessage[]
   currentTurn        Int          @default(0)
   dice1              Int?
   dice2              Int?
@@ -49,6 +50,7 @@ model GameSession {
   obstructions       Json         @default("[]")
   lastMovePath       Json?
   lastMovePlayer     String?
+  pickingPlayerIndex Int          @default(0)
   botsEnabled        Boolean      @default(true)
   mapZoom            Int          @default(7)
   mapCentreLat       Float?
@@ -74,6 +76,7 @@ model GamePlayer {
   userId             String?
   missedTurns        Int         @default(0)
   cardDraws          CardDraw[]
+  chatMessages       ChatMessage[]
   joinedAt           DateTime    @default(now())
 
   @@map("game_players")
@@ -102,4 +105,17 @@ model CardDraw {
   drawnAt   DateTime    @default(now())
 
   @@map("card_draws")
+}
+
+model ChatMessage {
+  id        String      @id @default(cuid())
+  text      String
+  player    GamePlayer  @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  playerId  String
+  session   GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+  sentAt    DateTime    @default(now())
+
+  @@index([sessionId, sentAt])
+  @@map("chat_messages")
 }

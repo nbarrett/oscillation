@@ -300,6 +300,7 @@ export const gameRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const session = await ctx.db.gameSession.findUnique({
         where: { id: input.sessionId },
+        include: { players: { orderBy: { turnOrder: "asc" } } },
       })
 
       if (!session) {
@@ -310,8 +311,9 @@ export const gameRouter = createTRPCRouter({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Game is not in picking phase." })
       }
 
-      if (session.creatorPlayerId !== input.playerId) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Only the game creator can pick POIs." })
+      const currentPicker = session.players[session.pickingPlayerIndex % session.players.length]
+      if (!currentPicker || currentPicker.id !== input.playerId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "It's not your turn to pick." })
       }
 
       const candidates = (session.poiCandidates as Array<{ category: string; osmId: number; name: string | null; lat: number; lng: number }>) ?? []
@@ -328,11 +330,13 @@ export const gameRouter = createTRPCRouter({
 
       const updatedPois = [...selectedPois, candidate]
       const allPicked = POI_CATEGORIES.every(cat => updatedPois.some(p => p.category === cat))
+      const nextPickerIndex = (session.pickingPlayerIndex + 1) % session.players.length
 
       await ctx.db.gameSession.update({
         where: { id: input.sessionId },
         data: {
           selectedPois: JSON.parse(JSON.stringify(updatedPois)),
+          pickingPlayerIndex: nextPickerIndex,
           ...(allPicked ? { phase: "playing", poiCandidates: Prisma.DbNull } : {}),
         },
       })
@@ -370,6 +374,7 @@ export const gameRouter = createTRPCRouter({
         selectedPois: session.selectedPois as Array<{ category: string; osmId: number; name: string | null; lat: number; lng: number }> | null,
         poiCandidates: session.poiCandidates as Array<{ category: string; osmId: number; name: string | null; lat: number; lng: number }> | null,
         deckState: session.deckState as { edgeDeck: string[]; motorwayDeck: string[]; chanceDeck: string[]; edgeDrawIndex: number; motorwayDrawIndex: number; chanceDrawIndex: number } | null,
+        pickingPlayerIndex: session.pickingPlayerIndex,
         obstructions: (session.obstructions as unknown as ObstructionToken[]) ?? [],
         lastMovePath: (session.lastMovePath as string[] | null) ?? null,
         lastMovePlayer: session.lastMovePlayer ?? null,

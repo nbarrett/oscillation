@@ -5,6 +5,7 @@ import { latLngToGridKey, gridKeyToLatLng, isRoadDataLoaded, reachableRoadGrids,
 import { CAR_STYLES } from "@/stores/car-store"
 import { type AreaSize, type GameBounds, DEFAULT_AREA_SIZE } from "@/lib/area-size"
 import { useDeckStore } from "@/stores/deck-store"
+import { useChatStore } from "@/stores/chat-store"
 import { type PoiCategory } from "@/lib/poi-categories"
 
 export interface CardTrigger {
@@ -124,6 +125,7 @@ interface GameState {
   winnerName: string | null;
   showPreviewPaths: boolean;
   cardTrigger: CardTrigger | null;
+  pickingPlayerIndex: number;
   activePickingCategory: PoiCategory | null;
   previewPaths: string[][];
   previewPathIndex: number;
@@ -176,6 +178,7 @@ interface GameState {
   setPoiCandidates: (candidates: SelectedPoi[] | null) => void;
   setWinnerName: (name: string | null) => void;
   setPendingEndTurn: (pending: boolean) => void;
+  setPickingPlayerIndex: (index: number) => void;
   setActivePickingCategory: (category: PoiCategory | null) => void;
   isCreator: () => boolean;
   leaveSession: () => void;
@@ -216,6 +219,7 @@ export const useGameStore = create<GameState>()(
       winnerName: null,
       showPreviewPaths: true,
       cardTrigger: null,
+      pickingPlayerIndex: 0,
       activePickingCategory: null,
       previewPaths: [],
       previewPathIndex: 0,
@@ -560,6 +564,8 @@ export const useGameStore = create<GameState>()(
 
       setPendingEndTurn: (pendingEndTurn) => set({ pendingEndTurn }),
 
+      setPickingPlayerIndex: (pickingPlayerIndex) => set({ pickingPlayerIndex }),
+
       setActivePickingCategory: (activePickingCategory) => set({ activePickingCategory }),
 
       isCreator: () => {
@@ -569,6 +575,7 @@ export const useGameStore = create<GameState>()(
 
       leaveSession: () => {
         setPathfindingBounds(null);
+        useChatStore.getState().clearMessages();
         return set({
           sessionId: null,
           playerId: null,
@@ -586,6 +593,7 @@ export const useGameStore = create<GameState>()(
           selectedPois: null,
           poiCandidates: null,
           winnerName: null,
+          pickingPlayerIndex: 0,
           activePickingCategory: null,
         });
       },

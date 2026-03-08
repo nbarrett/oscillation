@@ -10,7 +10,7 @@ import { gridKeyToLatLng, setPathfindingBounds } from "@/lib/road-data"
 import { log } from "@/lib/utils"
 
 export default function GameSync() {
-  const { sessionId, playerId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setDiceValues, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setPoiCandidates, setWinnerName, leaveSession } = useGameStore()
+  const { sessionId, playerId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setDiceValues, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setPoiCandidates, setPickingPlayerIndex, setWinnerName, leaveSession } = useGameStore()
   const { addNotification } = useNotificationStore()
   const { initDecks, setObstructions, setMissedTurns } = useDeckStore()
   const hasCheckedSession = useRef(false)
@@ -66,6 +66,7 @@ export default function GameSync() {
       setCreatorPlayerId(gameState.creatorPlayerId ?? null)
       setSelectedPois(gameState.selectedPois ?? null)
       setPoiCandidates(gameState.poiCandidates ?? null)
+      setPickingPlayerIndex(gameState.pickingPlayerIndex ?? 0)
 
       const startPos: [number, number] | null =
         gameState.startLat != null && gameState.startLng != null

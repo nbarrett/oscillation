@@ -47,7 +47,7 @@ function resolveIcon<T extends string>(
 export default function PoiCandidateMarkers() {
   const map = useMap()
   const layerRef = useRef<L.LayerGroup | null>(null)
-  const { poiCandidates, selectedPois, playerId, creatorPlayerId, sessionId, activePickingCategory } = useGameStore()
+  const { poiCandidates, selectedPois, playerId, sessionId, activePickingCategory, players, pickingPlayerIndex, localPlayerName } = useGameStore()
   const utils = trpc.useUtils()
 
   const pubIconStyle = usePubStore((s) => s.pubIconStyle)
@@ -71,7 +71,8 @@ export default function PoiCandidateMarkers() {
     },
   })
 
-  const isCreator = playerId !== null && playerId === creatorPlayerId
+  const currentPicker = players[pickingPlayerIndex % Math.max(players.length, 1)]
+  const isMyPick = currentPicker?.name === localPlayerName
 
   const renderMarkers = useCallback(() => {
     if (!layerRef.current || !map) return
@@ -100,7 +101,7 @@ export default function PoiCandidateMarkers() {
         marker.bindTooltip(candidate.name)
       }
 
-      if (isCreator && !pickPoiMutation.isPending) {
+      if (isMyPick && !pickPoiMutation.isPending) {
         marker.on("click", () => {
           if (!sessionId || !playerId) return
           pickPoiMutation.mutate({
@@ -114,7 +115,7 @@ export default function PoiCandidateMarkers() {
 
       layerRef.current!.addLayer(marker)
     }
-  }, [map, poiCandidates, selectedPois, isCreator, sessionId, playerId, pickPoiMutation, activePickingCategory, categoryIcons])
+  }, [map, poiCandidates, selectedPois, isMyPick, sessionId, playerId, pickPoiMutation, activePickingCategory, categoryIcons])
 
   useEffect(() => {
     if (!map) return
