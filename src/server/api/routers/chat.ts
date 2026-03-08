@@ -6,9 +6,13 @@ export const chatRouter = createTRPCRouter({
     .input(z.object({
       sessionId: z.string(),
       playerId: z.string(),
-      text: z.string().min(1).max(500),
+      text: z.string().max(500).optional(),
+      imageUrl: z.string().url().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const hasContent = (input.text && input.text.trim().length > 0) || input.imageUrl
+      if (!hasContent) return { success: false }
+
       const player = await ctx.db.gamePlayer.findFirst({
         where: { id: input.playerId, sessionId: input.sessionId },
       })
@@ -17,12 +21,36 @@ export const chatRouter = createTRPCRouter({
         return { success: false }
       }
 
-      await ctx.db.chatMessage.create({
+      const msg = await ctx.db.chatMessage.create({
         data: {
-          text: input.text.trim(),
+          text: input.text?.trim() ?? "",
+          imageUrl: input.imageUrl ?? null,
           playerId: input.playerId,
           sessionId: input.sessionId,
         },
+      })
+
+      return { success: true, messageId: msg.id }
+    }),
+
+  update: publicProcedure
+    .input(z.object({
+      messageId: z.string(),
+      playerId: z.string(),
+      text: z.string().min(1).max(500),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const msg = await ctx.db.chatMessage.findUnique({
+        where: { id: input.messageId },
+      })
+
+      if (!msg || msg.playerId !== input.playerId) {
+        return { success: false }
+      }
+
+      await ctx.db.chatMessage.update({
+        where: { id: input.messageId },
+        data: { text: input.text.trim() },
       })
 
       return { success: true }
@@ -60,6 +88,7 @@ export const chatRouter = createTRPCRouter({
       return messages.map((m) => ({
         id: m.id,
         text: m.text,
+        imageUrl: m.imageUrl,
         playerName: m.player.name,
         playerIconType: m.player.iconType,
         sentAt: m.sentAt.toISOString(),

@@ -3,6 +3,7 @@ import { create } from "zustand"
 export interface ChatMessage {
   id: string
   text: string
+  imageUrl: string | null
   playerName: string
   playerIconType: string
   sentAt: string
@@ -14,6 +15,7 @@ interface ChatState {
   isOpen: boolean
   unreadCount: number
   addMessages: (msgs: ChatMessage[]) => void
+  updateMessage: (id: string, text: string) => void
   setOpen: (open: boolean) => void
   clearMessages: () => void
 }
@@ -36,6 +38,11 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       unreadCount: state.isOpen ? 0 : state.unreadCount + fresh.length,
     }))
   },
+
+  updateMessage: (id, text) =>
+    set((state) => ({
+      messages: state.messages.map((m) => (m.id === id ? { ...m, text } : m)),
+    })),
 
   setOpen: (open) =>
     set((state) => ({ isOpen: open, unreadCount: open ? 0 : state.unreadCount })),

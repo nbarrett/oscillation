@@ -5,7 +5,7 @@ import { trpc } from "@/lib/trpc/client"
 import { useGameStore, GameTurnState, type Player, type GamePhase } from "@/stores/game-store"
 import { useNotificationStore } from "@/stores/notification-store"
 import { useDeckStore } from "@/stores/deck-store"
-import { areaSizeBounds, isWithinBounds, type AreaSize } from "@/lib/area-size"
+import { areaSizeBounds, type AreaSize } from "@/lib/area-size"
 import { gridKeyToLatLng, setPathfindingBounds } from "@/lib/road-data"
 import { log } from "@/lib/utils"
 
@@ -68,13 +68,6 @@ export default function GameSync() {
       setPoiCandidates(gameState.poiCandidates ?? null)
       setPickingPlayerIndex(gameState.pickingPlayerIndex ?? 0)
 
-      const startPos: [number, number] | null =
-        gameState.startLat != null && gameState.startLng != null
-          ? [gameState.startLat, gameState.startLng]
-          : null
-      const bounds = startPos && gameState.areaSize
-        ? areaSizeBounds(startPos[0], startPos[1], gameState.areaSize)
-        : null
 
       const moveKey = gameState.lastMovePlayer && gameState.lastMovePath
         ? `${gameState.lastMovePlayer}:${gameState.currentTurn}:${gameState.updatedAt}`
@@ -100,13 +93,7 @@ export default function GameSync() {
             hasReturnedToStart: p.hasReturnedToStart,
           }
         }
-        const outOfBounds = bounds && startPos && !isWithinBounds(p.position[0], p.position[1], bounds)
-        if (outOfBounds) {
-          log.warn(`GameSync: player "${p.name}" position [${p.position[0].toFixed(5)},${p.position[1].toFixed(5)}] is outside bounds, snapping to startPos [${startPos![0].toFixed(5)},${startPos![1].toFixed(5)}]`)
-        }
-        const position: [number, number] = outOfBounds
-          ? startPos!
-          : p.position
+        const position: [number, number] = p.position
 
         if (isNewRemoteMove && p.name === gameState.lastMovePlayer && gameState.lastMovePath && gameState.lastMovePath.length > 0) {
           const prevPlayer = localPlayers.find(lp => lp.name === p.name)

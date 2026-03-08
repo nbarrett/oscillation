@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client"
 import { TRPCError } from "@trpc/server"
 import { createTRPCRouter, publicProcedure } from "../trpc"
 import { CAR_STYLES } from "@/stores/car-store"
-import { AREA_SIZES, DEFAULT_AREA_SIZE, areaSizeBounds, isWithinBounds, type AreaSize } from "@/lib/area-size"
+import { AREA_SIZES, DEFAULT_AREA_SIZE, areaSizeBounds, type AreaSize } from "@/lib/area-size"
 import { snapToGridCenter } from "@/lib/road-data"
 import { validatePoiCoverage, fetchPoiCandidates, prewarmPoiCandidates } from "@/server/overpass"
 import { POI_CATEGORIES } from "@/lib/poi-categories"
@@ -462,13 +462,6 @@ export const gameRouter = createTRPCRouter({
       const turnPlayerId = isBotTurn ? currentPlayer!.id : input.playerId
 
       if (input.newLat != null && input.newLng != null) {
-        if (session.startLat != null && session.startLng != null) {
-          const bounds = areaSizeBounds(session.startLat, session.startLng, (session as Record<string, unknown>).areaSize as AreaSize ?? DEFAULT_AREA_SIZE);
-          if (!isWithinBounds(input.newLat, input.newLng, bounds)) {
-            throw new TRPCError({ code: "BAD_REQUEST", message: "Move is outside the game boundary." })
-          }
-        }
-
         await ctx.db.gamePlayer.update({
           where: { id: turnPlayerId },
           data: {
