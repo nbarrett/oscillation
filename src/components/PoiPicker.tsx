@@ -113,9 +113,11 @@ export default function PoiPicker() {
                       className="shrink-0 flex items-center"
                       dangerouslySetInnerHTML={{ __html: categoryIcons[activeCategory] ?? "" }}
                     />
-                    {pickedCategories.size === 0
-                      ? `Tap a ${POI_CATEGORY_LABELS[activeCategory as PoiCategory]?.replace(/s$/, "")} on the map`
-                      : `Now place a ${POI_CATEGORY_LABELS[activeCategory as PoiCategory]?.replace(/s$/, "")}`}
+                    {isMyPick
+                      ? pickedCategories.size === 0
+                        ? `Tap a ${POI_CATEGORY_LABELS[activeCategory as PoiCategory]?.replace(/s$/, "")} on the map`
+                        : `Now place a ${POI_CATEGORY_LABELS[activeCategory as PoiCategory]?.replace(/s$/, "")}`
+                      : `${currentPicker?.name ?? "Another player"} is placing a ${POI_CATEGORY_LABELS[activeCategory as PoiCategory]?.replace(/s$/, "")}`}
                   </p>
                 )}
                 <span className="text-xs text-muted-foreground whitespace-nowrap">
@@ -263,7 +265,9 @@ export default function PoiPicker() {
                   className="shrink-0 flex items-center"
                   dangerouslySetInnerHTML={{ __html: categoryIcons[activeCategory] ?? "" }}
                 />
-                Place a Staging Post on a {POI_CATEGORY_LABELS[activeCategory as PoiCategory]?.replace(/s$/, "")}
+                {isMyPick
+                  ? `Place a Staging Post on a ${POI_CATEGORY_LABELS[activeCategory as PoiCategory]?.replace(/s$/, "")}`
+                  : `${currentPicker?.name ?? "Another player"} is placing a Staging Post on a ${POI_CATEGORY_LABELS[activeCategory as PoiCategory]?.replace(/s$/, "")}`}
               </p>
             )}
           </div>

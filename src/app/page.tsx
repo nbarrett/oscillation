@@ -52,6 +52,28 @@ const ChatPanel = dynamic(() => import("@/components/ChatPanel"), { ssr: false }
 const PoiPicker = dynamic(() => import("@/components/PoiPicker"), { ssr: false })
 
 
+function RoadDataIndicator() {
+  const roadDataStatus = useGameStore((s) => s.roadDataStatus)
+  const phase = useGameStore((s) => s.phase)
+
+  if (phase !== "playing" || roadDataStatus === "loaded") return null
+
+  return (
+    <div className="absolute bottom-3 left-3 z-[1000]">
+      <div className={cn(
+        "px-3 py-1.5 rounded-lg text-xs font-medium shadow-lg",
+        roadDataStatus === "loading" && "bg-amber-500/90 text-white animate-pulse",
+        roadDataStatus === "error" && "bg-red-500/90 text-white",
+        roadDataStatus === "idle" && "bg-muted/90 text-muted-foreground",
+      )}>
+        {roadDataStatus === "loading" && "Loading roads..."}
+        {roadDataStatus === "error" && "Road data failed"}
+        {roadDataStatus === "idle" && "Roads not loaded"}
+      </div>
+    </div>
+  )
+}
+
 function MovementOverlay() {
   const gameTurnState = useGameStore((s) => s.gameTurnState)
   const diceResult = useGameStore((s) => s.diceResult)
@@ -66,6 +88,7 @@ function MovementOverlay() {
   const diceRolling = useGameStore((s) => s.diceRolling)
   const diceValues = useGameStore((s) => s.diceValues)
   const localPlayerName = useGameStore((s) => s.localPlayerName)
+  const roadDataStatus = useGameStore((s) => s.roadDataStatus)
   const isMyTurn = localPlayerName !== null && localPlayerName === currentPlayerName
   const isBotTurn = currentPlayerName?.startsWith("Bot ") ?? false
   const showPreviews = isMyTurn && gameTurnState === GameTurnState.DICE_ROLLED && diceResult && movementPath.length === 0 && previewPaths.length > 0
@@ -97,16 +120,32 @@ function MovementOverlay() {
         {showFreeSelection && (
           <div className="flex items-center gap-3">
             <div className="text-lg font-bold">
-              {movementPath.length > 0
-                ? `Moves: ${movementPath.length}/${diceResult} — click to extend`
-                : `Move ${diceResult} squares — click a square on the road`}
+              {roadDataStatus === "loading"
+                ? "Loading road data..."
+                : roadDataStatus === "error"
+                  ? "Road data failed to load"
+                  : movementPath.length > 0
+                    ? `Moves: ${movementPath.length}/${diceResult} — click to extend`
+                    : `Move ${diceResult} squares — click a square on the road`}
             </div>
-            <button
-              onClick={() => useGameStore.getState().clearGridSelections()}
-              className="px-3 py-1.5 rounded-lg bg-primary-foreground text-primary text-sm font-bold hover:bg-primary-foreground/90 transition-colors"
-            >
-              Show Routes
-            </button>
+            {roadDataStatus === "error" ? (
+              <button
+                onClick={() => {
+                  useGameStore.getState().setRoadDataStatus("idle")
+                  useGameStore.getState().triggerPreviewRecompute()
+                }}
+                className="px-3 py-1.5 rounded-lg bg-red-100 text-red-700 text-sm font-bold hover:bg-red-200 transition-colors"
+              >
+                Retry
+              </button>
+            ) : (
+              <button
+                onClick={() => useGameStore.getState().triggerPreviewRecompute()}
+                className="px-3 py-1.5 rounded-lg bg-primary-foreground text-primary text-sm font-bold hover:bg-primary-foreground/90 transition-colors"
+              >
+                Show Routes
+              </button>
+            )}
           </div>
         )}
         {showPreviews && (
@@ -269,7 +308,7 @@ export default function GamePage() {
               <h1 className="text-xl font-bold tracking-tight text-primary">Oscillation</h1>
             </div>
             <span className="hidden sm:inline-block text-xs text-muted-foreground">
-              v0.4
+              v0.5
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -390,6 +429,7 @@ export default function GamePage() {
                   <div className="flex-1 relative min-w-0">
                     <MapWithCars />
                     <MapPositions />
+                    <RoadDataIndicator />
                     <MovementOverlay />
                     {!chatOpen && <ChatToggleButton onClick={() => setChatOpen(true)} />}
                   </div>

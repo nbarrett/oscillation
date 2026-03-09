@@ -8,7 +8,7 @@ import { useGameStore } from "@/stores/game-store";
 import { useMapStore, MapLayers, MappingProvider, ProjectionValue } from "@/stores/map-store";
 import { useRouteStore } from "@/stores/route-store";
 import { log } from "@/lib/utils";
-import { loadRoadData } from "@/lib/road-data";
+import { loadRoadData, setRoadDataStatusCallback } from "@/lib/road-data";
 import "proj4leaflet";
 import PlayerCar from "./PlayerCar";
 import RecordMapCentreAndZoom from "./RecordMapCentreAndZoom";
@@ -74,6 +74,12 @@ export default function MapWithCars() {
     }, 100);
     return () => clearTimeout(timer);
   }, [map]);
+
+  useEffect(() => {
+    setRoadDataStatusCallback((status) => {
+      useGameStore.getState().setRoadDataStatus(status);
+    });
+  }, []);
 
   useEffect(() => {
     if (map && startingPosition) {

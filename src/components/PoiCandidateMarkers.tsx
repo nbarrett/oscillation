@@ -67,6 +67,8 @@ export default function PoiCandidateMarkers() {
 
   const pickPoiMutation = trpc.game.pickPoi.useMutation({
     onSuccess: () => {
+      const nextIndex = (pickingPlayerIndex + 1) % Math.max(players.length, 1)
+      useGameStore.getState().setPickingPlayerIndex(nextIndex)
       utils.game.state.invalidate()
     },
   })

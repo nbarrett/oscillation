@@ -73,6 +73,7 @@ export default function SelectGridSquares() {
   const movementPath = useGameStore((s) => s.movementPath);
   const playerStartGridKey = useGameStore((s) => s.playerStartGridKey);
   const showPreviewPaths = useGameStore((s) => s.showPreviewPaths);
+  const requestPreviewRecompute = useGameStore((s) => s.requestPreviewRecompute);
   const previewPaths = useGameStore((s) => s.previewPaths);
   const previewPathIndex = useGameStore((s) => s.previewPathIndex);
 
@@ -285,7 +286,7 @@ export default function SelectGridSquares() {
     if (paths.length > 0) {
       drawPreviewPath(paths[0]);
     }
-  }, [map, gameTurnState, diceResult, playerStartGridKey, movementPath.length, showPreviewPaths]);
+  }, [map, gameTurnState, diceResult, playerStartGridKey, movementPath.length, showPreviewPaths, requestPreviewRecompute]);
 
   useEffect(() => {
     computeAndSetPaths();

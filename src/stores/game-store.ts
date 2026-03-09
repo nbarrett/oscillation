@@ -124,6 +124,7 @@ interface GameState {
   poiCandidates: SelectedPoi[] | null;
   winnerName: string | null;
   showPreviewPaths: boolean;
+  roadDataStatus: "idle" | "loading" | "loaded" | "error";
   cardTrigger: CardTrigger | null;
   pickingPlayerIndex: number;
   activePickingCategory: PoiCategory | null;
@@ -131,6 +132,9 @@ interface GameState {
   previewPathIndex: number;
   pendingEndTurn: boolean;
   setShowPreviewPaths: (show: boolean) => void;
+  setRoadDataStatus: (status: "idle" | "loading" | "loaded" | "error") => void;
+  requestPreviewRecompute: number;
+  triggerPreviewRecompute: () => void;
   setPreviewPaths: (paths: string[][]) => void;
   setPreviewPathIndex: (index: number) => void;
   cyclePreviewPath: (direction: 1 | -1) => void;
@@ -218,6 +222,8 @@ export const useGameStore = create<GameState>()(
       poiCandidates: null,
       winnerName: null,
       showPreviewPaths: true,
+      roadDataStatus: "idle" as const,
+      requestPreviewRecompute: 0,
       cardTrigger: null,
       pickingPlayerIndex: 0,
       activePickingCategory: null,
@@ -226,6 +232,14 @@ export const useGameStore = create<GameState>()(
       pendingEndTurn: false,
 
       setShowPreviewPaths: (showPreviewPaths) => set({ showPreviewPaths }),
+      setRoadDataStatus: (roadDataStatus) => set({ roadDataStatus }),
+      triggerPreviewRecompute: () => set((state) => ({
+        requestPreviewRecompute: state.requestPreviewRecompute + 1,
+        showPreviewPaths: true,
+        movementPath: [],
+        previewPaths: [],
+        previewPathIndex: 0,
+      })),
 
       setPreviewPaths: (previewPaths) => set({ previewPaths, previewPathIndex: 0 }),
 
@@ -433,7 +447,10 @@ export const useGameStore = create<GameState>()(
               for (const k of obs) occ.add(k);
               const updated = reachableRoadGrids(startGridKey, result, occ);
               log.info("handleDiceRoll: road data loaded, recomputed reachable grids:", updated.size);
-              set({ reachableGrids: updated } as Partial<GameState> as GameState);
+              set((prev) => ({
+                reachableGrids: updated,
+                requestPreviewRecompute: prev.requestPreviewRecompute + 1,
+              } as Partial<GameState> as GameState));
             }
           });
         }

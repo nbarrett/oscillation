@@ -51,6 +51,11 @@ const STORAGE_MAX_AGE = 24 * 60 * 60 * 1000;
 let roadDataCache: RoadDataCache | null = null;
 const roadDataListeners: Array<() => void> = [];
 let gridRoadIndex: Map<string, Array<{roadIdx: number, coordIdx: number}>> | null = null;
+let roadDataStatusCallback: ((status: "loading" | "loaded" | "error") => void) | null = null;
+
+export function setRoadDataStatusCallback(cb: (status: "loading" | "loaded" | "error") => void): void {
+  roadDataStatusCallback = cb;
+}
 
 export function setPathfindingBounds(_bounds: GameBounds | null): void {
 }
@@ -768,12 +773,14 @@ export async function loadRoadData(
       east <= bounds.east &&
       Date.now() - roadDataCache.timestamp < STORAGE_MAX_AGE
     ) {
+      roadDataStatusCallback?.("loaded");
       notifyRoadDataListeners();
       return;
     }
   }
 
   log.info("Loading road data for area:", { south, west, north, east });
+  roadDataStatusCallback?.("loading");
 
   try {
     const result = await queryOverpassForRoads(south, west, north, east);
@@ -808,8 +815,10 @@ export async function loadRoadData(
     log.info(
       `Loaded ${roads.length} road segments, ${motorways.length} motorway segments, ${motorwayJunctions.length} junctions, ${railwayStations.length} stations, ${gridSquaresWithRoads.size} grid squares with roads, ${gridSquaresWithABRoads.size} with A/B roads, ${gridAdjacency.size} connected grids`
     );
+    roadDataStatusCallback?.("loaded");
   } catch (error) {
     log.error("Failed to load road data:", error);
+    roadDataStatusCallback?.("error");
   }
 }
 
