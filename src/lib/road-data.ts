@@ -330,6 +330,8 @@ export function gridKeyToLatLng(gridKey: string): [number, number] {
   return snapped ?? [lat, lng];
 }
 
+const MAX_SNAP_DIST_SQ = 0.0002;
+
 export function nearestRoadPosition(lat: number, lng: number): [number, number] | null {
   if (!roadDataCache) return null;
 
@@ -347,6 +349,8 @@ export function nearestRoadPosition(lat: number, lng: number): [number, number] 
       }
     }
   }
+
+  if (bestDist > MAX_SNAP_DIST_SQ) return null;
 
   return bestCoord;
 }

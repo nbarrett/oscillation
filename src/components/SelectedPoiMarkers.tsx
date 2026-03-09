@@ -77,7 +77,7 @@ export default function SelectedPoiMarkers() {
       const marker = L.marker([poi.lat, poi.lng], { icon })
 
       if (poi.name) {
-        marker.bindTooltip(poi.name)
+        marker.bindTooltip(poi.name, { direction: "top", offset: [0, -10], className: "poi-tooltip" })
       }
 
       layerRef.current.addLayer(marker)

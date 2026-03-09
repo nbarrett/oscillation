@@ -308,7 +308,7 @@ export default function GamePage() {
               <h1 className="text-xl font-bold tracking-tight text-primary">Oscillation</h1>
             </div>
             <span className="hidden sm:inline-block text-xs text-muted-foreground">
-              v0.5
+              v0.5.1
             </span>
           </div>
           <div className="flex items-center gap-2">

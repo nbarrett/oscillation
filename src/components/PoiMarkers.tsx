@@ -111,7 +111,7 @@ export default function PoiMarkers<T extends string>({
     for (const item of visible) {
       const marker = L.marker([item.lat, item.lng], { icon });
       if (item.name) {
-        marker.bindTooltip(item.name);
+        marker.bindTooltip(item.name, { direction: "top", offset: [0, -10], className: "poi-tooltip" });
       }
       layerRef.current.addLayer(marker);
     }

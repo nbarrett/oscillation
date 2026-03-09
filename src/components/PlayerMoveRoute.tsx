@@ -32,6 +32,13 @@ export default function PlayerMoveRoute({ player }: PlayerMoveRouteProps) {
     }
   }, [player.completedRoute, player.name, playerRouteReceived]);
 
+  useEffect(() => {
+    if (positions.length > 0 && !player.completedRoute) {
+      const timer = setTimeout(() => setPositions([]), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [positions.length > 0, player.completedRoute]);
+
   return (
     <Polyline
       color={colours.osMapsPurple}

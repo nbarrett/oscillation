@@ -100,7 +100,9 @@ export default function PoiCandidateMarkers() {
       const marker = L.marker([candidate.lat, candidate.lng], { icon })
 
       if (candidate.name) {
-        marker.bindTooltip(candidate.name)
+        const pad = Math.round(size * 0.2)
+        const outer = size + pad * 2
+        marker.bindTooltip(candidate.name, { direction: "top", offset: [0, -(outer / 2)], className: "poi-tooltip" })
       }
 
       if (isMyPick && !pickPoiMutation.isPending) {

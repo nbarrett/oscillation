@@ -89,6 +89,15 @@
   @apply hidden;
 }
 
+.leaflet-tooltip.poi-tooltip {
+  @apply bg-primary/95 text-primary-foreground rounded-xl shadow-2xl px-3 py-2 text-sm font-bold whitespace-nowrap;
+  border: none;
+}
+
+.leaflet-tooltip.poi-tooltip::before {
+  display: none;
+}
+
 .dice-scene {
   width: 50px;
   height: 50px;
@@ -232,4 +241,20 @@
 
 .animate-bounce-in {
   animation: bounce-in 0.4s ease-out forwards;
+}
+
+.poi-tooltip {
+  background: hsl(var(--primary) / 0.95) !important;
+  color: hsl(var(--primary-foreground)) !important;
+  border: none !important;
+  border-radius: 0.75rem !important;
+  padding: 0.375rem 0.75rem !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+  white-space: nowrap !important;
+}
+
+.poi-tooltip::before {
+  border-top-color: hsl(var(--primary) / 0.95) !important;
 }

@@ -89,7 +89,7 @@ export default function PubMarkers() {
     for (const pub of visible) {
       const marker = L.marker([pub.lat, pub.lng], { icon });
       if (pub.name) {
-        marker.bindTooltip(pub.name);
+        marker.bindTooltip(pub.name, { direction: "top", offset: [0, -10], className: "poi-tooltip" });
       }
       layerRef.current.addLayer(marker);
     }

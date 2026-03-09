@@ -59,7 +59,7 @@ export default function ObstructionMarkers() {
       const icon = buildIcon(svgSource, colour)
       const center = gridKeyToCenter(obstruction.gridKey)
       const marker = L.marker(center, { icon })
-      marker.bindTooltip(`${obstruction.color} obstruction`)
+      marker.bindTooltip(`${obstruction.color} obstruction`, { direction: "top", offset: [0, -10], className: "poi-tooltip" })
       group.addLayer(marker)
     }
 
