@@ -4,21 +4,23 @@ import { resolve } from "path"
 
 const BOT_TURN_PLAYER_PATH = resolve(__dirname, "../BotTurnPlayer.tsx")
 const DICE_ROLLER_PATH = resolve(__dirname, "../DiceRoller.tsx")
+const SELECT_GRID_SQUARES_PATH = resolve(__dirname, "../SelectGridSquares.tsx")
 
 const botCode = readFileSync(BOT_TURN_PLAYER_PATH, "utf-8")
 const humanCode = readFileSync(DICE_ROLLER_PATH, "utf-8")
+const gridSquaresCode = readFileSync(SELECT_GRID_SQUARES_PATH, "utf-8")
 
 describe("Bot Rule Compliance - Deck Card Triggers", () => {
-  it("human player checks isNearBoundaryEdge trigger", () => {
-    expect(humanCode).toContain("isNearBoundaryEdge")
+  it("human player checks isOnBoardEdge trigger via SelectGridSquares", () => {
+    expect(gridSquaresCode).toContain("isOnBoardEdge")
   })
 
-  it("bot player checks isNearBoundaryEdge trigger", () => {
-    expect(botCode).toContain("isNearBoundaryEdge")
+  it("bot player checks isOnBoardEdge trigger", () => {
+    expect(botCode).toContain("isOnBoardEdge")
   })
 
-  it("human player checks isOnMotorwayOrRailway trigger", () => {
-    expect(humanCode).toContain("isOnMotorwayOrRailway")
+  it("human player checks isOnMotorwayOrRailway trigger via SelectGridSquares", () => {
+    expect(gridSquaresCode).toContain("isOnMotorwayOrRailway")
   })
 
   it("bot player checks isOnMotorwayOrRailway trigger", () => {
@@ -26,7 +28,7 @@ describe("Bot Rule Compliance - Deck Card Triggers", () => {
   })
 
   it("both import deck trigger functions", () => {
-    expect(humanCode).toContain("deck-triggers")
+    expect(gridSquaresCode).toContain("deck-triggers")
     expect(botCode).toContain("deck-triggers")
   })
 })
@@ -165,23 +167,32 @@ describe("Bot Rule Compliance - Extra Throw", () => {
 
 describe("Feature Parity Summary", () => {
   const humanFeatures = [
-    { name: "isNearBoundaryEdge", pattern: "isNearBoundaryEdge" },
-    { name: "isOnMotorwayOrRailway", pattern: "isOnMotorwayOrRailway" },
-    { name: "queueDraw", pattern: "queueDraw" },
-    { name: "processNextDraw", pattern: "processNextDraw" },
-    { name: "extraThrow", pattern: "extraThrow" },
-    { name: "applyChanceEffectMutation", pattern: "applyChanceEffectMutation" },
-    { name: "detectPoiVisits", pattern: "detectPoiVisits" },
-    { name: "drawCardMutation", pattern: "drawCardMutation" },
-    { name: "missedTurns", pattern: "missedTurns" },
-    { name: "obstructions", pattern: "obstructions" },
+    { name: "isOnBoardEdge", pattern: "isOnBoardEdge", source: "gridSquares" },
+    { name: "isOnMotorwayOrRailway", pattern: "isOnMotorwayOrRailway", source: "gridSquares" },
+    { name: "queueDraw", pattern: "queueDraw", source: "human" },
+    { name: "processNextDraw", pattern: "processNextDraw", source: "human" },
+    { name: "extraThrow", pattern: "extraThrow", source: "human" },
+    { name: "applyChanceEffectMutation", pattern: "applyChanceEffectMutation", source: "human" },
+    { name: "detectPoiVisits", pattern: "detectPoiVisits", source: "human" },
+    { name: "drawCardMutation", pattern: "drawCardMutation", source: "human" },
+    { name: "missedTurns", pattern: "missedTurns", source: "human" },
+    { name: "obstructions", pattern: "obstructions", source: "gridSquares" },
   ]
 
   it("bot has full feature parity with human player", () => {
-    const missingFeatures = humanFeatures
+    const humanCodeSources: Record<string, string> = {
+      human: humanCode,
+      gridSquares: gridSquaresCode,
+    }
+
+    const missingFromHuman = humanFeatures
+      .filter(f => !humanCodeSources[f.source]?.includes(f.pattern))
+      .map(f => f.name)
+    expect(missingFromHuman).toEqual([])
+
+    const missingFromBot = humanFeatures
       .filter(f => !botCode.includes(f.pattern))
       .map(f => f.name)
-
-    expect(missingFeatures).toEqual([])
+    expect(missingFromBot).toEqual([])
   })
 })
