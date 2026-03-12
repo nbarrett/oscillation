@@ -136,34 +136,37 @@ export default function SelectGridSquares() {
     }
   }
 
-  function drawPreviewPath(path: string[]) {
+  function drawAllPreviewPaths(paths: string[][]) {
     clearPreviewPolygons();
-
-    for (let i = 0; i < path.length - 1; i++) {
-      const key = path[i];
-      const latLngs = gridKeyToLatLngs(map, key);
-      const polygon = new PreviewPolygon(latLngs, key, {
-        interactive: true,
-        color: colours.osMapsPurple,
-        weight: 2,
-        fillOpacity: 0.35,
-      });
-      polygon.addTo(map);
-    }
 
     const { currentPlayerName, players } = useGameStore.getState();
     const currentPlayer = players.find(p => p.name === currentPlayerName);
-    if (!currentPlayer || path.length === 0) return;
 
-    const roadPoints = roadPathThroughGrids(currentPlayer.position, path);
-    const routePoints: L.LatLngTuple[] = roadPoints.map(([lat, lng]) => [lat, lng] as L.LatLngTuple);
-    if (routePoints.length >= 2) {
-      const routeLine = new RoutePolyline(routePoints, {
-        color: colours.osMapsPurple,
-        opacity: 0.8,
-        weight: 6,
-      });
-      routeLine.addTo(map);
+    for (const path of paths) {
+      for (let i = 0; i < path.length - 1; i++) {
+        const key = path[i];
+        const latLngs = gridKeyToLatLngs(map, key);
+        const polygon = new PreviewPolygon(latLngs, key, {
+          interactive: true,
+          color: colours.osMapsPurple,
+          weight: 2,
+          fillOpacity: 0.35,
+        });
+        polygon.addTo(map);
+      }
+
+      if (!currentPlayer || path.length === 0) continue;
+
+      const roadPoints = roadPathThroughGrids(currentPlayer.position, path);
+      const routePoints: L.LatLngTuple[] = roadPoints.map(([lat, lng]) => [lat, lng] as L.LatLngTuple);
+      if (routePoints.length >= 2) {
+        const routeLine = new RoutePolyline(routePoints, {
+          color: colours.osMapsPurple,
+          opacity: 0.8,
+          weight: 6,
+        });
+        routeLine.addTo(map);
+      }
     }
   }
 
@@ -284,7 +287,7 @@ export default function SelectGridSquares() {
     useGameStore.getState().setPreviewPaths(paths);
 
     if (paths.length > 0) {
-      drawPreviewPath(paths[0]);
+      drawAllPreviewPaths(paths);
     }
   }, [map, gameTurnState, diceResult, playerStartGridKey, movementPath.length, showPreviewPaths, requestPreviewRecompute]);
 
@@ -344,10 +347,7 @@ export default function SelectGridSquares() {
 
     if (previewPaths.length === 0 || movementPath.length > 0) return;
 
-    const path = previewPaths[previewPathIndex];
-    if (path) {
-      drawPreviewPath(path);
-    }
+    drawAllPreviewPaths(previewPaths);
   }, [previewPathIndex, previewPaths, movementPath.length]);
 
   useEffect(() => {
@@ -451,7 +451,7 @@ export default function SelectGridSquares() {
         const matchIdx = previews.findIndex(p => p[p.length - 1] === gridKey);
         if (matchIdx >= 0) {
           useGameStore.getState().setPreviewPathIndex(matchIdx);
-          drawPreviewPath(previews[matchIdx]);
+          drawAllPreviewPaths(previews);
           return;
         }
       }

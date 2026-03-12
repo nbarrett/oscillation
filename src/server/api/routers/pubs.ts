@@ -23,7 +23,7 @@ export const pubsRouter = createTRPCRouter({
         "[out:json][timeout:25];",
         "(",
         `node["amenity"="pub"](${bbox});`,
-        `way["highway"~"^(trunk|primary|secondary)$"](${bbox});`,
+        `way["highway"~"^(trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified)$"](${bbox});`,
         motorwayOverpassClause(bbox),
         ");",
         "out body geom;",

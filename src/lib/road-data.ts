@@ -45,7 +45,7 @@ export interface RoadDataCache {
   timestamp: number;
 }
 
-const STORAGE_KEY = "oscillation-road-data-v2";
+const STORAGE_KEY = "oscillation-road-data-v4";
 const STORAGE_MAX_AGE = 24 * 60 * 60 * 1000;
 
 let roadDataCache: RoadDataCache | null = null;
@@ -216,13 +216,19 @@ async function queryOverpassForRoads(
   east: number
 ): Promise<RoadQueryResult> {
   const query = `
-    [out:json][timeout:25];
+    [out:json][timeout:30];
     (
       way["highway"="motorway"](${south},${west},${north},${east});
       way["highway"="motorway_link"](${south},${west},${north},${east});
       way["highway"="trunk"](${south},${west},${north},${east});
+      way["highway"="trunk_link"](${south},${west},${north},${east});
       way["highway"="primary"](${south},${west},${north},${east});
+      way["highway"="primary_link"](${south},${west},${north},${east});
       way["highway"="secondary"](${south},${west},${north},${east});
+      way["highway"="secondary_link"](${south},${west},${north},${east});
+      way["highway"="tertiary"](${south},${west},${north},${east});
+      way["highway"="tertiary_link"](${south},${west},${north},${east});
+      way["highway"="unclassified"](${south},${west},${north},${east});
       node["highway"="motorway_junction"](${south},${west},${north},${east});
       node["railway"="station"](${south},${west},${north},${east});
     );
@@ -287,9 +293,9 @@ async function queryOverpassForRoads(
 
       if (highway === 'motorway' || highway === 'motorway_link') {
         roadType = 'M';
-      } else if (highway === 'trunk' || highway === 'primary') {
+      } else if (highway === 'trunk' || highway === 'trunk_link' || highway === 'primary' || highway === 'primary_link') {
         roadType = 'A';
-      } else if (highway === 'secondary') {
+      } else if (highway === 'secondary' || highway === 'secondary_link' || highway === 'tertiary' || highway === 'tertiary_link' || highway === 'unclassified') {
         roadType = 'B';
       }
 
