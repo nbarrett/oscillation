@@ -372,8 +372,6 @@ export default function GamePage() {
                   <PlayerPositions />
                   <div className="hidden md:block h-8 w-px bg-border" />
                   <DiceRoller />
-                  <div className="hidden md:block h-8 w-px bg-border" />
-                  <GameObjectives />
                   <div className="ml-auto">
                     <button
                       onClick={() => setSettingsExpanded(!settingsExpanded)}
@@ -394,6 +392,7 @@ export default function GamePage() {
                     </button>
                   </div>
                 </div>
+                <GameObjectives />
 
             <div
               className={cn(

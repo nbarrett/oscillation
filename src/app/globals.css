@@ -258,3 +258,8 @@
 .poi-tooltip::before {
   border-top-color: hsl(var(--primary) / 0.95) !important;
 }
+
+.collected-poi-marker {
+  background: none !important;
+  border: none !important;
+}

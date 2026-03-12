@@ -14,6 +14,7 @@ import { type PoiIconOption } from "@/stores/poi-types"
 import { isNearMotorway } from "@/lib/road-data"
 
 const ICON_SIZE = 52
+const COLLECTED_SIZE = 56
 
 function buildIcon(svgTemplate: string, colour: string): L.DivIcon {
   const coloured = svgTemplate
@@ -25,6 +26,22 @@ function buildIcon(svgTemplate: string, colour: string): L.DivIcon {
     className: "selected-poi-icon",
     iconSize: [ICON_SIZE, ICON_SIZE],
     iconAnchor: [ICON_SIZE / 2, ICON_SIZE / 2],
+  })
+}
+
+function buildCollectedIcon(svgTemplate: string, colour: string): L.DivIcon {
+  const poiSize = 30
+  const coloured = svgTemplate
+    .replace(/currentColor/g, colour)
+    .replace(/<svg /, `<svg width="${poiSize}" height="${poiSize}" style="opacity:0.35;filter:grayscale(80%)" `)
+
+  const html = `<div style="width:${COLLECTED_SIZE}px;height:${COLLECTED_SIZE}px;position:relative;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(22,163,106,0.15);border:3px solid #16a34a;box-shadow:0 0 8px rgba(22,163,106,0.4)">${coloured}<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" style="position:absolute;right:-6px;top:-6px;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.5))"><circle cx="12" cy="12" r="11" fill="#16a34a"/><path d="M7 12.5l3.5 3.5 6.5-7" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`
+
+  return L.divIcon({
+    html,
+    className: "collected-poi-marker",
+    iconSize: [COLLECTED_SIZE, COLLECTED_SIZE],
+    iconAnchor: [COLLECTED_SIZE / 2, COLLECTED_SIZE / 2],
   })
 }
 
@@ -58,6 +75,14 @@ export default function SelectedPoiMarkers() {
     school: buildIcon(resolveIcon(SCHOOL_ICON_OPTIONS, schoolIconStyle, iconDetailMode), POI_COLOURS.school),
   }), [pubIconStyle, spireIconStyle, towerIconStyle, phoneIconStyle, schoolIconStyle, iconDetailMode])
 
+  const collectedIcons = useMemo(() => ({
+    pub: buildCollectedIcon(resolveIcon(PUB_ICON_OPTIONS, pubIconStyle, iconDetailMode), POI_COLOURS.pub),
+    spire: buildCollectedIcon(resolveIcon(SPIRE_ICON_OPTIONS, spireIconStyle, iconDetailMode), POI_COLOURS.spire),
+    tower: buildCollectedIcon(resolveIcon(TOWER_ICON_OPTIONS, towerIconStyle, iconDetailMode), POI_COLOURS.tower),
+    phone: buildCollectedIcon(resolveIcon(PHONE_ICON_OPTIONS, phoneIconStyle, iconDetailMode), POI_COLOURS.phone),
+    school: buildCollectedIcon(resolveIcon(SCHOOL_ICON_OPTIONS, schoolIconStyle, iconDetailMode), POI_COLOURS.school),
+  }), [pubIconStyle, spireIconStyle, towerIconStyle, phoneIconStyle, schoolIconStyle, iconDetailMode])
+
   const visitedSet = new Set(currentPlayer?.visitedPois ?? [])
 
   const renderMarkers = useCallback(() => {
@@ -68,21 +93,24 @@ export default function SelectedPoiMarkers() {
 
     for (const poi of selectedPois) {
       const poiId = `${poi.category}:${poi.osmId}`
-      if (visitedSet.has(poiId)) continue
       if (isNearMotorway(poi.lat, poi.lng)) continue
 
-      const icon = categoryIcons[poi.category as keyof typeof categoryIcons]
+      const visited = visitedSet.has(poiId)
+      const icon = visited
+        ? collectedIcons[poi.category as keyof typeof collectedIcons]
+        : categoryIcons[poi.category as keyof typeof categoryIcons]
       if (!icon) continue
 
-      const marker = L.marker([poi.lat, poi.lng], { icon })
+      const marker = L.marker([poi.lat, poi.lng], { icon, zIndexOffset: visited ? -100 : 0 })
 
-      if (poi.name) {
-        marker.bindTooltip(poi.name, { direction: "top", offset: [0, -10], className: "poi-tooltip" })
+      const tooltipLabel = visited ? `${poi.name ?? poi.category} ✓` : (poi.name ?? "")
+      if (tooltipLabel) {
+        marker.bindTooltip(tooltipLabel, { direction: "top", offset: [0, -10], className: "poi-tooltip" })
       }
 
       layerRef.current.addLayer(marker)
     }
-  }, [map, selectedPois, visitedSet, categoryIcons])
+  }, [map, selectedPois, visitedSet, categoryIcons, collectedIcons])
 
   useEffect(() => {
     if (!map) return
