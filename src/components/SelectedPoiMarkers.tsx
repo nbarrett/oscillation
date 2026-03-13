@@ -16,16 +16,35 @@ import { isNearMotorway } from "@/lib/road-data"
 const ICON_SIZE = 52
 const COLLECTED_SIZE = 56
 
-function buildIcon(svgTemplate: string, colour: string): L.DivIcon {
-  const coloured = svgTemplate
-    .replace(/currentColor/g, colour)
-    .replace(/<svg /, `<svg width="${ICON_SIZE}" height="${ICON_SIZE}" `)
+function buildBaseIcon(svgTemplate: string, colour: string, dimmed = false): string {
+  const hex = dimmed ? "#9ca3af" : colour
+  return svgTemplate
+    .replace(/currentColor/g, hex)
+    .replace(/<svg /, `<svg width="${ICON_SIZE}" height="${ICON_SIZE}" opacity="${dimmed ? 0.45 : 1}" `)
+}
 
+function buildMarkerHtml(iconSvg: string, label: string, style: "normal" | "depleted" | "collected"): string {
+  const badgeBg =
+    style === "collected" ? "#16a34a" :
+    style === "depleted" ? "#6b7280" :
+    "#2563eb"
+
+  return `
+    <div style="position:relative;width:${ICON_SIZE}px;height:${ICON_SIZE}px;">
+      ${iconSvg}
+      <div style="position:absolute;top:-4px;right:-4px;background:${badgeBg};color:white;border-radius:9999px;min-width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;padding:0 3px;border:2px solid white;">
+        ${label}
+      </div>
+    </div>
+  `
+}
+
+function buildIcon(html: string): L.DivIcon {
   return L.divIcon({
-    html: coloured,
+    html,
     className: "selected-poi-icon",
-    iconSize: [ICON_SIZE, ICON_SIZE],
-    iconAnchor: [ICON_SIZE / 2, ICON_SIZE / 2],
+    iconSize: [ICON_SIZE + 8, ICON_SIZE + 8],
+    iconAnchor: [(ICON_SIZE + 8) / 2, (ICON_SIZE + 8) / 2],
   })
 }
 
@@ -57,7 +76,7 @@ function resolveIcon<T extends string>(
 export default function SelectedPoiMarkers() {
   const map = useMap()
   const layerRef = useRef<L.LayerGroup | null>(null)
-  const { selectedPois } = useGameStore()
+  const { selectedPois, tokenInventory } = useGameStore()
   const currentPlayer = useCurrentPlayer()
 
   const pubIconStyle = usePubStore((s) => s.pubIconStyle)
@@ -67,23 +86,16 @@ export default function SelectedPoiMarkers() {
   const schoolIconStyle = useSchoolStore((s) => s.schoolIconStyle)
   const iconDetailMode = usePoiSettingsStore((s) => s.iconDetailMode)
 
-  const categoryIcons = useMemo(() => ({
-    pub: buildIcon(resolveIcon(PUB_ICON_OPTIONS, pubIconStyle, iconDetailMode), POI_COLOURS.pub),
-    spire: buildIcon(resolveIcon(SPIRE_ICON_OPTIONS, spireIconStyle, iconDetailMode), POI_COLOURS.spire),
-    tower: buildIcon(resolveIcon(TOWER_ICON_OPTIONS, towerIconStyle, iconDetailMode), POI_COLOURS.tower),
-    phone: buildIcon(resolveIcon(PHONE_ICON_OPTIONS, phoneIconStyle, iconDetailMode), POI_COLOURS.phone),
-    school: buildIcon(resolveIcon(SCHOOL_ICON_OPTIONS, schoolIconStyle, iconDetailMode), POI_COLOURS.school),
+  const categoryIconSvgs = useMemo(() => ({
+    pub: resolveIcon(PUB_ICON_OPTIONS, pubIconStyle, iconDetailMode),
+    spire: resolveIcon(SPIRE_ICON_OPTIONS, spireIconStyle, iconDetailMode),
+    tower: resolveIcon(TOWER_ICON_OPTIONS, towerIconStyle, iconDetailMode),
+    phone: resolveIcon(PHONE_ICON_OPTIONS, phoneIconStyle, iconDetailMode),
+    school: resolveIcon(SCHOOL_ICON_OPTIONS, schoolIconStyle, iconDetailMode),
   }), [pubIconStyle, spireIconStyle, towerIconStyle, phoneIconStyle, schoolIconStyle, iconDetailMode])
 
-  const collectedIcons = useMemo(() => ({
-    pub: buildCollectedIcon(resolveIcon(PUB_ICON_OPTIONS, pubIconStyle, iconDetailMode), POI_COLOURS.pub),
-    spire: buildCollectedIcon(resolveIcon(SPIRE_ICON_OPTIONS, spireIconStyle, iconDetailMode), POI_COLOURS.spire),
-    tower: buildCollectedIcon(resolveIcon(TOWER_ICON_OPTIONS, towerIconStyle, iconDetailMode), POI_COLOURS.tower),
-    phone: buildCollectedIcon(resolveIcon(PHONE_ICON_OPTIONS, phoneIconStyle, iconDetailMode), POI_COLOURS.phone),
-    school: buildCollectedIcon(resolveIcon(SCHOOL_ICON_OPTIONS, schoolIconStyle, iconDetailMode), POI_COLOURS.school),
-  }), [pubIconStyle, spireIconStyle, towerIconStyle, phoneIconStyle, schoolIconStyle, iconDetailMode])
-
-  const visitedSet = new Set(currentPlayer?.visitedPois ?? [])
+  const visitedPois = currentPlayer?.visitedPois ?? []
+  const visitedSet = useMemo(() => new Set(visitedPois), [visitedPois.join(",")])
 
   const renderMarkers = useCallback(() => {
     if (!layerRef.current || !map) return
@@ -95,22 +107,43 @@ export default function SelectedPoiMarkers() {
       const poiId = `${poi.category}:${poi.osmId}`
       if (isNearMotorway(poi.lat, poi.lng)) continue
 
+      const svgTemplate = categoryIconSvgs[poi.category as keyof typeof categoryIconSvgs]
+      if (!svgTemplate) continue
+
+      const colour = POI_COLOURS[poi.category as keyof typeof POI_COLOURS] ?? "#374151"
+      const remaining = tokenInventory[poiId] ?? null
       const visited = visitedSet.has(poiId)
-      const icon = visited
-        ? collectedIcons[poi.category as keyof typeof collectedIcons]
-        : categoryIcons[poi.category as keyof typeof categoryIcons]
-      if (!icon) continue
+      const depleted = remaining !== null && remaining === 0
+
+      let style: "normal" | "depleted" | "collected"
+      let badgeLabel: string
+
+      if (visited) {
+        style = "collected"
+        badgeLabel = "✓"
+      } else if (depleted) {
+        style = "depleted"
+        badgeLabel = "0"
+      } else {
+        style = "normal"
+        badgeLabel = remaining !== null ? String(remaining) : "?"
+      }
+
+      const iconSvg = buildBaseIcon(svgTemplate, colour, depleted && !visited)
+      const html = buildMarkerHtml(iconSvg, badgeLabel, style)
+      const icon = buildIcon(html)
 
       const marker = L.marker([poi.lat, poi.lng], { icon, zIndexOffset: visited ? -100 : 0 })
 
-      const tooltipLabel = visited ? `${poi.name ?? poi.category} ✓` : (poi.name ?? "")
-      if (tooltipLabel) {
-        marker.bindTooltip(tooltipLabel, { direction: "top", offset: [0, -10], className: "poi-tooltip" })
-      }
+      const tooltipParts = [poi.name ?? poi.category]
+      if (visited) tooltipParts.push("Collected ✓")
+      else if (depleted) tooltipParts.push("Depleted — no tokens left")
+      else if (remaining !== null) tooltipParts.push(`${remaining} token${remaining === 1 ? "" : "s"} remaining`)
+      marker.bindTooltip(tooltipParts.join(" · "), { direction: "top", offset: [0, -10], className: "poi-tooltip" })
 
       layerRef.current.addLayer(marker)
     }
-  }, [map, selectedPois, visitedSet, categoryIcons, collectedIcons])
+  }, [map, selectedPois, visitedSet, categoryIconSvgs, tokenInventory])
 
   useEffect(() => {
     if (!map) return

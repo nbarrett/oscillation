@@ -2,6 +2,9 @@
   "name": "oscillation",
   "private": true,
   "version": "0.5.1",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "next dev --port 3002 --turbo",
     "build": "next build",

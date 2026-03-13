@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic"
 import { useEffect, useState } from "react"
-import { Loader2, Gamepad2, ChevronDown, ChevronLeft, ChevronRight, Settings, Users, LogOut, Copy, Check, Trophy, MessageCircle } from "lucide-react"
+import { Loader2, Gamepad2, ChevronDown, ChevronLeft, ChevronRight, Settings, Users, LogOut, Copy, Check, Trophy, MessageCircle, ScrollText, Shuffle } from "lucide-react"
 import { AuthDialog } from "@/components/auth/auth-dialog"
 import { UserMenu } from "@/components/auth/user-menu"
 import { useMapStore } from "@/stores/map-store"
@@ -50,6 +50,8 @@ const GameLobby = dynamic(() => import("@/components/GameLobby"), { ssr: false }
 const BotTurnPlayer = dynamic(() => import("@/components/BotTurnPlayer"), { ssr: false })
 const ChatPanel = dynamic(() => import("@/components/ChatPanel"), { ssr: false })
 const PoiPicker = dynamic(() => import("@/components/PoiPicker"), { ssr: false })
+const ActivityLog = dynamic(() => import("@/components/ActivityLog"), { ssr: false })
+const CardBrowser = dynamic(() => import("@/components/CardBrowser"), { ssr: false })
 
 
 function RoadDataIndicator() {
@@ -140,7 +142,10 @@ function MovementOverlay() {
               </button>
             ) : (
               <button
-                onClick={() => useGameStore.getState().triggerPreviewRecompute()}
+                onClick={() => {
+                  useGameStore.getState().setShowPreviewPaths(true)
+                  useGameStore.getState().triggerPreviewRecompute()
+                }}
                 className="px-3 py-1.5 rounded-lg bg-primary-foreground text-primary text-sm font-bold hover:bg-primary-foreground/90 transition-colors"
               >
                 Show Routes
@@ -221,6 +226,8 @@ export default function GamePage() {
   const { data: tokenData } = trpc.token.getRawToken.useQuery()
   const { data: locations } = trpc.locations.getAll.useQuery()
   const [settingsExpanded, setSettingsExpanded] = useState(false)
+  const [activityExpanded, setActivityExpanded] = useState(false)
+  const [cardsOpen, setCardsOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [showVictory, setShowVictory] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
@@ -349,7 +356,7 @@ export default function GamePage() {
       </header>
 
       {inSession && <GameSync />}
-      {inSession && phase === "playing" && <BotTurnPlayer />}
+      {inSession && (phase === "playing" || phase === "picking") && <BotTurnPlayer />}
 
       <main className="w-full px-4 py-3 flex-1 flex flex-col gap-3">
         {validatingSession ? (
@@ -372,6 +379,35 @@ export default function GamePage() {
                   <PlayerPositions />
                   <div className="hidden md:block h-8 w-px bg-border" />
                   <DiceRoller />
+                  <div className="hidden md:block h-8 w-px bg-border" />
+                  <GameObjectives />
+                  <button
+                    onClick={() => setActivityExpanded(!activityExpanded)}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                      "hover:bg-muted border",
+                      activityExpanded && "bg-muted"
+                    )}
+                  >
+                    <ScrollText className="h-4 w-4" />
+                    <span className="hidden sm:inline">Activity</span>
+                    <ChevronDown
+                      className={cn(
+                        "h-3 w-3 transition-transform duration-200",
+                        activityExpanded && "rotate-180"
+                      )}
+                    />
+                  </button>
+                  <button
+                    onClick={() => setCardsOpen(true)}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                      "hover:bg-muted border",
+                    )}
+                  >
+                    <Shuffle className="h-4 w-4" />
+                    <span className="hidden sm:inline">Cards</span>
+                  </button>
                   <div className="ml-auto">
                     <button
                       onClick={() => setSettingsExpanded(!settingsExpanded)}
@@ -419,6 +455,19 @@ export default function GamePage() {
                 </div>
               </div>
             </div>
+
+            <div
+              className={cn(
+                "grid transition-all duration-300 ease-in-out",
+                activityExpanded ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0"
+              )}
+            >
+              <div className="overflow-hidden">
+                <div className="border-t">
+                  <ActivityLog maxRows={8} />
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -445,6 +494,14 @@ export default function GamePage() {
               </CardContent>
             </Card>
           </>
+        )}
+
+        {inSession && sessionId && (
+          <CardBrowser
+            open={cardsOpen}
+            onClose={() => setCardsOpen(false)}
+            sessionId={sessionId}
+          />
         )}
 
         <Dialog open={showVictory} onOpenChange={setShowVictory}>

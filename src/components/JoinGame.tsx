@@ -163,7 +163,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
   const [locationDropdownOpen, setLocationDropdownOpen] = useState(false)
   const locationRef = useRef<HTMLDivElement>(null)
   const [areaSize, setAreaSize] = useState<AreaSize>(DEFAULT_AREA_SIZE)
-  const [botsEnabled, setBotsEnabled] = useState(false)
+  const [botCount, setBotCount] = useState(3)
 
   const { setSessionId, setPlayerId, setSessionCode, setCreatorPlayerId, showPreviewPaths, setShowPreviewPaths: showPreviewPathsSetter } = useGameStore()
   const { preferredCar, setPreferredCar } = useCarStore()
@@ -398,7 +398,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
       startLng: selectedLocation.lng,
       iconType: preferredCar,
       areaSize,
-      botsEnabled,
+      botCount,
     })
   }
 
@@ -581,32 +581,23 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
 
               <div className="space-y-2">
                 <Label>Bots</Label>
-                <p className="text-xs text-muted-foreground">Fill empty slots with bots when starting a game</p>
+                <p className="text-xs text-muted-foreground">Number of bots to add when starting</p>
                 <div className="flex rounded-md border overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => setBotsEnabled(true)}
-                    className={cn(
-                      "flex-1 px-3 py-1.5 text-xs font-medium transition-colors",
-                      botsEnabled
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-background hover:bg-muted text-muted-foreground"
-                    )}
-                  >
-                    On
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBotsEnabled(false)}
-                    className={cn(
-                      "flex-1 px-3 py-1.5 text-xs font-medium transition-colors",
-                      !botsEnabled
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-background hover:bg-muted text-muted-foreground"
-                    )}
-                  >
-                    Off
-                  </button>
+                  {[0, 1, 2, 3, 4].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setBotCount(n)}
+                      className={cn(
+                        "flex-1 px-3 py-1.5 text-xs font-medium transition-colors",
+                        botCount === n
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-background hover:bg-muted text-muted-foreground"
+                      )}
+                    >
+                      {n}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -654,7 +645,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
                 <SummaryItem label="Car" value={carLabelForStyle(preferredCar)} />
                 <SummaryItem label="Location" value={selectedLocation ? asTitle(selectedLocation.name) : "—"} />
                 <SummaryItem label="Area Size" value={`${preset.label} (${preset.widthKm}x${preset.heightKm} km)`} />
-                <SummaryItem label="Bots" value={botsEnabled ? "On" : "Off"} />
+                <SummaryItem label="Bots" value={botCount === 0 ? "None" : String(botCount)} />
                 <SummaryItem label="Preview Paths" value={showPreviewPaths ? "On" : "Off"} />
               </div>
 

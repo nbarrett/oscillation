@@ -31,6 +31,16 @@ export interface SelectedPoi {
   lng: number;
 }
 
+export interface ActivityEntry {
+  type: "token_collected" | "player_joined"
+  playerName: string
+  tokenColour: string | null
+  poiName: string | null
+  poiCategory: string | null
+  timestamp: string
+  message: string
+}
+
 export interface Player {
   position: [number, number];
   previousPosition: [number, number] | null;
@@ -38,6 +48,7 @@ export interface Player {
   name: string;
   iconType: string;
   visitedPois: string[];
+  tokens: Record<string, number>;
   hasReturnedToStart: boolean;
 }
 
@@ -123,6 +134,8 @@ interface GameState {
   selectedPois: SelectedPoi[] | null;
   poiCandidates: SelectedPoi[] | null;
   winnerName: string | null;
+  tokenInventory: Record<string, number>;
+  activityLog: ActivityEntry[];
   showPreviewPaths: boolean;
   roadDataStatus: "idle" | "loading" | "loaded" | "error";
   cardTrigger: CardTrigger | null;
@@ -181,6 +194,8 @@ interface GameState {
   setSelectedPois: (pois: SelectedPoi[] | null) => void;
   setPoiCandidates: (candidates: SelectedPoi[] | null) => void;
   setWinnerName: (name: string | null) => void;
+  setTokenInventory: (inventory: Record<string, number>) => void;
+  setActivityLog: (log: ActivityEntry[]) => void;
   setPendingEndTurn: (pending: boolean) => void;
   setPickingPlayerIndex: (index: number) => void;
   setActivePickingCategory: (category: PoiCategory | null) => void;
@@ -230,6 +245,8 @@ export const useGameStore = create<GameState>()(
       previewPaths: [],
       previewPathIndex: 0,
       pendingEndTurn: false,
+      tokenInventory: {},
+      activityLog: [],
 
       setShowPreviewPaths: (showPreviewPaths) => set({ showPreviewPaths }),
       setRoadDataStatus: (roadDataStatus) => set({ roadDataStatus }),
@@ -548,6 +565,7 @@ export const useGameStore = create<GameState>()(
           previousPosition: null,
           completedRoute: null,
           visitedPois: [],
+          tokens: {},
           hasReturnedToStart: false,
         }))
 
@@ -578,6 +596,10 @@ export const useGameStore = create<GameState>()(
       setPoiCandidates: (poiCandidates) => set({ poiCandidates }),
 
       setWinnerName: (winnerName) => set({ winnerName }),
+
+      setTokenInventory: (tokenInventory) => set({ tokenInventory }),
+
+      setActivityLog: (activityLog) => set({ activityLog }),
 
       setPendingEndTurn: (pendingEndTurn) => set({ pendingEndTurn }),
 
@@ -612,6 +634,8 @@ export const useGameStore = create<GameState>()(
           winnerName: null,
           pickingPlayerIndex: 0,
           activePickingCategory: null,
+          tokenInventory: {},
+          activityLog: [],
         });
       },
     }),

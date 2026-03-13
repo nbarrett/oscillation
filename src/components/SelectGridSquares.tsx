@@ -5,7 +5,7 @@ import { useMap } from "react-leaflet";
 import L from "leaflet";
 import { useGameStore, occupiedGridKeys, GameTurnState } from "@/stores/game-store";
 import { useDeckStore } from "@/stores/deck-store";
-import { latLngToGridKey, getAdjacentRoadGrids, shortestPath, reachableRoadGrids, isRoadDataLoaded, onRoadDataReady, gridHasABRoad, loadRoadData, gridKeyToLatLng, roadPathThroughGrids } from "@/lib/road-data";
+import { latLngToGridKey, getAdjacentRoadGrids, shortestPath, reachableRoadGrids, isRoadDataLoaded, onRoadDataReady, gridHasABRoad, gridHasRoad, loadRoadData, gridKeyToLatLng, roadPathThroughGrids } from "@/lib/road-data";
 import { gridKeyToLatLngs } from "@/lib/grid-polygon";
 import { isOnBoardEdge, isOnMotorwayOrRailway } from "@/lib/deck-triggers";
 import { type GameBounds } from "@/lib/area-size";
@@ -232,12 +232,22 @@ export default function SelectGridSquares() {
 
     const reachable = reachableGrids ?? reachableRoadGrids(effectiveStart, diceResult, occupied);
     log.info(`computeAndSetPaths: dice=${diceResult} start=${effectiveStart} reachable=${reachable.size} occupied=${occupied.size} fromStore=${reachableGrids !== null}`);
+    const roadCheck = (gridKey: string) => gridHasABRoad(gridKey) || gridHasRoad(gridKey);
+
     const endpoints: string[] = [];
     reachable.forEach((steps, gridKey) => {
       if (steps === diceResult && !occupied.has(gridKey) && gridHasABRoad(gridKey)) {
         endpoints.push(gridKey);
       }
     });
+
+    if (endpoints.length === 0) {
+      reachable.forEach((steps, gridKey) => {
+        if (steps === diceResult && !occupied.has(gridKey) && gridHasRoad(gridKey)) {
+          endpoints.push(gridKey);
+        }
+      });
+    }
 
     const paths: string[][] = [];
     for (const endpoint of endpoints) {
@@ -251,7 +261,7 @@ export default function SelectGridSquares() {
       const furthest: string[] = [];
       let maxDist = 0;
       reachable.forEach((steps, gridKey) => {
-        if (!occupied.has(gridKey) && gridHasABRoad(gridKey)) {
+        if (!occupied.has(gridKey) && roadCheck(gridKey)) {
           if (steps > maxDist) {
             maxDist = steps;
             furthest.length = 0;

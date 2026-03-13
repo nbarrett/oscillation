@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react"
 import { trpc } from "@/lib/trpc/client"
-import { useGameStore, GameTurnState, type Player, type GamePhase } from "@/stores/game-store"
+import { useGameStore, GameTurnState, type Player, type GamePhase, type ActivityEntry } from "@/stores/game-store"
 import { useNotificationStore } from "@/stores/notification-store"
 import { useDeckStore } from "@/stores/deck-store"
 import { areaSizeBounds, type AreaSize } from "@/lib/area-size"
@@ -10,13 +10,14 @@ import { gridKeyToLatLng, setPathfindingBounds } from "@/lib/road-data"
 import { log } from "@/lib/utils"
 
 export default function GameSync() {
-  const { sessionId, playerId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setDiceValues, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setPoiCandidates, setPickingPlayerIndex, setWinnerName, leaveSession } = useGameStore()
+  const { sessionId, playerId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setDiceValues, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setPoiCandidates, setPickingPlayerIndex, setWinnerName, leaveSession, setTokenInventory, setActivityLog } = useGameStore()
   const { addNotification } = useNotificationStore()
   const { initDecks, setObstructions, setMissedTurns } = useDeckStore()
   const hasCheckedSession = useRef(false)
   const previousPlayerNamesRef = useRef<string[]>([])
   const previousPhaseRef = useRef<string | null>(null)
   const lastProcessedMoveRef = useRef<string | null>(null)
+  const lastActivityLengthRef = useRef<number>(0)
 
   const phase = useGameStore((s) => s.phase)
   const pollInterval = phase === "playing" ? 3000 : phase === "lobby" ? 5000 : 5000
@@ -90,6 +91,7 @@ export default function GameSync() {
             previousPosition: localPlayer.previousPosition,
             completedRoute: localPlayer.completedRoute,
             visitedPois: p.visitedPois,
+            tokens: p.tokens ?? {},
             hasReturnedToStart: p.hasReturnedToStart,
           }
         }
@@ -110,6 +112,7 @@ export default function GameSync() {
             previousPosition: prevPos,
             completedRoute: routeWaypoints,
             visitedPois: p.visitedPois,
+            tokens: p.tokens ?? {},
             hasReturnedToStart: p.hasReturnedToStart,
           }
         }
@@ -121,6 +124,7 @@ export default function GameSync() {
           previousPosition: null,
           completedRoute: null,
           visitedPois: p.visitedPois,
+          tokens: p.tokens ?? {},
           hasReturnedToStart: p.hasReturnedToStart,
         }
       })
@@ -138,6 +142,24 @@ export default function GameSync() {
           setMissedTurns(p.name, p.missedTurns)
         }
       }
+
+      if (gameState.tokenInventory) {
+        setTokenInventory(gameState.tokenInventory)
+      }
+
+      const serverActivityLog = (gameState.activityLog as ActivityEntry[]) ?? []
+      const prevLen = lastActivityLengthRef.current
+      if (serverActivityLog.length > prevLen) {
+        const newEntries = serverActivityLog.slice(prevLen)
+        for (const entry of newEntries) {
+          const myPlayer = gameState.players.find(p => p.id === playerId)
+          if (entry.playerName !== myPlayer?.name) {
+            addNotification(entry.message, "info")
+          }
+        }
+      }
+      lastActivityLengthRef.current = serverActivityLog.length
+      setActivityLog(serverActivityLog)
 
       const myPlayer = gameState.players.find(p => p.id === playerId)
       if (myPlayer) {
@@ -190,7 +212,7 @@ export default function GameSync() {
         setWinnerName(winningPlayer?.name ?? null)
       }
     }
-  }, [gameState, playerId, addNotification, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setPoiCandidates, setWinnerName, initDecks, setObstructions, setMissedTurns])
+  }, [gameState, playerId, addNotification, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setPoiCandidates, setWinnerName, initDecks, setObstructions, setMissedTurns, setTokenInventory, setActivityLog])
 
   return null
 }

@@ -1,4 +1,4 @@
-FROM node:20-slim AS deps
+FROM node:22-slim AS deps
 WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
@@ -11,7 +11,7 @@ COPY prisma ./prisma
 
 RUN pnpm install --frozen-lockfile
 
-FROM node:20-slim AS builder
+FROM node:22-slim AS builder
 WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
@@ -26,7 +26,7 @@ RUN pnpm run db:generate
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm run build
 
-FROM node:20-slim AS runner
+FROM node:22-slim AS runner
 WORKDIR /app
 
 # Install OpenSSL for Prisma runtime and enable corepack for pnpm

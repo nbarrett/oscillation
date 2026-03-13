@@ -85,6 +85,8 @@ export default function BotTurnPlayer() {
     phase,
     gameTurnState,
     selectedPois,
+    poiCandidates,
+    pickingPlayerIndex,
     setDiceResult,
     setDiceValues,
     setDiceRolling,
@@ -113,6 +115,11 @@ export default function BotTurnPlayer() {
   const applyChanceEffectMutation = trpc.game.applyChanceEffect.useMutation()
   const placeObstructionMutation = trpc.game.placeObstruction.useMutation()
   const removeObstructionMutation = trpc.game.removeObstruction.useMutation()
+  const pickPoiMutation = trpc.game.pickPoi.useMutation()
+
+  const currentPicker = players[pickingPlayerIndex % players.length]
+  const isBotNeedingPick = phase === "picking"
+    && currentPicker?.name.startsWith("Bot ")
 
   const isBotNeedingRoll = phase === "playing"
     && currentPlayerName?.startsWith("Bot ")
@@ -121,6 +128,20 @@ export default function BotTurnPlayer() {
   const isBotNeedingMove = phase === "playing"
     && currentPlayerName?.startsWith("Bot ")
     && gameTurnState === GameTurnState.DICE_ROLLED
+
+  useEffect(() => {
+    if (!isBotNeedingPick || !sessionId || !playerId) return
+
+    if (botTimerRef.current) clearTimeout(botTimerRef.current)
+
+    botTimerRef.current = setTimeout(() => {
+      playBotPick()
+    }, 1200)
+
+    return () => {
+      if (botTimerRef.current) clearTimeout(botTimerRef.current)
+    }
+  }, [isBotNeedingPick, pickingPlayerIndex, sessionId, playerId])
 
   useEffect(() => {
     if ((!isBotNeedingRoll && !isBotNeedingMove) || !sessionId || !playerId) return
@@ -139,6 +160,20 @@ export default function BotTurnPlayer() {
       if (botTimerRef.current) clearTimeout(botTimerRef.current)
     }
   }, [isBotNeedingRoll, isBotNeedingMove, currentPlayerName, sessionId, playerId])
+
+  function playBotPick() {
+    if (!sessionId || !playerId) return
+    const state = useGameStore.getState()
+    const candidates = state.poiCandidates ?? []
+    const picked = new Set((state.selectedPois ?? []).map(p => p.category))
+    const categories = ["pub", "spire", "tower", "phone", "school"]
+    const activeCategory = categories.find(c => !picked.has(c))
+    if (!activeCategory) return
+    const eligible = candidates.filter(c => c.category === activeCategory)
+    if (eligible.length === 0) return
+    const chosen = eligible[Math.floor(Math.random() * eligible.length)]
+    pickPoiMutation.mutate({ sessionId, playerId, osmId: chosen.osmId, category: chosen.category })
+  }
 
   function advanceToNextPlayer() {
     const state = useGameStore.getState()

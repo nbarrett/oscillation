@@ -10,6 +10,24 @@ import { POI_CATEGORIES } from "@/lib/poi-categories"
 import { EDGE_DECK, MOTORWAY_DECK, CHANCE_DECK, shuffleDeck, cardById, type ObstructionToken } from "@/lib/card-decks"
 import { log } from "@/lib/utils"
 
+const CATEGORY_TO_COLOUR: Record<string, string> = {
+  pub: "blue",
+  spire: "black",
+  tower: "pink",
+  phone: "yellow",
+  school: "green",
+}
+
+interface ActivityEntry {
+  type: "token_collected" | "player_joined"
+  playerName: string
+  tokenColour: string | null
+  poiName: string | null
+  poiCategory: string | null
+  timestamp: string
+  message: string
+}
+
 function capitalizeName(name: string): string {
   return name.trim().replace(/\b\w/g, (c) => c.toUpperCase())
 }
@@ -84,7 +102,7 @@ export const gameRouter = createTRPCRouter({
       startLng: z.number(),
       iconType: z.string().optional(),
       areaSize: z.enum(AREA_SIZES as [string, ...string[]]).default(DEFAULT_AREA_SIZE),
-      botsEnabled: z.boolean().default(true),
+      botCount: z.number().int().min(0).max(4).default(3),
     }))
     .mutation(async ({ ctx, input }) => {
       let code = generateSessionCode()
@@ -104,7 +122,7 @@ export const gameRouter = createTRPCRouter({
           startLat: snapped.lat,
           startLng: snapped.lng,
           areaSize: input.areaSize,
-          botsEnabled: input.botsEnabled,
+          botCount: input.botCount,
           players: {
             create: {
               name: capitalizeName(input.playerName),
@@ -178,20 +196,56 @@ export const gameRouter = createTRPCRouter({
 
       const turnOrder = session.players.length
       const iconType = input.iconType ?? CAR_STYLES[turnOrder % CAR_STYLES.length]
+      const playerName = capitalizeName(input.playerName)
 
-      const offsetLat = (session.startLat || 0) + 0.00014 * turnOrder
-      const offsetLng = (session.startLng || 0) - 0.00025 * turnOrder
+      const isInProgress = session.phase === "playing"
+      const posLat = isInProgress ? (session.startLat ?? 0) : ((session.startLat || 0) + 0.00014 * turnOrder)
+      const posLng = isInProgress ? (session.startLng ?? 0) : ((session.startLng || 0) - 0.00025 * turnOrder)
 
       const player = await ctx.db.gamePlayer.create({
         data: {
-          name: capitalizeName(input.playerName),
+          name: playerName,
           iconType,
-          positionLat: offsetLat,
-          positionLng: offsetLng,
+          positionLat: posLat,
+          positionLng: posLng,
           turnOrder,
           sessionId: session.id,
         },
       })
+
+      if (isInProgress) {
+        const tokenInventory = (session.tokenInventory as Record<string, number>) ?? {}
+        const activityLog = (session.activityLog as unknown as ActivityEntry[]) ?? []
+
+        const rebalanced: Record<string, number> = {}
+        for (const [poiId, count] of Object.entries(tokenInventory)) {
+          rebalanced[poiId] = count > 0 ? count + 1 : 0
+        }
+
+        const remainingThisRound = session.players.length - 1 - session.currentTurn
+        const turnsUntilFirst = remainingThisRound >= 0 ? remainingThisRound + 1 : 1
+        const roundNote = turnsUntilFirst <= 1
+          ? "plays at the end of this round"
+          : `plays after ${remainingThisRound} more player${remainingThisRound === 1 ? "" : "s"} this round`
+
+        const joinEntry: ActivityEntry = {
+          type: "player_joined",
+          playerName,
+          tokenColour: null,
+          poiName: null,
+          poiCategory: null,
+          timestamp: new Date().toISOString(),
+          message: `${playerName} joined the game — ${roundNote}. Token counts updated`,
+        }
+        const updatedLog = [...activityLog, joinEntry].slice(-50)
+        await ctx.db.gameSession.update({
+          where: { id: session.id },
+          data: {
+            tokenInventory: JSON.parse(JSON.stringify(rebalanced)),
+            activityLog: JSON.parse(JSON.stringify(updatedLog)),
+          },
+        })
+      }
 
       return {
         sessionId: session.id,
@@ -227,18 +281,18 @@ export const gameRouter = createTRPCRouter({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Need at least 1 player to start." })
       }
 
-      const minPlayersForGame = 4
-      if (session.botsEnabled && session.players.length < minPlayersForGame) {
-        const botNames = ["Bot Alice", "Bot Bob", "Bot Charlie"]
-        const botsNeeded = minPlayersForGame - session.players.length
-        for (let i = 0; i < botsNeeded; i++) {
+      if (session.botCount > 0) {
+        const botNames = ["Bot Alice", "Bot Bob", "Bot Charlie", "Bot Dave"]
+        const takenStyles = new Set(session.players.map(p => p.iconType))
+        const availableStyles = CAR_STYLES.filter(s => !takenStyles.has(s))
+        for (let i = 0; i < session.botCount; i++) {
           const turnOrder = session.players.length + i
-          const iconType = CAR_STYLES[turnOrder % CAR_STYLES.length]
+          const iconType = availableStyles[i] ?? CAR_STYLES[(turnOrder + 1) % CAR_STYLES.length]
           const offsetLat = (session.startLat || 0) + 0.00014 * turnOrder
           const offsetLng = (session.startLng || 0) - 0.00025 * turnOrder
           await ctx.db.gamePlayer.create({
             data: {
-              name: botNames[i],
+              name: botNames[i]!,
               iconType,
               positionLat: offsetLat,
               positionLng: offsetLng,
@@ -312,7 +366,8 @@ export const gameRouter = createTRPCRouter({
       }
 
       const currentPicker = session.players[session.pickingPlayerIndex % session.players.length]
-      if (!currentPicker || currentPicker.id !== input.playerId) {
+      const isBotPicker = currentPicker?.name.startsWith("Bot ")
+      if (!currentPicker || (!isBotPicker && currentPicker.id !== input.playerId)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "It's not your turn to pick." })
       }
 
@@ -332,12 +387,23 @@ export const gameRouter = createTRPCRouter({
       const allPicked = POI_CATEGORIES.every(cat => updatedPois.some(p => p.category === cat))
       const nextPickerIndex = (session.pickingPlayerIndex + 1) % session.players.length
 
+      const tokenInventoryInit: Record<string, number> = {}
+      if (allPicked) {
+        for (const poi of updatedPois) {
+          tokenInventoryInit[`${poi.category}:${poi.osmId}`] = session.players.length
+        }
+      }
+
       await ctx.db.gameSession.update({
         where: { id: input.sessionId },
         data: {
           selectedPois: JSON.parse(JSON.stringify(updatedPois)),
           pickingPlayerIndex: nextPickerIndex,
-          ...(allPicked ? { phase: "playing", poiCandidates: Prisma.DbNull } : {}),
+          ...(allPicked ? {
+            phase: "playing",
+            poiCandidates: Prisma.DbNull,
+            tokenInventory: JSON.parse(JSON.stringify(tokenInventoryInit)),
+          } : {}),
         },
       })
 
@@ -378,6 +444,8 @@ export const gameRouter = createTRPCRouter({
         obstructions: (session.obstructions as unknown as ObstructionToken[]) ?? [],
         lastMovePath: (session.lastMovePath as string[] | null) ?? null,
         lastMovePlayer: session.lastMovePlayer ?? null,
+        tokenInventory: (session.tokenInventory as Record<string, number>) ?? {},
+        activityLog: (session.activityLog as unknown as ActivityEntry[]) ?? [],
         players: session.players.map(p => ({
           id: p.id,
           name: p.name,
@@ -385,6 +453,7 @@ export const gameRouter = createTRPCRouter({
           position: [p.positionLat, p.positionLng] as [number, number],
           turnOrder: p.turnOrder,
           visitedPois: (p.visitedPois as string[]) ?? [],
+          tokens: (p.tokens as Record<string, number>) ?? {},
           hasReturnedToStart: p.hasReturnedToStart,
           missedTurns: p.missedTurns,
         })),
@@ -485,14 +554,59 @@ export const gameRouter = createTRPCRouter({
         })
       }
 
-      let updatedVisitedPois = (currentPlayer.visitedPois as string[]) ?? []
+      const existingVisited = new Set((currentPlayer.visitedPois as string[]) ?? [])
+      let updatedVisitedPois = [...existingVisited]
+      const tokenInventory = (session.tokenInventory as Record<string, number>) ?? {}
+      const playerTokens = (currentPlayer.tokens as Record<string, number>) ?? {}
+      const activityLog = (session.activityLog as unknown as ActivityEntry[]) ?? []
+      const newActivityEntries: ActivityEntry[] = []
+
       if (input.visitedPoiIds && input.visitedPoiIds.length > 0) {
-        const deduped = new Set([...updatedVisitedPois, ...input.visitedPoiIds])
+        const deduped = new Set([...existingVisited, ...input.visitedPoiIds])
         updatedVisitedPois = [...deduped]
+
+        const selectedPoisList = (session.selectedPois as Array<{ category: string; osmId: number; name: string | null; lat: number; lng: number }>) ?? []
+        const newlyVisited = input.visitedPoiIds.filter(id => !existingVisited.has(id))
+        for (const poiId of newlyVisited) {
+          const currentCount = tokenInventory[poiId] ?? 0
+          if (currentCount > 0) {
+            tokenInventory[poiId] = currentCount - 1
+            const [category] = poiId.split(":")
+            const colour = CATEGORY_TO_COLOUR[category ?? ""] ?? null
+            if (colour) {
+              playerTokens[colour] = (playerTokens[colour] ?? 0) + 1
+            }
+            const poi = selectedPoisList.find(p => `${p.category}:${p.osmId}` === poiId)
+            newActivityEntries.push({
+              type: "token_collected",
+              playerName: currentPlayer.name,
+              tokenColour: colour,
+              poiName: poi?.name ?? null,
+              poiCategory: category ?? null,
+              timestamp: new Date().toISOString(),
+              message: `${currentPlayer.name} collected a ${colour ?? "?"} token from ${poi?.name ?? "a staging post"}`,
+            })
+          }
+        }
+
         await ctx.db.gamePlayer.update({
           where: { id: turnPlayerId },
-          data: { visitedPois: updatedVisitedPois },
+          data: {
+            visitedPois: updatedVisitedPois,
+            tokens: JSON.parse(JSON.stringify(playerTokens)),
+          },
         })
+
+        if (newActivityEntries.length > 0 || Object.keys(tokenInventory).length > 0) {
+          const updatedLog = [...activityLog, ...newActivityEntries].slice(-50)
+          await ctx.db.gameSession.update({
+            where: { id: input.sessionId },
+            data: {
+              tokenInventory: JSON.parse(JSON.stringify(tokenInventory)),
+              activityLog: JSON.parse(JSON.stringify(updatedLog)),
+            },
+          })
+        }
       }
 
       const selectedPois = (session.selectedPois as Array<{ category: string; osmId: number }>) ?? []
@@ -565,6 +679,18 @@ export const gameRouter = createTRPCRouter({
       return { title: card.title, body: card.body, type: card.type }
     }),
 
+  deckDrawHistory: publicProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const session = await ctx.db.gameSession.findUnique({
+        where: { id: input.sessionId },
+        select: { deckState: true },
+      })
+      if (!session?.deckState) return []
+      const state = session.deckState as { drawHistory?: Array<{ cardId: string; playerName: string; drawnAt: string }> }
+      return state.drawHistory ?? []
+    }),
+
   drawDeckCard: publicProcedure
     .input(z.object({
       sessionId: z.string(),
@@ -574,11 +700,14 @@ export const gameRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const session = await ctx.db.gameSession.findUnique({
         where: { id: input.sessionId },
+        include: { players: { where: { id: input.playerId } } },
       })
 
       if (!session) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Game not found." })
       }
+
+      const playerName = session.players[0]?.name ?? "Unknown"
 
       const deckState = session.deckState as {
         edgeDeck: string[]
@@ -587,6 +716,7 @@ export const gameRouter = createTRPCRouter({
         edgeDrawIndex: number
         motorwayDrawIndex: number
         chanceDrawIndex: number
+        drawHistory: Array<{ cardId: string; playerName: string; drawnAt: string }>
       } | null
 
       if (!deckState) {
@@ -634,6 +764,10 @@ export const gameRouter = createTRPCRouter({
         cardId = deck[drawIndex]
         deckState[indexKey as keyof typeof deckState] = (drawIndex + 1) as never
       }
+
+      const drawHistory = deckState.drawHistory ?? []
+      drawHistory.push({ cardId, playerName, drawnAt: new Date().toISOString() })
+      deckState.drawHistory = drawHistory
 
       await ctx.db.gameSession.update({
         where: { id: input.sessionId },

@@ -14,6 +14,7 @@ import { usePoiSettingsStore } from "@/stores/poi-settings-store"
 import { type PoiIconOption } from "@/stores/poi-types"
 import { cn } from "@/lib/cn"
 
+
 function resolveIcon<T extends string>(
   options: PoiIconOption<T>[],
   style: T,

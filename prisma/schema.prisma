@@ -51,10 +51,12 @@ model GameSession {
   lastMovePath       Json?
   lastMovePlayer     String?
   pickingPlayerIndex Int          @default(0)
-  botsEnabled        Boolean      @default(true)
+  botCount           Int          @default(3)
   mapZoom            Int          @default(7)
   mapCentreLat       Float?
   mapCentreLng       Float?
+  tokenInventory     Json         @default("{}")
+  activityLog        Json         @default("[]")
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
@@ -69,6 +71,7 @@ model GamePlayer {
   positionLng        Float
   turnOrder          Int
   visitedPois        Json        @default("[]")
+  tokens             Json        @default("{}")
   hasReturnedToStart Boolean     @default(false)
   session            GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   sessionId          String

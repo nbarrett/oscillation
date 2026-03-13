@@ -19,7 +19,16 @@ import { Button } from "@/components/ui/button"
 import { DiceDisplay } from "@/components/ui/dice"
 import GridSelectionButton from "./GridSelectionButton"
 import CardDrawDialog from "./CardDrawDialog"
+import TokenCollectedDialog, { type TokenCollection } from "./TokenCollectedDialog"
 import { cn } from "@/lib/cn"
+
+const CATEGORY_TO_COLOUR: Record<string, string> = {
+  pub: "blue",
+  spire: "black",
+  tower: "pink",
+  phone: "yellow",
+  school: "green",
+}
 
 export default function DiceRoller() {
   const player = useCurrentPlayer()
@@ -84,6 +93,7 @@ export default function DiceRoller() {
     }
   }, [diceValues, storeDiceRolling])
   const [drawnCard, setDrawnCard] = useState<{ title: string; body: string; type: string } | null>(null)
+  const [pendingTokenCollection, setPendingTokenCollection] = useState<TokenCollection | null>(null)
   const [processingDeckDraws, setProcessingDeckDraws] = useState(false)
   const total = dice1Value + dice2Value
   const playerName = player?.name || ""
@@ -188,10 +198,24 @@ export default function DiceRoller() {
     if (destinationGridKey) {
       const visits = detectPoiVisits(destinationGridKey, pubs, spires, towers, phones, schools, selectedPois)
       visitedPoiIds = visits.map(v => v.id)
-      visits.forEach(v => {
+
+      const existingVisited = new Set(useGameStore.getState().players.find(p => p.name === useGameStore.getState().localPlayerName)?.visitedPois ?? [])
+      const newVisits = visits.filter(v => !existingVisited.has(v.id))
+
+      newVisits.forEach(v => {
         const categoryLabel = POI_CATEGORY_LABELS[v.category as PoiCategory] ?? v.category
-        addNotification(`Visited ${categoryLabel}: ${v.name ?? "Unknown"}`, "success")
+        addNotification(`Collected ${categoryLabel} token: ${v.name ?? "Unknown"}`, "success")
       })
+
+      if (newVisits.length > 0) {
+        const first = newVisits[0]
+        setPendingTokenCollection({
+          poiId: first.id,
+          poiName: first.name ?? null,
+          category: first.category,
+          colour: CATEGORY_TO_COLOUR[first.category] ?? "blue",
+        })
+      }
 
       if (visits.length > 0 && sessionId && playerId && lastGridKey) {
         const firstVisit = visits[0]
@@ -399,6 +423,12 @@ export default function DiceRoller() {
       </div>
 
       {isMyTurn && (
+        <TokenCollectedDialog
+          collection={pendingTokenCollection}
+          onClose={() => setPendingTokenCollection(null)}
+        />
+      )}
+      {isMyTurn && !pendingTokenCollection && (
         <CardDrawDialog
           card={drawnCard}
           deckCard={drawnDeckCard}
