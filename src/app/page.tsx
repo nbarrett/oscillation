@@ -428,7 +428,6 @@ export default function GamePage() {
                     </button>
                   </div>
                 </div>
-                <GameObjectives />
 
             <div
               className={cn(
