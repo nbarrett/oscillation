@@ -137,6 +137,7 @@ interface GameState {
   tokenInventory: Record<string, number>;
   activityLog: ActivityEntry[];
   showPreviewPaths: boolean;
+  showAllRoutes: boolean;
   roadDataStatus: "idle" | "loading" | "loaded" | "error";
   cardTrigger: CardTrigger | null;
   pickingPlayerIndex: number;
@@ -144,7 +145,21 @@ interface GameState {
   previewPaths: string[][];
   previewPathIndex: number;
   pendingEndTurn: boolean;
+  remotePreviewPath: string[] | null;
+  pathDiagnostics: {
+    dice: number;
+    reachable: number;
+    atExactSteps: number;
+    atExactStepsABRoad: number;
+    atExactStepsAnyRoad: number;
+    occupied: number;
+    pathsFound: number;
+    startHasRoad: boolean;
+  } | null;
+  setRemotePreviewPath: (path: string[] | null) => void;
+  setPathDiagnostics: (d: GameState["pathDiagnostics"]) => void;
   setShowPreviewPaths: (show: boolean) => void;
+  setShowAllRoutes: (show: boolean) => void;
   setRoadDataStatus: (status: "idle" | "loading" | "loaded" | "error") => void;
   requestPreviewRecompute: number;
   triggerPreviewRecompute: () => void;
@@ -237,6 +252,7 @@ export const useGameStore = create<GameState>()(
       poiCandidates: null,
       winnerName: null,
       showPreviewPaths: true,
+      showAllRoutes: false,
       roadDataStatus: "idle" as const,
       requestPreviewRecompute: 0,
       cardTrigger: null,
@@ -245,10 +261,15 @@ export const useGameStore = create<GameState>()(
       previewPaths: [],
       previewPathIndex: 0,
       pendingEndTurn: false,
+      remotePreviewPath: null,
+      pathDiagnostics: null,
       tokenInventory: {},
       activityLog: [],
 
+      setRemotePreviewPath: (remotePreviewPath) => set({ remotePreviewPath }),
+      setPathDiagnostics: (pathDiagnostics) => set({ pathDiagnostics }),
       setShowPreviewPaths: (showPreviewPaths) => set({ showPreviewPaths }),
+      setShowAllRoutes: (showAllRoutes) => set({ showAllRoutes }),
       setRoadDataStatus: (roadDataStatus) => set({ roadDataStatus }),
       triggerPreviewRecompute: () => set((state) => ({
         requestPreviewRecompute: state.requestPreviewRecompute + 1,
@@ -654,6 +675,7 @@ export const useGameStore = create<GameState>()(
         phase: state.phase,
         creatorPlayerId: state.creatorPlayerId,
         showPreviewPaths: state.showPreviewPaths,
+        showAllRoutes: state.showAllRoutes,
         diceValues: state.diceValues,
       }),
     }

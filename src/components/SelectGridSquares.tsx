@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useMap } from "react-leaflet";
 import L from "leaflet";
+import { trpc } from "@/lib/trpc/client";
 import { useGameStore, occupiedGridKeys, GameTurnState } from "@/stores/game-store";
 import { useDeckStore } from "@/stores/deck-store";
 import { latLngToGridKey, getAdjacentRoadGrids, shortestPath, reachableRoadGrids, isRoadDataLoaded, onRoadDataReady, gridHasABRoad, gridHasRoad, loadRoadData, gridKeyToLatLng, roadPathThroughGrids } from "@/lib/road-data";
@@ -40,6 +41,15 @@ class EndpointPolygon extends L.Polygon {
   }
 }
 
+class RemotePreviewPolygon extends L.Polygon {
+  gridKey: string;
+
+  constructor(gridSquareLatLongs: L.LatLng[], gridKey: string, options?: L.PolylineOptions) {
+    super(gridSquareLatLongs, options);
+    this.gridKey = gridKey;
+  }
+}
+
 class RoutePolyline extends L.Polyline {
   constructor(latlngs: L.LatLngExpression[], options?: L.PolylineOptions) {
     super(latlngs, options);
@@ -62,6 +72,10 @@ function isRoutePolyline(layer: L.Layer): layer is RoutePolyline {
   return layer instanceof RoutePolyline;
 }
 
+function isRemotePreviewPolygon(layer: L.Layer): layer is RemotePreviewPolygon {
+  return layer instanceof RemotePreviewPolygon;
+}
+
 export default function SelectGridSquares() {
   const map = useMap();
   const gridClearRequest = useGameStore((s) => s.gridClearRequest);
@@ -76,6 +90,9 @@ export default function SelectGridSquares() {
   const requestPreviewRecompute = useGameStore((s) => s.requestPreviewRecompute);
   const previewPaths = useGameStore((s) => s.previewPaths);
   const previewPathIndex = useGameStore((s) => s.previewPathIndex);
+  const remotePreviewPath = useGameStore((s) => s.remotePreviewPath);
+  const sessionId = useGameStore((s) => s.sessionId);
+  const updatePreviewPath = trpc.game.updatePreviewPath.useMutation();
 
   log.debug("SelectGridSquares render, turnState:", gameTurnState, "dice:", diceResult);
 
@@ -121,6 +138,31 @@ export default function SelectGridSquares() {
     });
   }
 
+  function clearRemotePreviewPolygons() {
+    map.eachLayer((layer) => {
+      if (isRemotePreviewPolygon(layer)) {
+        layer.remove();
+      }
+    });
+  }
+
+  function drawRemotePreviewPath(path: string[]) {
+    clearRemotePreviewPolygons();
+    for (let i = 0; i < path.length; i++) {
+      const key = path[i];
+      const latLngs = gridKeyToLatLngs(map, key);
+      const isLast = i === path.length - 1;
+      const polygon = new RemotePreviewPolygon(latLngs, key, {
+        interactive: false,
+        color: colours.remotePreview,
+        weight: isLast ? 3 : 2,
+        fillOpacity: isLast ? 0.5 : 0.25,
+        fillColor: colours.remotePreview,
+      });
+      polygon.addTo(map);
+    }
+  }
+
   function drawEndpoints(endpointKeys: string[]) {
     clearEndpointPolygons();
     for (const key of endpointKeys) {
@@ -136,13 +178,14 @@ export default function SelectGridSquares() {
     }
   }
 
-  function drawAllPreviewPaths(paths: string[][]) {
+  function drawPreviewPaths(paths: string[][], index: number) {
     clearPreviewPolygons();
 
-    const { currentPlayerName, players } = useGameStore.getState();
+    const { currentPlayerName, players, showAllRoutes } = useGameStore.getState();
     const currentPlayer = players.find(p => p.name === currentPlayerName);
+    const displayPaths = showAllRoutes ? paths : (paths[index] ? [paths[index]] : []);
 
-    for (const path of paths) {
+    for (const path of displayPaths) {
       for (let i = 0; i < path.length - 1; i++) {
         const key = path[i];
         const latLngs = gridKeyToLatLngs(map, key);
@@ -234,6 +277,17 @@ export default function SelectGridSquares() {
     log.info(`computeAndSetPaths: dice=${diceResult} start=${effectiveStart} reachable=${reachable.size} occupied=${occupied.size} fromStore=${reachableGrids !== null}`);
     const roadCheck = (gridKey: string) => gridHasABRoad(gridKey) || gridHasRoad(gridKey);
 
+    let atExactSteps = 0;
+    let atExactStepsABRoad = 0;
+    let atExactStepsAnyRoad = 0;
+    reachable.forEach((steps, gridKey) => {
+      if (steps === diceResult && !occupied.has(gridKey)) {
+        atExactSteps++;
+        if (gridHasABRoad(gridKey)) atExactStepsABRoad++;
+        if (gridHasRoad(gridKey)) atExactStepsAnyRoad++;
+      }
+    });
+
     const endpoints: string[] = [];
     reachable.forEach((steps, gridKey) => {
       if (steps === diceResult && !occupied.has(gridKey) && gridHasABRoad(gridKey)) {
@@ -280,6 +334,17 @@ export default function SelectGridSquares() {
     }
     log.info(`computeAndSetPaths: ${endpoints.length} exact-step endpoints → ${paths.length} valid paths (reachable=${reachable.size} dice=${diceResult})`);
 
+    useGameStore.getState().setPathDiagnostics({
+      dice: diceResult,
+      reachable: reachable.size,
+      atExactSteps,
+      atExactStepsABRoad,
+      atExactStepsAnyRoad,
+      occupied: occupied.size,
+      pathsFound: paths.length,
+      startHasRoad: gridHasRoad(effectiveStart),
+    });
+
     const allEndpointKeys = paths.map(p => p[p.length - 1]);
     drawEndpoints(allEndpointKeys);
 
@@ -297,7 +362,7 @@ export default function SelectGridSquares() {
     useGameStore.getState().setPreviewPaths(paths);
 
     if (paths.length > 0) {
-      drawAllPreviewPaths(paths);
+      drawPreviewPaths(paths, 0);
     }
   }, [map, gameTurnState, diceResult, playerStartGridKey, movementPath.length, showPreviewPaths, requestPreviewRecompute]);
 
@@ -357,7 +422,7 @@ export default function SelectGridSquares() {
 
     if (previewPaths.length === 0 || movementPath.length > 0) return;
 
-    drawAllPreviewPaths(previewPaths);
+    drawPreviewPaths(previewPaths, previewPathIndex);
   }, [previewPathIndex, previewPaths, movementPath.length]);
 
   useEffect(() => {
@@ -461,7 +526,7 @@ export default function SelectGridSquares() {
         const matchIdx = previews.findIndex(p => p[p.length - 1] === gridKey);
         if (matchIdx >= 0) {
           useGameStore.getState().setPreviewPathIndex(matchIdx);
-          drawAllPreviewPaths(previews);
+          drawPreviewPaths(previews, matchIdx);
           return;
         }
       }
@@ -516,7 +581,7 @@ export default function SelectGridSquares() {
   useEffect(() => {
     if (gridClearRequest > 0) {
       map.eachLayer((layer) => {
-        if (layer instanceof L.Polygon || isRoutePolyline(layer)) {
+        if ((layer instanceof L.Polygon && !isRemotePreviewPolygon(layer)) || isRoutePolyline(layer)) {
           layer.remove();
         }
       });
@@ -526,6 +591,27 @@ export default function SelectGridSquares() {
       setTimeout(() => computeAndSetPaths(), 50);
     }
   }, [gridClearRequest, map, setSelectedGridSquares, setMovementPath]);
+
+  useEffect(() => {
+    if (remotePreviewPath && remotePreviewPath.length > 0) {
+      drawRemotePreviewPath(remotePreviewPath);
+    } else {
+      clearRemotePreviewPolygons();
+    }
+  }, [remotePreviewPath]);
+
+  const broadcastDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!sessionId) return;
+    const currentPath = previewPaths[previewPathIndex] ?? null;
+    if (broadcastDebounceRef.current) clearTimeout(broadcastDebounceRef.current);
+    broadcastDebounceRef.current = setTimeout(() => {
+      updatePreviewPath.mutate({ sessionId, path: currentPath ?? null });
+    }, 600);
+    return () => {
+      if (broadcastDebounceRef.current) clearTimeout(broadcastDebounceRef.current);
+    };
+  }, [previewPaths, previewPathIndex, sessionId]);
 
   return null;
 }

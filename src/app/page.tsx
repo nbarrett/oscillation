@@ -1,7 +1,8 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import packageJson from "../../package.json"
 import { Loader2, Gamepad2, ChevronDown, ChevronLeft, ChevronRight, Settings, Users, LogOut, Copy, Check, Trophy, MessageCircle, ScrollText, Shuffle } from "lucide-react"
 import { AuthDialog } from "@/components/auth/auth-dialog"
 import { UserMenu } from "@/components/auth/user-menu"
@@ -54,6 +55,22 @@ const ActivityLog = dynamic(() => import("@/components/ActivityLog"), { ssr: fal
 const CardBrowser = dynamic(() => import("@/components/CardBrowser"), { ssr: false })
 
 
+function ShowAllRoutesToggle() {
+  const showAllRoutes = useGameStore((s) => s.showAllRoutes)
+  const setShowAllRoutes = useGameStore((s) => s.setShowAllRoutes)
+  return (
+    <button
+      onClick={() => setShowAllRoutes(!showAllRoutes)}
+      className={cn(
+        "inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors border",
+        showAllRoutes ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+      )}
+    >
+      <span>Show all routes</span>
+    </button>
+  )
+}
+
 function RoadDataIndicator() {
   const roadDataStatus = useGameStore((s) => s.roadDataStatus)
   const phase = useGameStore((s) => s.phase)
@@ -86,6 +103,27 @@ function MovementOverlay() {
   const cyclePreviewPath = useGameStore((s) => s.cyclePreviewPath)
   const confirmPreviewPath = useGameStore((s) => s.confirmPreviewPath)
   const setPendingEndTurn = useGameStore((s) => s.setPendingEndTurn)
+  const pathDiagnostics = useGameStore((s) => s.pathDiagnostics)
+
+  const [diagOpen, setDiagOpen] = useState(false)
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null)
+  const dragStart = useRef<{ mx: number; my: number; ox: number; oy: number } | null>(null)
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return
+    dragStart.current = { mx: e.clientX, my: e.clientY, ox: dragOffset?.x ?? 0, oy: dragOffset?.y ?? 0 }
+    const onMove = (ev: MouseEvent) => {
+      if (!dragStart.current) return
+      setDragOffset({ x: dragStart.current.ox + ev.clientX - dragStart.current.mx, y: dragStart.current.oy + ev.clientY - dragStart.current.my })
+    }
+    const onUp = () => {
+      dragStart.current = null
+      window.removeEventListener("mousemove", onMove)
+      window.removeEventListener("mouseup", onUp)
+    }
+    window.addEventListener("mousemove", onMove)
+    window.addEventListener("mouseup", onUp)
+  }
 
   const diceRolling = useGameStore((s) => s.diceRolling)
   const diceValues = useGameStore((s) => s.diceValues)
@@ -102,8 +140,14 @@ function MovementOverlay() {
   if (!showPreviews && !showRollDice && !showFreeSelection && !showBotRolling && !showBotResult) return null
 
   return (
-    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] animate-bounce-in">
-      <div className="bg-primary/95 text-primary-foreground px-6 py-3 rounded-xl shadow-2xl text-center">
+    <div
+      className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] animate-bounce-in"
+      style={dragOffset ? { transform: `translate(calc(-50% + ${dragOffset.x}px), ${dragOffset.y}px)` } : undefined}
+    >
+      <div
+        className="bg-primary/95 text-primary-foreground px-6 py-3 rounded-xl shadow-2xl text-center cursor-grab active:cursor-grabbing select-none"
+        onMouseDown={handleMouseDown}
+      >
         {showBotRolling && (
           <div className="text-lg font-bold pointer-events-none">
             {currentPlayerName} is rolling the dice...
@@ -120,36 +164,61 @@ function MovementOverlay() {
           </div>
         )}
         {showFreeSelection && (
-          <div className="flex items-center gap-3">
-            <div className="text-lg font-bold">
-              {roadDataStatus === "loading"
-                ? "Loading road data..."
-                : roadDataStatus === "error"
-                  ? "Road data failed to load"
-                  : movementPath.length > 0
-                    ? `Moves: ${movementPath.length}/${diceResult} — click to extend`
-                    : `Move ${diceResult} squares — click a square on the road`}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-3">
+              <div className="text-lg font-bold">
+                {roadDataStatus === "loading"
+                  ? "Loading road data..."
+                  : roadDataStatus === "error"
+                    ? "Road data failed to load"
+                    : movementPath.length > 0
+                      ? `Moves: ${movementPath.length}/${diceResult} — click to extend`
+                      : `Move ${diceResult} squares — click a square on the road`}
+              </div>
+              {roadDataStatus === "error" ? (
+                <button
+                  onClick={() => {
+                    useGameStore.getState().setRoadDataStatus("idle")
+                    useGameStore.getState().triggerPreviewRecompute()
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-red-100 text-red-700 text-sm font-bold hover:bg-red-200 transition-colors"
+                >
+                  Retry
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    useGameStore.getState().setShowPreviewPaths(true)
+                    useGameStore.getState().triggerPreviewRecompute()
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-primary-foreground text-primary text-sm font-bold hover:bg-primary-foreground/90 transition-colors"
+                >
+                  Show Routes
+                </button>
+              )}
             </div>
-            {roadDataStatus === "error" ? (
-              <button
-                onClick={() => {
-                  useGameStore.getState().setRoadDataStatus("idle")
-                  useGameStore.getState().triggerPreviewRecompute()
-                }}
-                className="px-3 py-1.5 rounded-lg bg-red-100 text-red-700 text-sm font-bold hover:bg-red-200 transition-colors"
-              >
-                Retry
-              </button>
-            ) : (
-              <button
-                onClick={() => {
-                  useGameStore.getState().setShowPreviewPaths(true)
-                  useGameStore.getState().triggerPreviewRecompute()
-                }}
-                className="px-3 py-1.5 rounded-lg bg-primary-foreground text-primary text-sm font-bold hover:bg-primary-foreground/90 transition-colors"
-              >
-                Show Routes
-              </button>
+            {pathDiagnostics && (
+              <div className="text-xs">
+                <button
+                  onClick={() => setDiagOpen(o => !o)}
+                  className="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity"
+                >
+                  <ChevronDown className={cn("h-3 w-3 transition-transform", diagOpen && "rotate-180")} />
+                  Why no routes?
+                </button>
+                {diagOpen && (
+                  <div className="mt-1.5 bg-black/20 rounded-lg px-3 py-2 text-left space-y-0.5 font-mono">
+                    <div>Dice: {pathDiagnostics.dice}</div>
+                    <div>Reachable grids (BFS): {pathDiagnostics.reachable}</div>
+                    <div>At exact {pathDiagnostics.dice} steps: {pathDiagnostics.atExactSteps}</div>
+                    <div>↳ with A/B road: {pathDiagnostics.atExactStepsABRoad}</div>
+                    <div>↳ with any road: {pathDiagnostics.atExactStepsAnyRoad}</div>
+                    <div>Occupied grids: {pathDiagnostics.occupied}</div>
+                    <div>Start has road: {pathDiagnostics.startHasRoad ? "yes" : "no"}</div>
+                    <div>Paths found: {pathDiagnostics.pathsFound}</div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -315,7 +384,7 @@ export default function GamePage() {
               <h1 className="text-xl font-bold tracking-tight text-primary">Oscillation</h1>
             </div>
             <span className="hidden sm:inline-block text-xs text-muted-foreground">
-              v0.5.1
+              v{packageJson.version}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -450,6 +519,7 @@ export default function GamePage() {
                     <PhoneIconSelector />
                     <SchoolIconSelector />
                     <ObstructionIconSelector />
+                    <ShowAllRoutesToggle />
                   </div>
                 </div>
               </div>

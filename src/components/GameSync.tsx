@@ -10,7 +10,7 @@ import { gridKeyToLatLng, setPathfindingBounds } from "@/lib/road-data"
 import { log } from "@/lib/utils"
 
 export default function GameSync() {
-  const { sessionId, playerId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setDiceValues, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setPoiCandidates, setPickingPlayerIndex, setWinnerName, leaveSession, setTokenInventory, setActivityLog } = useGameStore()
+  const { sessionId, playerId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setDiceValues, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setPoiCandidates, setPickingPlayerIndex, setWinnerName, leaveSession, setTokenInventory, setActivityLog, setRemotePreviewPath } = useGameStore()
   const { addNotification } = useNotificationStore()
   const { initDecks, setObstructions, setMissedTurns } = useDeckStore()
   const hasCheckedSession = useRef(false)
@@ -211,8 +211,16 @@ export default function GameSync() {
         const winningPlayer = gameState.players.find(p => p.hasReturnedToStart)
         setWinnerName(winningPlayer?.name ?? null)
       }
+
+      const localPlayer = gameState.players.find(p => p.id === playerId)
+      const serverCurrentPlayer = gameState.players[gameState.currentTurn]
+      if (serverCurrentPlayer && serverCurrentPlayer.name !== localPlayer?.name) {
+        setRemotePreviewPath((gameState as Record<string, unknown>).previewPath as string[] | null ?? null)
+      } else {
+        setRemotePreviewPath(null)
+      }
     }
-  }, [gameState, playerId, addNotification, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setPoiCandidates, setWinnerName, initDecks, setObstructions, setMissedTurns, setTokenInventory, setActivityLog])
+  }, [gameState, playerId, addNotification, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setPoiCandidates, setWinnerName, initDecks, setObstructions, setMissedTurns, setTokenInventory, setActivityLog, setRemotePreviewPath])
 
   return null
 }

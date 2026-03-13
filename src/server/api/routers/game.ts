@@ -444,6 +444,7 @@ export const gameRouter = createTRPCRouter({
         obstructions: (session.obstructions as unknown as ObstructionToken[]) ?? [],
         lastMovePath: (session.lastMovePath as string[] | null) ?? null,
         lastMovePlayer: session.lastMovePlayer ?? null,
+        previewPath: ((session as Record<string, unknown>).previewPath as string[] | null) ?? null,
         tokenInventory: (session.tokenInventory as Record<string, number>) ?? {},
         activityLog: (session.activityLog as unknown as ActivityEntry[]) ?? [],
         players: session.players.map(p => ({
@@ -943,6 +944,21 @@ export const gameRouter = createTRPCRouter({
         },
       })
 
+      return { success: true }
+    }),
+
+  updatePreviewPath: publicProcedure
+    .input(z.object({
+      sessionId: z.string(),
+      path: z.array(z.string()).nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await (ctx.db.gameSession as unknown as { update: (args: unknown) => Promise<unknown> }).update({
+        where: { id: input.sessionId },
+        data: {
+          previewPath: input.path ? JSON.parse(JSON.stringify(input.path)) : Prisma.DbNull,
+        },
+      })
       return { success: true }
     }),
 

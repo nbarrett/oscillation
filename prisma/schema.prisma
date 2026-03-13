@@ -50,6 +50,7 @@ model GameSession {
   obstructions       Json         @default("[]")
   lastMovePath       Json?
   lastMovePlayer     String?
+  previewPath        Json?
   pickingPlayerIndex Int          @default(0)
   botCount           Int          @default(3)
   mapZoom            Int          @default(7)

@@ -38,6 +38,7 @@ export const colours = {
   reachableMove: "#81C784",
   exactEndpoint: "#00FF64",
   playerStart: "#2196F3",
+  remotePreview: "#FF8C00",
 };
 
 export function timeAgo(date: Date | string): string {

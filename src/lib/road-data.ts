@@ -576,7 +576,12 @@ export function roadPathThroughGrids(
   for (let i = 0; i < allGrids.length - 1; i++) {
     const crossing = found.get(`${allGrids[i]}|${allGrids[i + 1]}`);
     if (!crossing) {
-      result.push(gridKeyToLatLng(allGrids[i + 1]));
+      const fallback = roadPathBetweenGrids(allGrids[i], allGrids[i + 1]);
+      if (fallback.length >= 2) {
+        for (const pt of fallback.slice(1)) result.push(pt);
+      } else {
+        result.push(gridKeyToLatLng(allGrids[i + 1]));
+      }
       continue;
     }
 
@@ -860,7 +865,7 @@ export function getAdjacentRoadGrids(gridKey: string): string[] {
     if (merged.size > 0) return Array.from(merged);
   }
   if (cardinalWithRoads.length > 0) return cardinalWithRoads;
-  return allAdjacentGrids(gridKey);
+  return allAdjacentGrids(gridKey).filter(g => roadDataCache!.gridSquaresWithRoads.has(g));
 }
 
 function allAdjacentGrids(gridKey: string): string[] {
