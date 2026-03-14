@@ -45,7 +45,7 @@ export interface RoadDataCache {
   timestamp: number;
 }
 
-const STORAGE_KEY = "oscillation-road-data-v4";
+const STORAGE_KEY = "oscillation-road-data-v5";
 const STORAGE_MAX_AGE = 24 * 60 * 60 * 1000;
 
 let roadDataCache: RoadDataCache | null = null;
@@ -807,7 +807,7 @@ export async function loadRoadData(
     const gridSquaresWithARoads = calculateGridSquaresWithRoads(aRoads);
     const bRoads = roads.filter((r) => r.type === "B");
     const gridSquaresWithBRoads = calculateGridSquaresWithRoads(bRoads);
-    const gridAdjacency = calculateGridAdjacency(roads);
+    const gridAdjacency = calculateGridAdjacency(abRoads);
 
     gridRoadIndex = null;
     roadDataCache = {
@@ -855,17 +855,13 @@ export function getAdjacentRoadGrids(gridKey: string): string[] {
   if (!roadDataCache) {
     return allAdjacentGrids(gridKey);
   }
-  const cardinalWithRoads = allAdjacentGrids(gridKey).filter(
-    (g) => roadDataCache!.gridSquaresWithABRoads.has(g)
-  );
   if (roadDataCache.gridAdjacency.has(gridKey)) {
-    const fromAdj = roadDataCache.gridAdjacency.get(gridKey)!;
-    const merged = new Set(fromAdj);
-    for (const g of cardinalWithRoads) merged.add(g);
-    if (merged.size > 0) return Array.from(merged);
+    return Array.from(roadDataCache.gridAdjacency.get(gridKey)!);
   }
-  if (cardinalWithRoads.length > 0) return cardinalWithRoads;
-  return allAdjacentGrids(gridKey).filter(g => roadDataCache!.gridSquaresWithRoads.has(g));
+  const candidates = allAdjacentGrids(gridKey);
+  const withAdjacency = candidates.filter(g => roadDataCache!.gridAdjacency.has(g));
+  if (withAdjacency.length > 0) return withAdjacency;
+  return candidates.filter(g => roadDataCache!.gridSquaresWithRoads.has(g));
 }
 
 function allAdjacentGrids(gridKey: string): string[] {

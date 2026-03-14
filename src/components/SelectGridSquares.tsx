@@ -98,6 +98,7 @@ export default function SelectGridSquares() {
 
   const prevIndexRef = useRef(previewPathIndex);
   const drawnPathRef = useRef<string[] | null>(null);
+  const fitBoundsDiceRef = useRef<number | null>(null);
 
   function checkMidMovementTrigger(path: string[], gameBounds: GameBounds | null) {
     const lastKey = path[path.length - 1];
@@ -348,7 +349,8 @@ export default function SelectGridSquares() {
     const allEndpointKeys = paths.map(p => p[p.length - 1]);
     drawEndpoints(allEndpointKeys);
 
-    if (allEndpointKeys.length > 0) {
+    if (allEndpointKeys.length > 0 && fitBoundsDiceRef.current !== diceResult) {
+      fitBoundsDiceRef.current = diceResult;
       const startLatLng = gridKeyToLatLng(effectiveStart);
       const points: L.LatLng[] = [L.latLng(startLatLng[0], startLatLng[1])];
       for (const key of allEndpointKeys) {
