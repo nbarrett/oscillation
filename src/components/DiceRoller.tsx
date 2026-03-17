@@ -175,7 +175,7 @@ export default function DiceRoller() {
       } else {
         store.setPendingServerUpdate(false)
       }
-    }, 2000)
+    }, 1200)
   }
 
   function handleEndTurnClick() {
@@ -404,7 +404,7 @@ export default function DiceRoller() {
           <Button
             className="flex-1 sm:flex-none gap-2"
             onClick={handleEndTurnClick}
-            disabled={!isMyTurn || !isPlaying || gameTurnState !== GameTurnState.DICE_ROLLED}
+            disabled={!isMyTurn || !isPlaying || gameTurnState !== GameTurnState.DICE_ROLLED || (!!diceResult && movementPath.length < diceResult && previewPaths.length === 0)}
           >
             <CheckCircle2 className="h-4 w-4" />
             End Turn

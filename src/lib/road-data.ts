@@ -4,6 +4,22 @@ import { type GameBounds } from "@/lib/area-size";
 
 const BNG = "+proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy +towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 +units=m +no_defs";
 
+function isGridOutsideBounds(gridKey: string, gameBounds: GameBounds | null): boolean {
+  if (!gameBounds) return false;
+  const [eRaw, nRaw] = gridKey.split("-").map(Number);
+  const e = eRaw + 500;
+  const n = nRaw + 500;
+  const corners = gameBounds.corners.map((c) => {
+    const [easting, northing] = proj4("EPSG:4326", BNG, [c.lng, c.lat]);
+    return [easting, northing] as [number, number];
+  });
+  const minE = Math.floor(Math.min(...corners.map(([ce]) => ce)) / 1000) * 1000 + 500;
+  const maxE = Math.floor(Math.max(...corners.map(([ce]) => ce)) / 1000) * 1000 + 500;
+  const minN = Math.floor(Math.min(...corners.map(([, cn]) => cn)) / 1000) * 1000 + 500;
+  const maxN = Math.floor(Math.max(...corners.map(([, cn]) => cn)) / 1000) * 1000 + 500;
+  return e < minE || e > maxE || n < minN || n > maxN;
+}
+
 export interface RoadSegment {
   id: number;
   type: 'A' | 'B' | 'M';
@@ -877,7 +893,8 @@ function allAdjacentGrids(gridKey: string): string[] {
 export function reachableRoadGrids(
   startGridKey: string,
   maxSteps: number,
-  excludeKeys: Set<string> = new Set()
+  excludeKeys: Set<string> = new Set(),
+  gameBounds: GameBounds | null = null
 ): Map<string, number> {
   const visited = new Map<string, number>();
   const hasCache = roadDataCache !== null;
@@ -898,6 +915,7 @@ export function reachableRoadGrids(
 
     for (const neighbor of neighbors) {
       if (visited.has(neighbor) || excludeKeys.has(neighbor)) continue;
+      if (isGridOutsideBounds(neighbor, gameBounds)) continue;
       visited.set(neighbor, current.depth + 1);
       queue.push({ key: neighbor, depth: current.depth + 1 });
     }
@@ -912,7 +930,8 @@ export function shortestPath(
   startGridKey: string,
   targetGridKey: string,
   maxSteps: number,
-  excludeKeys: Set<string> = new Set()
+  excludeKeys: Set<string> = new Set(),
+  gameBounds: GameBounds | null = null
 ): string[] | null {
   const cameFrom = new Map<string, string>();
   const queue: Array<{ key: string; depth: number }> = [{ key: startGridKey, depth: 0 }];
@@ -937,6 +956,7 @@ export function shortestPath(
 
     for (const neighbor of neighbors) {
       if (visited.has(neighbor) || excludeKeys.has(neighbor)) continue;
+      if (isGridOutsideBounds(neighbor, gameBounds)) continue;
       visited.add(neighbor);
       cameFrom.set(neighbor, current.key);
       queue.push({ key: neighbor, depth: current.depth + 1 });

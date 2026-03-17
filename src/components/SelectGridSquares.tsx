@@ -12,7 +12,10 @@ import { isOnBoardEdge, isOnMotorwayOrRailway } from "@/lib/deck-triggers";
 import { type GameBounds } from "@/lib/area-size";
 import { colours, log } from "@/lib/utils";
 
+type OscLayerType = "identified" | "preview" | "endpoint" | "route";
+
 class IdentifiedPolygon extends L.Polygon {
+  _oscType: OscLayerType = "identified";
   firstLatLong: L.LatLng;
   gridKey: string;
 
@@ -24,6 +27,7 @@ class IdentifiedPolygon extends L.Polygon {
 }
 
 class PreviewPolygon extends L.Polygon {
+  _oscType: OscLayerType = "preview";
   gridKey: string;
 
   constructor(gridSquareLatLongs: L.LatLng[], gridKey: string, options?: L.PolylineOptions) {
@@ -33,6 +37,7 @@ class PreviewPolygon extends L.Polygon {
 }
 
 class EndpointPolygon extends L.Polygon {
+  _oscType: OscLayerType = "endpoint";
   gridKey: string;
 
   constructor(gridSquareLatLongs: L.LatLng[], gridKey: string, options?: L.PolylineOptions) {
@@ -51,25 +56,31 @@ class RemotePreviewPolygon extends L.Polygon {
 }
 
 class RoutePolyline extends L.Polyline {
+  _oscType: OscLayerType = "route";
+
   constructor(latlngs: L.LatLngExpression[], options?: L.PolylineOptions) {
     super(latlngs, options);
   }
 }
 
+function oscType(layer: L.Layer): OscLayerType | undefined {
+  return (layer as Record<string, unknown>)._oscType as OscLayerType | undefined;
+}
+
 function isIdentifiedPolygon(layer: L.Layer): layer is IdentifiedPolygon {
-  return layer instanceof IdentifiedPolygon;
+  return oscType(layer) === "identified";
 }
 
 function isPreviewPolygon(layer: L.Layer): layer is PreviewPolygon {
-  return layer instanceof PreviewPolygon;
+  return oscType(layer) === "preview";
 }
 
 function isEndpointPolygon(layer: L.Layer): layer is EndpointPolygon {
-  return layer instanceof EndpointPolygon;
+  return oscType(layer) === "endpoint";
 }
 
 function isRoutePolyline(layer: L.Layer): layer is RoutePolyline {
-  return layer instanceof RoutePolyline;
+  return oscType(layer) === "route";
 }
 
 function isRemotePreviewPolygon(layer: L.Layer): layer is RemotePreviewPolygon {
@@ -274,7 +285,8 @@ export default function SelectGridSquares() {
       occupied.add(key);
     }
 
-    const reachable = reachableGrids ?? reachableRoadGrids(effectiveStart, diceResult, occupied);
+    const { gameBounds: bounds } = useGameStore.getState();
+    const reachable = reachableGrids ?? reachableRoadGrids(effectiveStart, diceResult, occupied, bounds);
     log.info(`computeAndSetPaths: dice=${diceResult} start=${effectiveStart} reachable=${reachable.size} occupied=${occupied.size} fromStore=${reachableGrids !== null}`);
     const roadCheck = (gridKey: string) => gridHasABRoad(gridKey) || gridHasRoad(gridKey);
 
@@ -391,7 +403,7 @@ export default function SelectGridSquares() {
           for (const key of obstructionKeys) {
             occupied.add(key);
           }
-          const reachable = reachableRoadGrids(startKey, state.diceResult, occupied);
+          const reachable = reachableRoadGrids(startKey, state.diceResult, occupied, state.gameBounds);
           useGameStore.getState().setReachableGrids(reachable);
         }
       }
@@ -583,7 +595,7 @@ export default function SelectGridSquares() {
   useEffect(() => {
     if (gridClearRequest > 0) {
       map.eachLayer((layer) => {
-        if ((layer instanceof L.Polygon && !isRemotePreviewPolygon(layer)) || isRoutePolyline(layer)) {
+        if (oscType(layer) && !isRemotePreviewPolygon(layer)) {
           layer.remove();
         }
       });

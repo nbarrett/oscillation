@@ -227,7 +227,7 @@ export default function BotTurnPlayer() {
           const snapped = nearestRoadPosition(botPlayer.position[0], botPlayer.position[1])
           const pos = snapped ?? botPlayer.position
           const nearGridKey = latLngToGridKey(pos[0], pos[1])
-          const nearby = reachableRoadGrids(nearGridKey, 3, new Set())
+          const nearby = reachableRoadGrids(nearGridKey, 3, new Set(), gameBounds)
           if (nearby && nearby.size > 0) {
             const keys = [...nearby.keys()]
             const gridKey = keys[Math.floor(Math.random() * keys.length)]
@@ -280,7 +280,7 @@ export default function BotTurnPlayer() {
       excluded.add(o.gridKey)
     }
 
-    const reachable = reachableRoadGrids(startGridKey, total, excluded)
+    const reachable = reachableRoadGrids(startGridKey, total, excluded, gameBounds)
     const occupied = occupiedGridKeys(players, botName)
     let destinationGridKey: string | null = null
     let destination: [number, number] | null = null
@@ -332,7 +332,7 @@ export default function BotTurnPlayer() {
               const remaining = total - midResult.stepsUsed
 
               if (remaining > 0) {
-                const newReachable = reachableRoadGrids(resolvedGridKey, remaining, excluded)
+                const newReachable = reachableRoadGrids(resolvedGridKey, remaining, excluded, gameBounds)
                 const newExact = [...newReachable.entries()]
                   .filter(([, steps]) => steps === remaining)
                   .map(([key]) => key)

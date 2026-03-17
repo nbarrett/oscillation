@@ -327,7 +327,7 @@ export const useGameStore = create<GameState>()(
           for (const key of obstructionKeys) {
             occupied.add(key);
           }
-          const reachable = reachableRoadGrids(destinationGridKey, remainingMoves, occupied);
+          const reachable = reachableRoadGrids(destinationGridKey, remainingMoves, occupied, state.gameBounds);
 
           set({
             diceResult: remainingMoves,
@@ -472,7 +472,7 @@ export const useGameStore = create<GameState>()(
         for (const key of obstructionKeys) {
           occupied.add(key)
         }
-        const reachable = reachableRoadGrids(startGridKey, result, occupied);
+        const reachable = reachableRoadGrids(startGridKey, result, occupied, state.gameBounds);
         log.info(`handleDiceRoll: reachable=${reachable.size} grids, occupied=${occupied.size} blocked`);
 
         if (!isRoadDataLoaded()) {
@@ -483,7 +483,7 @@ export const useGameStore = create<GameState>()(
               const occ = occupiedGridKeys(s.players, s.currentPlayerName ?? "");
               const obs = useDeckStore.getState().obstructions.map((o) => o.gridKey);
               for (const k of obs) occ.add(k);
-              const updated = reachableRoadGrids(startGridKey, result, occ);
+              const updated = reachableRoadGrids(startGridKey, result, occ, s.gameBounds);
               log.info("handleDiceRoll: road data loaded, recomputed reachable grids:", updated.size);
               set((prev) => ({
                 reachableGrids: updated,

@@ -44,6 +44,23 @@ export function isNearBoundaryEdge(
   )
 }
 
+export function isOutsideBounds(
+  gridKey: string,
+  gameBounds: GameBounds | null
+): boolean {
+  if (!gameBounds) return false
+
+  const bngCorners = cornersToBng(gameBounds.corners)
+  const minE = Math.floor(Math.min(...bngCorners.map(([e]) => e)) / 1000) * 1000 + 500
+  const maxE = Math.floor(Math.max(...bngCorners.map(([e]) => e)) / 1000) * 1000 + 500
+  const minN = Math.floor(Math.min(...bngCorners.map(([, n]) => n)) / 1000) * 1000 + 500
+  const maxN = Math.floor(Math.max(...bngCorners.map(([, n]) => n)) / 1000) * 1000 + 500
+
+  const [e, n] = gridKeyToBng(gridKey)
+
+  return e < minE || e > maxE || n < minN || n > maxN
+}
+
 export function isOnBoardEdge(
   gridKey: string,
   gameBounds: GameBounds | null
@@ -51,19 +68,15 @@ export function isOnBoardEdge(
   if (!gameBounds) return false
 
   const bngCorners = cornersToBng(gameBounds.corners)
-  const minE = Math.min(...bngCorners.map(([e]) => e))
-  const maxE = Math.max(...bngCorners.map(([e]) => e))
-  const minN = Math.min(...bngCorners.map(([, n]) => n))
-  const maxN = Math.max(...bngCorners.map(([, n]) => n))
+  const minE = Math.floor(Math.min(...bngCorners.map(([e]) => e)) / 1000) * 1000 + 500
+  const maxE = Math.floor(Math.max(...bngCorners.map(([e]) => e)) / 1000) * 1000 + 500
+  const minN = Math.floor(Math.min(...bngCorners.map(([, n]) => n)) / 1000) * 1000 + 500
+  const maxN = Math.floor(Math.max(...bngCorners.map(([, n]) => n)) / 1000) * 1000 + 500
 
   const [e, n] = gridKeyToBng(gridKey)
 
-  const gridMinE = Math.floor(minE / 1000) * 1000 + 500
-  const gridMaxE = Math.floor(maxE / 1000) * 1000 + 500
-  const gridMinN = Math.floor(minN / 1000) * 1000 + 500
-  const gridMaxN = Math.floor(maxN / 1000) * 1000 + 500
-
-  return e <= gridMinE || e >= gridMaxE || n <= gridMinN || n >= gridMaxN
+  return (e === minE || e === maxE || n === minN || n === maxN) &&
+    e >= minE && e <= maxE && n >= minN && n <= maxN
 }
 
 export function boundaryEdge(
