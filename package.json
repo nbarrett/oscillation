@@ -64,7 +64,7 @@
     "zustand": "^4.5.4"
   },
   "devDependencies": {
-    "@annix/claude-swarm": "0.1.17",
+    "@annix/claude-swarm": "0.1.22",
     "@types/bcryptjs": "^3.0.0",
     "@types/leaflet": "^1.9.8",
     "@types/luxon": "^3.4.0",

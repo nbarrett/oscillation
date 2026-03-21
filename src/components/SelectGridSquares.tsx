@@ -64,7 +64,7 @@ class RoutePolyline extends L.Polyline {
 }
 
 function oscType(layer: L.Layer): OscLayerType | undefined {
-  return (layer as Record<string, unknown>)._oscType as OscLayerType | undefined;
+  return (layer as unknown as Record<string, unknown>)._oscType as OscLayerType | undefined;
 }
 
 function isIdentifiedPolygon(layer: L.Layer): layer is IdentifiedPolygon {
