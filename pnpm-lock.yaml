@@ -130,8 +130,8 @@ importers:
         version: 4.5.7(@types/react@18.3.27)(react@18.3.1)
     devDependencies:
       '@annix/claude-swarm':
-        specifier: 0.1.17
-        version: 0.1.17(@types/node@20.19.30)
+        specifier: 0.1.22
+        version: 0.1.22(@types/node@20.19.30)
       '@types/bcryptjs':
         specifier: ^3.0.0
         version: 3.0.0
@@ -191,8 +191,8 @@ packages:
     resolution: {integrity: sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw==}
     engines: {node: '>=10'}
 
-  '@annix/claude-swarm@0.1.17':
-    resolution: {integrity: sha512-uom+Rtk8GUMRsJQJQFkX+w7UCpiPA+8G+bAgozRX4KmruizHw5C9qCMZkeNf8SZEO55jSf1gvBXdPYlje/RtaA==}
+  '@annix/claude-swarm@0.1.22':
+    resolution: {integrity: sha512-Prr7CKpwqxfFT5hvQIrA9KN/EjOSbTH9BNOfv63A/KRHLyZkFQeYrqqWCx8ltiiN+ZHqiw2C0m3yyUQa09pvzw==}
     engines: {node: '>=18.0.0'}
     hasBin: true
 
@@ -3589,7 +3589,7 @@ snapshots:
 
   '@alloc/quick-lru@5.2.0': {}
 
-  '@annix/claude-swarm@0.1.17(@types/node@20.19.30)':
+  '@annix/claude-swarm@0.1.22(@types/node@20.19.30)':
     dependencies:
       '@inquirer/prompts': 8.3.0(@types/node@20.19.30)
       chalk: 5.6.2

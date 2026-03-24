@@ -15,7 +15,7 @@ const MAX_VISIBLE_MARKERS = 200;
 const BOUNDS_EXPANSION = 0.3;
 const DEBOUNCE_MS = 500;
 const ICON_SIZE = 48;
-const POI_RADIUS_METRES = 10_000;
+const POI_RADIUS_METRES = 1_000;
 
 function buildIcon(svgTemplate: string, colour: string): L.DivIcon {
   const coloured = svgTemplate
@@ -77,12 +77,32 @@ export default function PoiMarkers<T extends string>({
   const iconDetailMode = usePoiSettingsStore((s) => s.iconDetailMode);
   const currentPlayer = useCurrentPlayer();
   const gameBounds = useGameStore((s) => s.gameBounds);
+  const seenList = useGameStore((s) => s.seenPoiIds[label] ?? []);
+  const addSeenPoi = useGameStore((s) => s.addSeenPoi);
+
+  const seenSet = useMemo(() => new Set(seenList), [seenList]);
 
   const icon = useMemo(() => {
     const option = iconOptions.find((o) => o.style === iconStyle) ?? iconOptions[0]!;
     const svgSource = iconDetailMode === "simple" ? option.simpleSvg : option.svg;
     return buildIcon(svgSource, colour);
   }, [iconStyle, iconOptions, colour, iconDetailMode]);
+
+  useEffect(() => {
+    if (!currentPlayer || !show) return;
+    const playerLatLng = L.latLng(currentPlayer.position[0], currentPlayer.position[1]);
+    const newIds: string[] = [];
+    for (const item of items) {
+      if (gameBounds && !isWithinBounds(item.lat, item.lng, gameBounds)) continue;
+      if (!gridHasABRoad(latLngToGridKey(item.lat, item.lng))) continue;
+      const osmIdStr = String(item.id);
+      if (seenSet.has(osmIdStr)) continue;
+      if (playerLatLng.distanceTo(L.latLng(item.lat, item.lng)) <= POI_RADIUS_METRES) {
+        newIds.push(osmIdStr);
+      }
+    }
+    for (const id of newIds) addSeenPoi(label, id);
+  }, [currentPlayer, items, show, gameBounds, seenSet, addSeenPoi, label]);
 
   const renderMarkers = useCallback(() => {
     if (!layerRef.current || !map) return;
@@ -102,7 +122,9 @@ export default function PoiMarkers<T extends string>({
         if (gameBounds && !isWithinBounds(item.lat, item.lng, gameBounds)) return false;
         if (!gridHasABRoad(latLngToGridKey(item.lat, item.lng))) return false;
         if (playerLatLng) {
-          return playerLatLng.distanceTo(L.latLng(item.lat, item.lng)) <= POI_RADIUS_METRES;
+          const osmIdStr = String(item.id);
+          const inRadius = playerLatLng.distanceTo(L.latLng(item.lat, item.lng)) <= POI_RADIUS_METRES;
+          return inRadius || seenSet.has(osmIdStr);
         }
         return true;
       })
@@ -117,7 +139,7 @@ export default function PoiMarkers<T extends string>({
     }
 
     log.debug(`${label}: rendered`, visible.length, "of", items.length);
-  }, [map, items, show, icon, label, currentPlayer, gameBounds]);
+  }, [map, items, show, icon, label, currentPlayer, gameBounds, seenSet]);
 
   const fetchData = useCallback(async () => {
     if (!map || fetchingRef.current) return;

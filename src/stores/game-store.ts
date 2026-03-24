@@ -214,6 +214,8 @@ interface GameState {
   setPendingEndTurn: (pending: boolean) => void;
   setPickingPlayerIndex: (index: number) => void;
   setActivePickingCategory: (category: PoiCategory | null) => void;
+  seenPoiIds: Record<string, string[]>;
+  addSeenPoi: (category: string, osmId: string) => void;
   isCreator: () => boolean;
   leaveSession: () => void;
 }
@@ -265,6 +267,7 @@ export const useGameStore = create<GameState>()(
       pathDiagnostics: null,
       tokenInventory: {},
       activityLog: [],
+      seenPoiIds: {},
 
       setRemotePreviewPath: (remotePreviewPath) => set({ remotePreviewPath }),
       setPathDiagnostics: (pathDiagnostics) => set({ pathDiagnostics }),
@@ -628,6 +631,13 @@ export const useGameStore = create<GameState>()(
 
       setActivePickingCategory: (activePickingCategory) => set({ activePickingCategory }),
 
+      addSeenPoi: (category, osmId) => {
+        const current = get().seenPoiIds;
+        const list = current[category] ?? [];
+        if (list.includes(osmId)) return;
+        set({ seenPoiIds: { ...current, [category]: [...list, osmId] } });
+      },
+
       isCreator: () => {
         const state = get();
         return state.playerId !== null && state.playerId === state.creatorPlayerId;
@@ -657,6 +667,7 @@ export const useGameStore = create<GameState>()(
           activePickingCategory: null,
           tokenInventory: {},
           activityLog: [],
+          seenPoiIds: {},
         });
       },
     }),
@@ -677,6 +688,7 @@ export const useGameStore = create<GameState>()(
         showPreviewPaths: state.showPreviewPaths,
         showAllRoutes: state.showAllRoutes,
         diceValues: state.diceValues,
+        seenPoiIds: state.seenPoiIds,
       }),
     }
   )

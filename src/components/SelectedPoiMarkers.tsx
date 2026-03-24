@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback, useMemo } from "react"
 import { useMap } from "react-leaflet"
 import L from "leaflet"
-import { useGameStore, useCurrentPlayer } from "@/stores/game-store"
+import { useGameStore } from "@/stores/game-store"
 import { POI_COLOURS, PUB_ICON_OPTIONS, SPIRE_ICON_OPTIONS, TOWER_ICON_OPTIONS, PHONE_ICON_OPTIONS, SCHOOL_ICON_OPTIONS } from "@/stores/poi-icons"
 import { usePubStore } from "@/stores/pub-store"
 import { useSpireStore, useTowerStore } from "@/stores/church-store"
@@ -76,8 +76,7 @@ function resolveIcon<T extends string>(
 export default function SelectedPoiMarkers() {
   const map = useMap()
   const layerRef = useRef<L.LayerGroup | null>(null)
-  const { selectedPois, tokenInventory } = useGameStore()
-  const currentPlayer = useCurrentPlayer()
+  const { selectedPois, tokenInventory, players, localPlayerName } = useGameStore()
 
   const pubIconStyle = usePubStore((s) => s.pubIconStyle)
   const spireIconStyle = useSpireStore((s) => s.spireIconStyle)
@@ -94,7 +93,8 @@ export default function SelectedPoiMarkers() {
     school: resolveIcon(SCHOOL_ICON_OPTIONS, schoolIconStyle, iconDetailMode),
   }), [pubIconStyle, spireIconStyle, towerIconStyle, phoneIconStyle, schoolIconStyle, iconDetailMode])
 
-  const visitedPois = currentPlayer?.visitedPois ?? []
+  const localPlayer = players.find(p => p.name === localPlayerName)
+  const visitedPois = localPlayer?.visitedPois ?? []
   const visitedSet = useMemo(() => new Set(visitedPois), [visitedPois.join(",")])
 
   const renderMarkers = useCallback(() => {
