@@ -164,9 +164,11 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
   const locationRef = useRef<HTMLDivElement>(null)
   const [areaSize, setAreaSize] = useState<AreaSize>(DEFAULT_AREA_SIZE)
   const [botCount, setBotCount] = useState(3)
+  const [pickingRandom, setPickingRandom] = useState(false)
 
   const { setSessionId, setPlayerId, setSessionCode, setCreatorPlayerId, showPreviewPaths, setShowPreviewPaths: showPreviewPathsSetter } = useGameStore()
   const { preferredCar, setPreferredCar } = useCarStore()
+  const utils = trpc.useUtils()
   const { data: locations, refetch: refetchLocations } = trpc.locations.getAll.useQuery()
   const { data: availableGames } = trpc.game.list.useQuery(undefined, {
     refetchInterval: 5000,
@@ -342,13 +344,33 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
     register.mutate({ nickname: registerNickname, pin: registerPin })
   }
 
-  function pickRandomLocation() {
-    if (sortedLocations.length === 0) return
-    const randomIndex = Math.floor(Math.random() * sortedLocations.length)
-    const picked = sortedLocations[randomIndex]
-    setSelectedLocationId(picked.id)
-    setLocationSearch(asTitle(picked.name))
+  async function pickRandomLocation() {
+    if (sortedLocations.length === 0 || pickingRandom) return
+    setPickingRandom(true)
+    const shuffled = sortedLocations.slice().sort(() => Math.random() - 0.5)
+    for (const candidate of shuffled) {
+      try {
+        const result = await utils.game.validateArea.fetch({
+          lat: candidate.lat,
+          lng: candidate.lng,
+          areaSize,
+        })
+        if (result.valid) {
+          setSelectedLocationId(candidate.id)
+          setLocationSearch(asTitle(candidate.name))
+          setLocationDropdownOpen(false)
+          setPickingRandom(false)
+          return
+        }
+      } catch {
+        continue
+      }
+    }
+    const fallback = shuffled[0]
+    setSelectedLocationId(fallback.id)
+    setLocationSearch(asTitle(fallback.name))
     setLocationDropdownOpen(false)
+    setPickingRandom(false)
   }
 
   function selectLocation(location: { id: string; name: string }) {
@@ -537,10 +559,10 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
                   variant="outline"
                   size="icon"
                   onClick={pickRandomLocation}
-                  disabled={sortedLocations.length === 0}
-                  title="Random starting point"
+                  disabled={sortedLocations.length === 0 || pickingRandom}
+                  title="Random valid starting point"
                 >
-                  <Shuffle className="h-4 w-4" />
+                  {pickingRandom ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shuffle className="h-4 w-4" />}
                 </Button>
                 <AddStartingPointDialog onSuccess={refetchLocations} />
               </div>
@@ -746,10 +768,10 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
                                 size="icon"
                                 className="h-8 w-8"
                                 onClick={pickRandomLocation}
-                                disabled={sortedLocations.length === 0}
-                                title="Random starting point"
+                                disabled={sortedLocations.length === 0 || pickingRandom}
+                                title="Random valid starting point"
                               >
-                                <Shuffle className="h-3.5 w-3.5" />
+                                {pickingRandom ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Shuffle className="h-3.5 w-3.5" />}
                               </Button>
                             </div>
                           </div>
