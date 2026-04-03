@@ -19,6 +19,7 @@ export interface PoiValidationResult {
   insufficient: PoiCategory[];
   hasMotorway: boolean;
   hasRailway: boolean;
+  error?: string;
 }
 
 const SPIRE_TOWER_TYPES = new Set(["spire", "steeple"]);

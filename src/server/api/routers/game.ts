@@ -79,11 +79,24 @@ export const gameRouter = createTRPCRouter({
     }))
     .query(async ({ input }) => {
       const bounds = areaSizeBounds(input.lat, input.lng, input.areaSize as AreaSize)
-      const result = await validatePoiCoverage(bounds.south, bounds.west, bounds.north, bounds.east)
-      if (result.valid) {
-        prewarmPoiCandidates(bounds.south, bounds.west, bounds.north, bounds.east)
+      try {
+        const result = await validatePoiCoverage(bounds.south, bounds.west, bounds.north, bounds.east)
+        if (result.valid) {
+          prewarmPoiCandidates(bounds.south, bounds.west, bounds.north, bounds.east)
+        }
+        return result
+      } catch (err) {
+        log.warn("validateArea: Overpass query failed —", err instanceof Error ? err.message : String(err))
+        return {
+          valid: false,
+          counts: { pub: 0, spire: 0, tower: 0, phone: 0, school: 0 },
+          missing: POI_CATEGORIES.slice(),
+          insufficient: [],
+          hasMotorway: false,
+          hasRailway: false,
+          error: "Map data service temporarily unavailable — please try again",
+        }
       }
-      return result
     }),
 
   validLocationIds: publicProcedure

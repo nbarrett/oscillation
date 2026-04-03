@@ -722,7 +722,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
                       {!validation.data.valid && (
                         <div className="space-y-3 mt-2">
                           <p className="text-xs text-destructive">
-                            Missing requirements — choose a different location or larger area
+                            {validation.data.error ?? "Missing requirements — choose a different location or larger area"}
                           </p>
                           <div className="space-y-2">
                             <Label className="text-xs">Change Location</Label>
@@ -829,7 +829,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
                 disabled={createGame.isPending || !validation.data?.valid}
               >
                 {(createGame.isPending || validation.isLoading) && <Loader2 className="h-4 w-4 animate-spin" />}
-                {validation.isLoading ? "Checking area..." : !validation.data?.valid ? "Area invalid" : "Create Game"}
+                {validation.isLoading ? "Checking area..." : validation.data?.error ? "Try again" : !validation.data?.valid ? "Area invalid" : "Create Game"}
               </Button>
             )}
           </div>

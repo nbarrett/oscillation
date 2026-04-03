@@ -81,13 +81,6 @@ export async function queryOverpass(query: string, timeoutMs = FETCH_TIMEOUT_MS)
       const elapsed = Date.now() - startTime;
       lastError = err instanceof Error ? err : new Error(String(err));
       log.warn(`Overpass: attempt ${attempt + 1} failed — ${lastError.message} after ${elapsed}ms (${endpoint})`);
-      if (err instanceof TypeError || (err as { code?: string }).code === "ECONNREFUSED" || err instanceof DOMException) {
-        continue;
-      }
-      if (attempt < MAX_RETRIES - 1 && lastError.message.includes("Overpass API")) {
-        continue;
-      }
-      throw lastError;
     }
   }
 
