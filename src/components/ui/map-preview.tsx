@@ -31,7 +31,18 @@ function GameplayPreviewMarkers() {
       <CarMarker position="top-8 left-[15%]" color="bg-red-500" rotation={45} />
       <CarMarker position="top-20 left-[60%]" color="bg-blue-500" rotation={-30} />
       <CarMarker position="top-14 right-[20%]" color="bg-green-500" rotation={15} />
-      <CarMarker position="top-28 left-[40%]" color="bg-amber-500" rotation={-45} />
+      <div className="absolute top-28 left-[40%]">
+        <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-10 pointer-events-auto group/spindle flex flex-col items-center">
+          <span className="whitespace-nowrap text-[8px] font-bold text-green-500 opacity-0 group-hover/spindle:opacity-100 transition-opacity mb-0.5">You found Spindle!</span>
+          <pre className="text-[3px] leading-[1.1] text-green-700/50 dark:text-green-400/50 group-hover/spindle:text-green-500 dark:group-hover/spindle:text-green-400 group-hover/spindle:text-[6px] group-hover/spindle:font-black group-hover/spindle:[text-shadow:0_0_1px_currentColor] transition-all duration-200 font-mono select-none cursor-default p-1">{`  ___\n | o o |\nn |  ^  | n\n|_|   |_|`}</pre>
+        </div>
+        <div
+          className="w-8 h-8 bg-amber-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center"
+          style={{ transform: "rotate(-45deg)" }}
+        >
+          <Car className="h-4 w-4 text-white" />
+        </div>
+      </div>
 
       <svg className="absolute inset-0 w-full h-full" style={{ pointerEvents: "none" }}>
         <path
