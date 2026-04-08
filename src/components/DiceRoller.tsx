@@ -404,7 +404,7 @@ export default function DiceRoller() {
           <Button
             className="flex-1 sm:flex-none gap-2"
             onClick={handleEndTurnClick}
-            disabled={!isMyTurn || !isPlaying || gameTurnState !== GameTurnState.DICE_ROLLED || (!!diceResult && movementPath.length < diceResult && previewPaths.length === 0)}
+            disabled={!isMyTurn || !isPlaying || gameTurnState !== GameTurnState.DICE_ROLLED}
           >
             <CheckCircle2 className="h-4 w-4" />
             End Turn
