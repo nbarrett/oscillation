@@ -5,13 +5,6 @@ import { useMap } from "react-leaflet";
 import L from "leaflet";
 import { useGameStore } from "@/stores/game-store";
 
-const WORLD_OUTER: L.LatLngTuple[] = [
-  [-90, -180],
-  [-90, 180],
-  [90, 180],
-  [90, -180],
-];
-
 export default function GameBoundary() {
   const map = useMap();
   const borderRef = useRef<L.Polygon | null>(null);
@@ -30,11 +23,22 @@ export default function GameBoundary() {
 
     if (!gameBounds) return;
 
-    const hole: L.LatLngTuple[] = gameBounds.corners.map(
+    const { south, north, west, east } = gameBounds;
+    const latPad = (north - south) * 10;
+    const lngPad = (east - west) * 10;
+
+    const outer: L.LatLngTuple[] = [
+      [south - latPad, west - lngPad],
+      [south - latPad, east + lngPad],
+      [north + latPad, east + lngPad],
+      [north + latPad, west - lngPad],
+    ];
+
+    const boundary: L.LatLngTuple[] = gameBounds.corners.map(
       (c) => [c.lat, c.lng] as L.LatLngTuple
     );
 
-    borderRef.current = L.polygon(hole, {
+    borderRef.current = L.polygon(boundary, {
       color: "#d40058",
       weight: 4,
       opacity: 1,
@@ -42,7 +46,7 @@ export default function GameBoundary() {
       interactive: false,
     }).addTo(map);
 
-    maskRef.current = L.polygon([WORLD_OUTER, hole], {
+    maskRef.current = L.polygon([outer, boundary], {
       color: "transparent",
       weight: 0,
       fillColor: "#1a1a2e",

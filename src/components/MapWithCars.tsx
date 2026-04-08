@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { MapContainer, TileLayer } from "react-leaflet";
+import { MapContainer, TileLayer, ScaleControl } from "react-leaflet";
 import { useGameStore } from "@/stores/game-store";
 import { useMapStore, MapLayers, MappingProvider, ProjectionValue } from "@/stores/map-store";
 import { useRouteStore } from "@/stores/route-store";
@@ -151,7 +151,7 @@ export default function MapWithCars() {
         key={mapKey}
         crs={crs}
         whenReady={() => log.debug("map ready")}
-        minZoom={usesBritishNationalGrid ? mapLayerAttributes?.minZoom : 0}
+        minZoom={usesBritishNationalGrid ? Math.max(2, mapLayerAttributes?.minZoom ?? 0) : 0}
         maxZoom={usesBritishNationalGrid ? mapLayerAttributes?.maxZoom : 18}
         zoom={mapZoom}
         center={mapCentre || [startingPosition.lat, startingPosition.lng]}
@@ -184,6 +184,7 @@ export default function MapWithCars() {
           <SelectedPoiMarkers />
         )}
         <MapSearch />
+        <ScaleControl position="bottomleft" imperial={false} />
         <GameBoundary />
         <ObstructionMarkers />
         <ObjectiveArrows />

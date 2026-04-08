@@ -331,7 +331,9 @@ export const gameRouter = createTRPCRouter({
       const startLat = session.startLat!
       const startLng = session.startLng!
       const filteredCandidates = allCandidates.filter(
-        (poi) => haversineKm(poi.lat, poi.lng, startLat, startLng) >= 10
+        (poi) =>
+          isWithinBounds(poi.lat, poi.lng, bounds) &&
+          haversineKm(poi.lat, poi.lng, startLat, startLng) >= 10
       )
 
       const deckState = {
