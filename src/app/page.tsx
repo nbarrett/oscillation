@@ -443,13 +443,11 @@ export default function GamePage() {
         ) : (
           <>
             <Card>
-              <CardContent className="p-3 md:p-4">
+              <CardContent className="p-3 md:p-4 space-y-3">
                 <div className="flex flex-wrap items-center gap-4">
                   <PlayerPositions />
                   <div className="hidden md:block h-8 w-px bg-border" />
                   <DiceRoller />
-                  <div className="hidden md:block h-8 w-px bg-border" />
-                  <GameObjectives />
                   <button
                     onClick={() => setActivityExpanded(!activityExpanded)}
                     className={cn(
@@ -497,6 +495,7 @@ export default function GamePage() {
                     </button>
                   </div>
                 </div>
+                <GameObjectives />
 
             <div
               className={cn(

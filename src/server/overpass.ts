@@ -5,6 +5,7 @@ import { motorwayOverpassClause } from "@/server/motorway-filter";
 const OVERPASS_ENDPOINTS = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
+  "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
 ];
 
 const MAX_RETRIES = 3;
@@ -109,7 +110,7 @@ export interface PoiCandidate {
 
 function buildCombinedQuery(bbox: string): string {
   return [
-    "[out:json][timeout:25];",
+    "[out:json][timeout:45];",
     "(",
     `node["amenity"="pub"](${bbox});`,
     `node["amenity"="place_of_worship"]["religion"="christian"](${bbox});`,
@@ -133,7 +134,7 @@ function buildCombinedQuery(bbox: string): string {
  */
 function buildValidationQuery(bbox: string): string {
   return [
-    `[out:json][timeout:10];`,
+    `[out:json][timeout:25];`,
     `node["amenity"="pub"](${bbox})->.pubs;`,
     `.pubs out count;`,
     `(`,
@@ -206,7 +207,7 @@ export async function validatePoiCoverage(
   }
 
   // Count-only query: returns 6 count elements (pubs, churches, phones, schools, motorways, railways)
-  const data = await queryOverpass(buildValidationQuery(bbox), 25_000);
+  const data = await queryOverpass(buildValidationQuery(bbox), 35_000);
   const countElements = data.elements.filter((el) => el.type === "count");
   const getCount = (idx: number) => parseInt(countElements[idx]?.tags?.["total"] ?? "0", 10);
 

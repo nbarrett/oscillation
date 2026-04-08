@@ -55,8 +55,8 @@ export default function GameObjectives() {
   const allVisited = selectedPois.every(poi => visitedSet.has(`${poi.category}:${poi.osmId}`))
 
   return (
-    <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto">
-      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap mr-2">
+    <div className="flex items-center gap-2 flex-nowrap overflow-x-auto">
+      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap shrink-0">
         Staging Posts:
       </span>
         {selectedPois.map((poi) => {
