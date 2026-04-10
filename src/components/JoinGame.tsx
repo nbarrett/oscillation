@@ -42,7 +42,8 @@ function loadValidationCache(lat: number, lng: number, areaSize: string) {
     const cache = JSON.parse(raw) as Record<string, { data: unknown; ts: number }>
     const entry = cache[validationCacheKey(lat, lng, areaSize)]
     if (entry && Date.now() - entry.ts < VALIDATION_CACHE_MAX_AGE) {
-      return entry.data
+      const data = entry.data as { valid?: boolean } | null
+      if (data?.valid) return entry.data
     }
   } catch { /* ignore */ }
   return undefined
@@ -186,20 +187,21 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
   const selectedLocation = locations?.find(l => l.id === selectedLocationId)
 
   const cachedValidation = selectedLocation
-    ? loadValidationCache(selectedLocation.lat, selectedLocation.lng, areaSize)
+    ? (loadValidationCache(selectedLocation.lat, selectedLocation.lng, areaSize) as PoiValidationResult | undefined)
     : undefined
 
   const validation = trpc.game.validateArea.useQuery(
     { lat: selectedLocation?.lat ?? 0, lng: selectedLocation?.lng ?? 0, areaSize },
     {
       enabled: mode === "create" && !!selectedLocation,
-      staleTime: 5 * 60 * 1000,
-      initialData: cachedValidation as PoiValidationResult | undefined,
+      staleTime: 0,
+      gcTime: 0,
+      initialData: cachedValidation?.valid ? cachedValidation : undefined,
     },
   )
 
   useEffect(() => {
-    if (validation.data && selectedLocation) {
+    if (validation.data?.valid && selectedLocation) {
       saveValidationCache(selectedLocation.lat, selectedLocation.lng, areaSize, validation.data)
     }
   }, [validation.data, selectedLocation, areaSize])
@@ -724,6 +726,12 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
                           <p className="text-xs text-destructive">
                             {validation.data.error ?? "Missing requirements — choose a different location or larger area"}
                           </p>
+                          {validation.data.errorDetails && (
+                            <details className="text-xs text-muted-foreground">
+                              <summary className="cursor-pointer hover:text-foreground">Technical details</summary>
+                              <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-[10px] leading-tight bg-muted/50 p-2 rounded">{validation.data.errorDetails}</pre>
+                            </details>
+                          )}
                           <div className="space-y-2">
                             <Label className="text-xs">Change Location</Label>
                             <div className="flex items-center gap-2">
@@ -822,6 +830,15 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
                 Next
                 <ChevronRight className="h-4 w-4" />
               </Button>
+            ) : validation.data?.error ? (
+              <Button
+                className="gap-2"
+                onClick={() => validation.refetch()}
+                disabled={validation.isFetching}
+              >
+                {validation.isFetching && <Loader2 className="h-4 w-4 animate-spin" />}
+                {validation.isFetching ? "Checking area..." : "Try again"}
+              </Button>
             ) : (
               <Button
                 className="gap-2"
@@ -829,7 +846,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
                 disabled={createGame.isPending || !validation.data?.valid}
               >
                 {(createGame.isPending || validation.isLoading) && <Loader2 className="h-4 w-4 animate-spin" />}
-                {validation.isLoading ? "Checking area..." : validation.data?.error ? "Try again" : !validation.data?.valid ? "Area invalid" : "Create Game"}
+                {validation.isLoading ? "Checking area..." : !validation.data?.valid ? "Area invalid" : "Create Game"}
               </Button>
             )}
           </div>

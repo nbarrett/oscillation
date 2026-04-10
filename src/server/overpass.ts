@@ -5,12 +5,12 @@ import { motorwayOverpassClause } from "@/server/motorway-filter";
 const OVERPASS_ENDPOINTS = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
-  "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+  "https://overpass.openstreetmap.fr/api/interpreter",
 ];
 
-const MAX_RETRIES = 3;
-const RETRY_BASE_MS = 2000;
-const FETCH_TIMEOUT_MS = 45000;
+const FETCH_TIMEOUT_MS = 30000;
+const HEDGE_DELAY_MS = 2500;
 
 const poiCache = new Map<string, { result: PoiValidationResult; expiresAt: number }>();
 const POI_CACHE_TTL_MS = 10 * 60 * 1000;
@@ -29,64 +29,95 @@ export interface OverpassResponse {
   elements: OverpassElement[];
 }
 
-export async function queryOverpass(query: string, timeoutMs = FETCH_TIMEOUT_MS): Promise<OverpassResponse> {
-  let lastError: Error | null = null;
+async function readBodyExcerpt(response: Response): Promise<string> {
+  try {
+    const body = await response.text();
+    return body.slice(0, 300).replace(/\s+/g, " ").trim();
+  } catch {
+    return "";
+  }
+}
 
-  const queryPreview = query.slice(0, 120).replace(/\s+/g, " ");
-  log.debug(`Overpass: starting request (timeout=${timeoutMs}ms, maxRetries=${MAX_RETRIES}, query=${queryPreview}...)`);
+async function queryOneEndpoint(
+  endpoint: string,
+  query: string,
+  timeoutMs: number,
+  signal: AbortSignal,
+): Promise<OverpassResponse> {
+  const startTime = Date.now();
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": "oscillation-game/1.0 (https://github.com/nbarrett/oscillation)",
+      "Accept": "application/json",
+    },
+    body: `data=${encodeURIComponent(query)}`,
+    signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]),
+  });
 
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    const endpoint = OVERPASS_ENDPOINTS[attempt % OVERPASS_ENDPOINTS.length]!;
+  const elapsed = Date.now() - startTime;
 
-    if (attempt > 0) {
-      const delay = RETRY_BASE_MS * Math.pow(2, attempt - 1);
-      log.debug(`Overpass: retry ${attempt}/${MAX_RETRIES - 1} after ${delay}ms (using ${endpoint})`);
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    } else {
-      log.debug(`Overpass: attempt ${attempt + 1}/${MAX_RETRIES} → ${endpoint}`);
-    }
-
-    const startTime = Date.now();
-    try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: `data=${encodeURIComponent(query)}`,
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-
-      const elapsed = Date.now() - startTime;
-
-      if (response.status === 429 || response.status === 504) {
-        lastError = new Error(`Overpass API ${response.status}: ${response.statusText}`);
-        log.warn(`Overpass: attempt ${attempt + 1} failed — HTTP ${response.status} after ${elapsed}ms (${endpoint})`);
-        continue;
-      }
-
-      if (!response.ok) {
-        log.warn(`Overpass: attempt ${attempt + 1} failed — HTTP ${response.status} after ${elapsed}ms (${endpoint})`);
-        throw new Error(`Overpass API error: ${response.statusText}`);
-      }
-
-      const text = await response.text();
-      if (text.trimStart().startsWith("<")) {
-        lastError = new Error("Overpass API returned XML instead of JSON");
-        log.warn(`Overpass: attempt ${attempt + 1} failed — got XML response after ${elapsed}ms (${endpoint})`);
-        continue;
-      }
-
-      const parsed = JSON.parse(text) as OverpassResponse;
-      log.debug(`Overpass: success after ${elapsed}ms — ${parsed.elements.length} elements (${endpoint})`);
-      return parsed;
-    } catch (err) {
-      const elapsed = Date.now() - startTime;
-      lastError = err instanceof Error ? err : new Error(String(err));
-      log.warn(`Overpass: attempt ${attempt + 1} failed — ${lastError.message} after ${elapsed}ms (${endpoint})`);
-    }
+  if (!response.ok) {
+    const bodyExcerpt = await readBodyExcerpt(response);
+    const server = response.headers.get("server");
+    const retryAfter = response.headers.get("retry-after");
+    const msg = `HTTP ${response.status} ${response.statusText}${server ? ` (server=${server})` : ""}${retryAfter ? ` retry-after=${retryAfter}` : ""}${bodyExcerpt ? ` — ${bodyExcerpt}` : ""}`;
+    log.warn(`Overpass: ${endpoint} failed after ${elapsed}ms — ${msg}`);
+    throw new Error(msg);
   }
 
-  log.error(`Overpass: all ${MAX_RETRIES} attempts exhausted — ${lastError?.message}`);
-  throw lastError ?? new Error("Overpass API: all retries exhausted");
+  const text = await response.text();
+  if (text.trimStart().startsWith("<")) {
+    const xmlExcerpt = text.slice(0, 300).replace(/\s+/g, " ").trim();
+    log.warn(`Overpass: ${endpoint} returned XML after ${elapsed}ms — ${xmlExcerpt}`);
+    throw new Error(`XML response: ${xmlExcerpt}`);
+  }
+
+  const parsed = JSON.parse(text) as OverpassResponse;
+  log.debug(`Overpass: ${endpoint} success after ${elapsed}ms — ${parsed.elements.length} elements`);
+  return parsed;
+}
+
+export async function queryOverpass(query: string, timeoutMs = FETCH_TIMEOUT_MS): Promise<OverpassResponse> {
+  const queryPreview = query.slice(0, 120).replace(/\s+/g, " ");
+  log.debug(`Overpass: hedged race across ${OVERPASS_ENDPOINTS.length} endpoints (timeout=${timeoutMs}ms, hedgeDelay=${HEDGE_DELAY_MS}ms, query=${queryPreview}...)`);
+
+  const sharedController = new AbortController();
+  const startedAt = Date.now();
+
+  const attempts = OVERPASS_ENDPOINTS.map(async (endpoint, idx) => {
+    if (idx > 0) {
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, idx * HEDGE_DELAY_MS);
+        sharedController.signal.addEventListener("abort", () => {
+          clearTimeout(timer);
+          resolve();
+        }, { once: true });
+      });
+      if (sharedController.signal.aborted) throw new Error("aborted (winner already found)");
+      log.debug(`Overpass: hedge fire +${idx * HEDGE_DELAY_MS}ms → ${endpoint}`);
+    } else {
+      log.debug(`Overpass: hedge fire +0ms → ${endpoint}`);
+    }
+    return queryOneEndpoint(endpoint, query, timeoutMs, sharedController.signal);
+  });
+
+  try {
+    const result = await Promise.any(attempts);
+    const totalElapsed = Date.now() - startedAt;
+    log.debug(`Overpass: race won in ${totalElapsed}ms — cancelling remaining attempts`);
+    sharedController.abort();
+    return result;
+  } catch (err) {
+    sharedController.abort();
+    const errors = err instanceof AggregateError
+      ? err.errors.map((e, i) => `${OVERPASS_ENDPOINTS[i]}: ${e instanceof Error ? e.message : String(e)}`)
+      : [err instanceof Error ? err.message : String(err)];
+    const summary = errors.join(" | ");
+    log.error(`Overpass: all ${OVERPASS_ENDPOINTS.length} endpoints failed — ${summary}`);
+    throw new Error(summary);
+  }
 }
 
 function classifyElement(tags: Record<string, string>, elementId: number): PoiCategory | null {
@@ -127,38 +158,24 @@ function buildCombinedQuery(bbox: string): string {
   ].join("");
 }
 
-/**
- * Count-only validation query using named sets.
- * Returns 6 count elements (pubs, churches, phones, schools, motorways, railways)
- * instead of hundreds of full elements — dramatically faster.
- */
 function buildValidationQuery(bbox: string): string {
   return [
     `[out:json][timeout:25];`,
-    `node["amenity"="pub"](${bbox})->.pubs;`,
-    `.pubs out count;`,
     `(`,
+    `node["amenity"="pub"](${bbox});`,
     `node["amenity"="place_of_worship"]["religion"="christian"](${bbox});`,
     `way["amenity"="place_of_worship"]["religion"="christian"](${bbox});`,
     `way["building"="cathedral"](${bbox});`,
-    `)->.churches;`,
-    `.churches out count;`,
-    `(`,
     `node["amenity"="telephone"](${bbox});`,
     `node["emergency"="phone"](${bbox});`,
-    `)->.phones;`,
-    `.phones out count;`,
-    `(`,
     `node["amenity"="school"](${bbox});`,
     `way["amenity"="school"](${bbox});`,
     `node["amenity"="college"](${bbox});`,
     `way["amenity"="college"](${bbox});`,
-    `)->.schools;`,
-    `.schools out count;`,
-    `${motorwayOverpassClause(bbox).replace(/;$/, "")}->.motors;`,
-    `.motors out count;`,
-    `way["railway"="rail"](${bbox})->.rails;`,
-    `.rails out count;`,
+    `way["highway"~"^(motorway|motorway_link)$"](${bbox});`,
+    `way["railway"="rail"](${bbox});`,
+    `);`,
+    `out tags;`,
   ].join("");
 }
 
@@ -206,28 +223,25 @@ export async function validatePoiCoverage(
     return cached.result;
   }
 
-  // Count-only query: returns 6 count elements (pubs, churches, phones, schools, motorways, railways)
   const data = await queryOverpass(buildValidationQuery(bbox), 35_000);
-  const countElements = data.elements.filter((el) => el.type === "count");
-  const getCount = (idx: number) => parseInt(countElements[idx]?.tags?.["total"] ?? "0", 10);
 
-  const pubCount = getCount(0);
-  const churchCount = getCount(1);
-  const phoneCount = getCount(2);
-  const schoolCount = getCount(3);
-  const motorwayCount = getCount(4);
-  const railwayCount = getCount(5);
+  const counts: Record<PoiCategory, number> = { pub: 0, spire: 0, tower: 0, phone: 0, school: 0 };
+  let hasMotorway = false;
+  let hasRailway = false;
 
-  // Split churches ~50/50 into spire/tower (matches classifyChurch fallback behaviour)
-  const counts: Record<PoiCategory, number> = {
-    pub: pubCount,
-    spire: Math.ceil(churchCount / 2),
-    tower: Math.floor(churchCount / 2),
-    phone: phoneCount,
-    school: schoolCount,
-  };
-  const hasMotorway = motorwayCount > 0;
-  const hasRailway = railwayCount > 0;
+  for (const el of data.elements) {
+    const tags = el.tags ?? {};
+    if (tags["highway"] === "motorway" || tags["highway"] === "motorway_link") {
+      hasMotorway = true;
+      continue;
+    }
+    if (tags["railway"] === "rail") {
+      hasRailway = true;
+      continue;
+    }
+    const category = classifyElement(tags, el.id);
+    if (category) counts[category]++;
+  }
 
   const missing = POI_CATEGORIES.filter((cat) => counts[cat] === 0);
   const insufficient = POI_CATEGORIES.filter((cat) => counts[cat] > 0 && counts[cat] < MIN_POIS_PER_CATEGORY);

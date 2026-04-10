@@ -86,7 +86,8 @@ export const gameRouter = createTRPCRouter({
         }
         return result
       } catch (err) {
-        log.warn("validateArea: Overpass query failed —", err instanceof Error ? err.message : String(err))
+        const errMsg = err instanceof Error ? err.message : String(err)
+        log.warn("validateArea: Overpass query failed —", errMsg)
         return {
           valid: false,
           counts: { pub: 0, spire: 0, tower: 0, phone: 0, school: 0 },
@@ -95,6 +96,7 @@ export const gameRouter = createTRPCRouter({
           hasMotorway: false,
           hasRailway: false,
           error: "Map data service temporarily unavailable — please try again",
+          errorDetails: errMsg,
         }
       }
     }),

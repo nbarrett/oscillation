@@ -20,6 +20,7 @@ export interface PoiValidationResult {
   hasMotorway: boolean;
   hasRailway: boolean;
   error?: string;
+  errorDetails?: string;
 }
 
 const SPIRE_TOWER_TYPES = new Set(["spire", "steeple"]);
