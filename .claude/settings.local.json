@@ -86,7 +86,17 @@
       "Bash(pnpm run build:*)",
       "Bash(powershell -NoProfile -Command \"Remove-Item -Path ''$env:TEMP\\\\*'' -Recurse -Force -ErrorAction SilentlyContinue; Write-Host ''User temp cleaned''\")",
       "Bash(powershell -NoProfile -Command \"Remove-Item -Path ''C:\\\\Users\\\\james\\\\AppData\\\\Local\\\\NVIDIA\\\\*'' -Recurse -Force -ErrorAction SilentlyContinue; Write-Host ''NVIDIA cache cleaned''\")",
-      "Bash(npx prisma:*)"
+      "Bash(npx prisma:*)",
+      "WebFetch(domain:localhost)",
+      "Bash(pnpm:*)",
+      "Skill(update-config)",
+      "Bash(kill %b46sk6jmq)",
+      "Bash(npx tsx *)",
+      "Bash(kill %b6ighl3wl)",
+      "Bash(nslookup overpass-api.de)",
+      "Bash(node *)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(Stop-Process *)"
     ]
   }
 }

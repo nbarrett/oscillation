@@ -28,6 +28,15 @@ model NamedLocation {
   @@map("named_locations")
 }
 
+model PoiValidationCache {
+  id          String   @id @default(cuid())
+  cacheKey    String   @unique
+  result      Json
+  validatedAt DateTime @default(now())
+
+  @@map("poi_validation_cache")
+}
+
 model GameSession {
   id                 String         @id @default(cuid())
   code               String         @unique
@@ -53,6 +62,7 @@ model GameSession {
   previewPath        Json?
   pickingPlayerIndex Int          @default(0)
   botCount           Int          @default(3)
+  randomStagingPosts Boolean      @default(false)
   mapZoom            Int          @default(7)
   mapCentreLat       Float?
   mapCentreLng       Float?

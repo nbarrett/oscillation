@@ -165,6 +165,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
   const locationRef = useRef<HTMLDivElement>(null)
   const [areaSize, setAreaSize] = useState<AreaSize>(DEFAULT_AREA_SIZE)
   const [botCount, setBotCount] = useState(3)
+  const [randomStagingPosts, setRandomStagingPosts] = useState(false)
   const [pickingRandom, setPickingRandom] = useState(false)
 
   const { setSessionId, setPlayerId, setSessionCode, setCreatorPlayerId, showPreviewPaths, setShowPreviewPaths: showPreviewPathsSetter } = useGameStore()
@@ -423,6 +424,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
       iconType: preferredCar,
       areaSize,
       botCount,
+      randomStagingPosts,
     })
   }
 
@@ -626,6 +628,39 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
               </div>
 
               <div className="space-y-2">
+                <Label>Staging Posts</Label>
+                <div className="flex rounded-md border overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setRandomStagingPosts(false)}
+                    className={cn(
+                      "flex-1 px-3 py-1.5 text-xs font-medium transition-colors",
+                      !randomStagingPosts
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background hover:bg-muted text-muted-foreground"
+                    )}
+                  >
+                    Players Place
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRandomStagingPosts(true)}
+                    className={cn(
+                      "flex-1 px-3 py-1.5 text-xs font-medium transition-colors",
+                      randomStagingPosts
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background hover:bg-muted text-muted-foreground"
+                    )}
+                  >
+                    Random
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Random skips the placing turn — five staging posts are picked automatically when the game starts
+                </p>
+              </div>
+
+              <div className="space-y-2">
                 <Label>Preview Paths</Label>
                 <div className="flex rounded-md border overflow-hidden">
                   <button
@@ -670,6 +705,7 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
                 <SummaryItem label="Location" value={selectedLocation ? asTitle(selectedLocation.name) : "—"} />
                 <SummaryItem label="Area Size" value={`${preset.label} (${preset.widthKm}x${preset.heightKm} km)`} />
                 <SummaryItem label="Bots" value={botCount === 0 ? "None" : String(botCount)} />
+                <SummaryItem label="Staging Posts" value={randomStagingPosts ? "Random" : "Players Place"} />
                 <SummaryItem label="Preview Paths" value={showPreviewPaths ? "On" : "Off"} />
               </div>
 
@@ -718,6 +754,16 @@ export default function JoinGame({ startingPosition }: JoinGameProps) {
                           )}
                           <span className={validation.data.hasRailway ? "text-foreground" : "text-destructive"}>
                             Railway
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-sm">
+                          {validation.data.onABRoad ? (
+                            <Check className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                          ) : (
+                            <X className="h-3.5 w-3.5 text-destructive shrink-0" />
+                          )}
+                          <span className={validation.data.onABRoad ? "text-foreground" : "text-destructive"}>
+                            On A/B road
                           </span>
                         </div>
                       </div>

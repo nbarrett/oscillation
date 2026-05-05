@@ -80,7 +80,7 @@ export const gameRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const bounds = areaSizeBounds(input.lat, input.lng, input.areaSize as AreaSize)
       try {
-        const result = await validatePoiCoverage(bounds.south, bounds.west, bounds.north, bounds.east)
+        const result = await validatePoiCoverage(bounds.south, bounds.west, bounds.north, bounds.east, input.lat, input.lng)
         if (result.valid) {
           prewarmPoiCandidates(bounds.south, bounds.west, bounds.north, bounds.east)
         }
@@ -95,6 +95,7 @@ export const gameRouter = createTRPCRouter({
           insufficient: [],
           hasMotorway: false,
           hasRailway: false,
+          onABRoad: false,
           error: "Map data service temporarily unavailable — please try again",
           errorDetails: errMsg,
         }
@@ -118,6 +119,7 @@ export const gameRouter = createTRPCRouter({
       iconType: z.string().optional(),
       areaSize: z.enum(AREA_SIZES as [string, ...string[]]).default(DEFAULT_AREA_SIZE),
       botCount: z.number().int().min(0).max(4).default(3),
+      randomStagingPosts: z.boolean().default(false),
     }))
     .mutation(async ({ ctx, input }) => {
       let code = generateSessionCode()
@@ -138,6 +140,7 @@ export const gameRouter = createTRPCRouter({
           startLng: snapped.lng,
           areaSize: input.areaSize,
           botCount: input.botCount,
+          randomStagingPosts: input.randomStagingPosts,
           players: {
             create: {
               name: capitalizeName(input.playerName),
@@ -332,11 +335,17 @@ export const gameRouter = createTRPCRouter({
 
       const startLat = session.startLat!
       const startLng = session.startLng!
-      const filteredCandidates = allCandidates.filter(
-        (poi) =>
-          isWithinBounds(poi.lat, poi.lng, bounds) &&
-          haversineKm(poi.lat, poi.lng, startLat, startLng) >= 10
-      )
+      const inBoundsCandidates = allCandidates.filter((poi) => isWithinBounds(poi.lat, poi.lng, bounds))
+      const filteredCandidates: typeof allCandidates = []
+      for (const cat of POI_CATEGORIES) {
+        const catCandidates = inBoundsCandidates.filter((c) => c.category === cat)
+        const farEnough = catCandidates.filter((c) => haversineKm(c.lat, c.lng, startLat, startLng) >= 10)
+        const chosen = farEnough.length > 0 ? farEnough : catCandidates
+        if (chosen.length === 0) {
+          log.warn(`startGame: no candidates for category ${cat} in bounds — staging post placement may fail`)
+        }
+        filteredCandidates.push(...chosen)
+      }
 
       const deckState = {
         edgeDeck: shuffleDeck(EDGE_DECK.map((c) => c.id)),
@@ -345,6 +354,55 @@ export const gameRouter = createTRPCRouter({
         edgeDrawIndex: 0,
         motorwayDrawIndex: 0,
         chanceDrawIndex: 0,
+      }
+
+      const MIN_POI_SPACING_KM = 5
+      const autoPicked: typeof filteredCandidates = []
+      if (session.randomStagingPosts) {
+        for (const cat of POI_CATEGORIES) {
+          const pool = filteredCandidates.filter((c) => c.category === cat)
+          if (pool.length === 0) {
+            autoPicked.length = 0
+            break
+          }
+          const farEnough = pool.filter((c) =>
+            autoPicked.every((prev) => haversineKm(c.lat, c.lng, prev.lat, prev.lng) >= MIN_POI_SPACING_KM)
+          )
+          if (farEnough.length > 0) {
+            autoPicked.push(farEnough[Math.floor(Math.random() * farEnough.length)])
+          } else {
+            let best = pool[0]
+            let bestMinDist = -1
+            for (const c of pool) {
+              const minDist = Math.min(...autoPicked.map((prev) => haversineKm(c.lat, c.lng, prev.lat, prev.lng)))
+              if (minDist > bestMinDist) {
+                bestMinDist = minDist
+                best = c
+              }
+            }
+            autoPicked.push(best)
+          }
+        }
+      }
+
+      if (autoPicked.length === POI_CATEGORIES.length) {
+        const totalPlayers = await ctx.db.gamePlayer.count({ where: { sessionId: session.id } })
+        const tokenInventoryInit: Record<string, number> = {}
+        for (const poi of autoPicked) {
+          tokenInventoryInit[`${poi.category}:${poi.osmId}`] = totalPlayers
+        }
+        await ctx.db.gameSession.update({
+          where: { id: input.sessionId },
+          data: {
+            phase: "playing",
+            selectedPois: JSON.parse(JSON.stringify(autoPicked)),
+            poiCandidates: Prisma.DbNull,
+            deckState: JSON.parse(JSON.stringify(deckState)),
+            obstructions: JSON.parse(JSON.stringify([])),
+            tokenInventory: JSON.parse(JSON.stringify(tokenInventoryInit)),
+          },
+        })
+        return { success: true }
       }
 
       await ctx.db.gameSession.update({
@@ -985,15 +1043,11 @@ export const gameRouter = createTRPCRouter({
       playerId: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const player = await ctx.db.gamePlayer.findUnique({
+      const result = await ctx.db.gamePlayer.deleteMany({
         where: { id: input.playerId },
       })
 
-      if (player) {
-        await ctx.db.gamePlayer.delete({
-          where: { id: input.playerId },
-        })
-
+      if (result.count > 0) {
         const remainingPlayers = await ctx.db.gamePlayer.count({
           where: { sessionId: input.sessionId },
         })

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import L from "leaflet"
 import { Marker, Popup } from "react-leaflet"
 import { useGameStore, GameTurnState, Player } from "@/stores/game-store"
@@ -83,6 +83,8 @@ interface PlayerCarProps {
   player: Player
 }
 
+const ANIMATION_MS_PER_SEGMENT = 200
+
 export default function PlayerCar({ player }: PlayerCarProps) {
   const markerRef = useRef<L.Marker>(null)
   const {
@@ -92,8 +94,12 @@ export default function PlayerCar({ player }: PlayerCarProps) {
   } = useGameStore()
   const { carSize } = useCarStore()
 
+  const [routeAnim, setRouteAnim] = useState<[number, number][] | null>(null)
+  const [animatedPosition, setAnimatedPosition] = useState<[number, number] | null>(null)
+
   const active = player.name === currentPlayerName
-  const hide = !active && gameTurnState === GameTurnState.DICE_ROLLED
+  const isAnimating = animatedPosition !== null
+  const hide = !active && gameTurnState === GameTurnState.DICE_ROLLED && !isAnimating
 
   const icon = useMemo(
     () => createCarIcon(player.iconType || CAR_FALLBACK, active, carSize),
@@ -115,6 +121,50 @@ export default function PlayerCar({ player }: PlayerCarProps) {
     }
   }, [active, gameTurnState])
 
+  useEffect(() => {
+    if (player.completedRoute && player.completedRoute.length >= 2) {
+      setRouteAnim([...player.completedRoute])
+    }
+  }, [player.completedRoute])
+
+  useEffect(() => {
+    if (!routeAnim || routeAnim.length < 2) return
+
+    let segmentIndex = 0
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+    let cancelled = false
+
+    const step = () => {
+      if (cancelled) return
+      setAnimatedPosition(routeAnim[segmentIndex])
+      segmentIndex++
+      if (segmentIndex < routeAnim.length) {
+        timeoutId = setTimeout(step, ANIMATION_MS_PER_SEGMENT)
+      } else {
+        timeoutId = setTimeout(() => {
+          if (cancelled) return
+          setAnimatedPosition(null)
+          setRouteAnim(null)
+        }, ANIMATION_MS_PER_SEGMENT)
+      }
+    }
+
+    step()
+    return () => {
+      cancelled = true
+      if (timeoutId) clearTimeout(timeoutId)
+    }
+  }, [routeAnim])
+
+  useEffect(() => {
+    const el = markerRef.current?.getElement() as HTMLElement | null
+    if (!el || !routeAnim) return
+    el.style.transition = `transform ${ANIMATION_MS_PER_SEGMENT}ms linear`
+    return () => {
+      el.style.transition = ""
+    }
+  }, [routeAnim])
+
   const isLocalPlayer = localPlayerName === player.name
 
   function popupCaption() {
@@ -127,7 +177,7 @@ export default function PlayerCar({ player }: PlayerCarProps) {
 
   return (
     <Marker
-      position={player.position}
+      position={animatedPosition ?? player.position}
       icon={icon}
       riseOnHover={false}
       eventHandlers={eventHandlers}

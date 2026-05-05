@@ -1,6 +1,7 @@
 import { log } from "@/lib/utils";
 import { POI_CATEGORIES, MIN_POIS_PER_CATEGORY, classifyChurch, type PoiCategory, type PoiValidationResult } from "@/lib/poi-categories";
 import { motorwayOverpassClause } from "@/server/motorway-filter";
+import { db } from "@/server/db";
 
 const OVERPASS_ENDPOINTS = [
   "https://overpass-api.de/api/interpreter",
@@ -11,9 +12,11 @@ const OVERPASS_ENDPOINTS = [
 
 const FETCH_TIMEOUT_MS = 30000;
 const HEDGE_DELAY_MS = 2500;
+const AB_ROAD_RADIUS_M = 150;
 
 const poiCache = new Map<string, { result: PoiValidationResult; expiresAt: number }>();
 const POI_CACHE_TTL_MS = 10 * 60 * 1000;
+const POI_DB_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export interface OverpassElement {
   type: string;
@@ -36,6 +39,17 @@ async function readBodyExcerpt(response: Response): Promise<string> {
   } catch {
     return "";
   }
+}
+
+function describeFetchError(e: unknown): string {
+  if (!(e instanceof Error)) return String(e);
+  const cause = (e as Error & { cause?: { code?: string; message?: string; address?: string; port?: number; errno?: number } }).cause;
+  if (!cause) return e.message;
+  const parts: string[] = [e.message];
+  if (cause.code) parts.push(`code=${cause.code}`);
+  if (cause.address) parts.push(`address=${cause.address}${cause.port ? `:${cause.port}` : ""}`);
+  if (cause.message && cause.message !== e.message) parts.push(cause.message);
+  return parts.join(" ");
 }
 
 async function queryOneEndpoint(
@@ -112,8 +126,8 @@ export async function queryOverpass(query: string, timeoutMs = FETCH_TIMEOUT_MS)
   } catch (err) {
     sharedController.abort();
     const errors = err instanceof AggregateError
-      ? err.errors.map((e, i) => `${OVERPASS_ENDPOINTS[i]}: ${e instanceof Error ? e.message : String(e)}`)
-      : [err instanceof Error ? err.message : String(err)];
+      ? err.errors.map((e, i) => `${OVERPASS_ENDPOINTS[i]}: ${describeFetchError(e)}`)
+      : [describeFetchError(err)];
     const summary = errors.join(" | ");
     log.error(`Overpass: all ${OVERPASS_ENDPOINTS.length} endpoints failed — ${summary}`);
     throw new Error(summary);
@@ -209,56 +223,98 @@ function classifyElements(data: OverpassResponse): ClassifyResult {
   return { counts, candidates, hasMotorway: false, hasRailway: false };
 }
 
+export async function checkOnABRoad(lat: number, lng: number): Promise<boolean> {
+  const query = [
+    "[out:json][timeout:25];",
+    `way(around:${AB_ROAD_RADIUS_M},${lat},${lng})["highway"~"^(trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified)$"];`,
+    "out ids 1;",
+  ].join("");
+  const result = await queryOverpass(query);
+  return result.elements.length > 0;
+}
+
 export async function validatePoiCoverage(
   south: number,
   west: number,
   north: number,
   east: number,
+  startLat: number,
+  startLng: number,
 ): Promise<PoiValidationResult> {
   const bbox = `${south},${west},${north},${east}`;
+  const cacheKey = `${bbox}|${startLat.toFixed(5)},${startLng.toFixed(5)}`;
 
-  const cached = poiCache.get(bbox);
-  if (cached && cached.expiresAt > Date.now()) {
-    log.debug("POI validation (cached):", cached.result.counts);
-    return cached.result;
+  const memCached = poiCache.get(cacheKey);
+  if (memCached && memCached.expiresAt > Date.now()) {
+    log.debug("POI validation (mem cache):", memCached.result.counts);
+    return memCached.result;
   }
 
-  const data = await queryOverpass(buildValidationQuery(bbox), 35_000);
-
-  const counts: Record<PoiCategory, number> = { pub: 0, spire: 0, tower: 0, phone: 0, school: 0 };
-  let hasMotorway = false;
-  let hasRailway = false;
-
-  for (const el of data.elements) {
-    const tags = el.tags ?? {};
-    if (tags["highway"] === "motorway" || tags["highway"] === "motorway_link") {
-      hasMotorway = true;
-      continue;
-    }
-    if (tags["railway"] === "rail") {
-      hasRailway = true;
-      continue;
-    }
-    const category = classifyElement(tags, el.id);
-    if (category) counts[category]++;
+  const dbCached = await db.poiValidationCache.findUnique({ where: { cacheKey } }).catch(() => null);
+  if (dbCached && Date.now() - dbCached.validatedAt.getTime() < POI_DB_CACHE_TTL_MS) {
+    const result = dbCached.result as unknown as PoiValidationResult;
+    log.debug("POI validation (db cache):", result.counts);
+    poiCache.set(cacheKey, { result, expiresAt: Date.now() + POI_CACHE_TTL_MS });
+    return result;
   }
 
-  const missing = POI_CATEGORIES.filter((cat) => counts[cat] === 0);
-  const insufficient = POI_CATEGORIES.filter((cat) => counts[cat] > 0 && counts[cat] < MIN_POIS_PER_CATEGORY);
+  try {
+    const [data, onABRoad] = await Promise.all([
+      queryOverpass(buildValidationQuery(bbox), 35_000),
+      checkOnABRoad(startLat, startLng),
+    ]);
 
-  log.debug("POI validation:", counts, "missing:", missing, "insufficient:", insufficient, "motorway:", hasMotorway, "railway:", hasRailway);
+    const counts: Record<PoiCategory, number> = { pub: 0, spire: 0, tower: 0, phone: 0, school: 0 };
+    let hasMotorway = false;
+    let hasRailway = false;
 
-  const result: PoiValidationResult = {
-    valid: missing.length === 0 && insufficient.length === 0 && hasMotorway && hasRailway,
-    counts,
-    missing,
-    insufficient,
-    hasMotorway,
-    hasRailway,
-  };
-  poiCache.set(bbox, { result, expiresAt: Date.now() + POI_CACHE_TTL_MS });
+    for (const el of data.elements) {
+      const tags = el.tags ?? {};
+      if (tags["highway"] === "motorway" || tags["highway"] === "motorway_link") {
+        hasMotorway = true;
+        continue;
+      }
+      if (tags["railway"] === "rail") {
+        hasRailway = true;
+        continue;
+      }
+      const category = classifyElement(tags, el.id);
+      if (category) counts[category]++;
+    }
 
-  return result;
+    const missing = POI_CATEGORIES.filter((cat) => counts[cat] === 0);
+    const insufficient = POI_CATEGORIES.filter((cat) => counts[cat] > 0 && counts[cat] < MIN_POIS_PER_CATEGORY);
+
+    log.debug("POI validation:", counts, "missing:", missing, "insufficient:", insufficient, "motorway:", hasMotorway, "railway:", hasRailway, "onABRoad:", onABRoad);
+
+    const result: PoiValidationResult = {
+      valid: missing.length === 0 && insufficient.length === 0 && hasMotorway && hasRailway && onABRoad,
+      counts,
+      missing,
+      insufficient,
+      hasMotorway,
+      hasRailway,
+      onABRoad,
+    };
+
+    poiCache.set(cacheKey, { result, expiresAt: Date.now() + POI_CACHE_TTL_MS });
+    await db.poiValidationCache.upsert({
+      where: { cacheKey },
+      create: { cacheKey, result: JSON.parse(JSON.stringify(result)) },
+      update: { result: JSON.parse(JSON.stringify(result)), validatedAt: new Date() },
+    }).catch((err: unknown) => {
+      log.warn("validatePoiCoverage: failed to write db cache —", err instanceof Error ? err.message : String(err));
+    });
+
+    return result;
+  } catch (err) {
+    if (dbCached) {
+      const result = dbCached.result as unknown as PoiValidationResult;
+      log.warn(`validatePoiCoverage: Overpass failed, returning stale db cache from ${dbCached.validatedAt.toISOString()}`);
+      return result;
+    }
+    throw err;
+  }
 }
 
 const poiCandidateCache = new Map<string, { candidates: PoiCandidate[]; expiresAt: number }>();

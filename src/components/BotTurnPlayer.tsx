@@ -10,7 +10,7 @@ import { usePhoneStore } from "@/stores/phone-store"
 import { useSchoolStore } from "@/stores/school-store"
 import { useRouteStore } from "@/stores/route-store"
 import { trpc } from "@/lib/trpc/client"
-import { latLngToGridKey, nearestRoadPosition, reachableRoadGrids, gridKeyToLatLng, shortestPath } from "@/lib/road-data"
+import { latLngToGridKey, nearestRoadPosition, reachableRoadGrids, gridKeyToLatLng, shortestPath, gridHasABRoad, gridHasRoad } from "@/lib/road-data"
 import { detectPoiVisits } from "@/lib/poi-detection"
 import { POI_CATEGORY_LABELS, type PoiCategory } from "@/lib/poi-categories"
 import { isOnBoardEdge, isOnMotorwayOrRailway } from "@/lib/deck-triggers"
@@ -279,18 +279,25 @@ export default function BotTurnPlayer() {
     for (const o of obstructions) {
       excluded.add(o.gridKey)
     }
+    const occupied = occupiedGridKeys(players, botName)
+    for (const key of occupied) {
+      excluded.add(key)
+    }
 
     const reachable = reachableRoadGrids(startGridKey, total, excluded, gameBounds)
-    const occupied = occupiedGridKeys(players, botName)
     let destinationGridKey: string | null = null
     let destination: [number, number] | null = null
 
     if (reachable && reachable.size > 0) {
       const exactStepGrids = [...reachable.entries()]
-        .filter(([key, steps]) => steps === total && !occupied.has(key))
+        .filter(([, steps]) => steps === total)
         .map(([key]) => key)
 
-      if (exactStepGrids.length > 0) {
+      const abEndpoints = exactStepGrids.filter(gridHasABRoad)
+      const roadEndpoints = abEndpoints.length > 0 ? abEndpoints : exactStepGrids.filter(gridHasRoad)
+      const candidateEndpoints = roadEndpoints.length > 0 ? roadEndpoints : exactStepGrids
+
+      if (candidateEndpoints.length > 0) {
         const target = chooseTarget(
           botPlayer.visitedPois,
           selectedPois,
@@ -301,9 +308,9 @@ export default function BotTurnPlayer() {
         )
 
         if (target) {
-          destinationGridKey = pickBestEndpoint(exactStepGrids, target)
+          destinationGridKey = pickBestEndpoint(candidateEndpoints, target)
         } else {
-          destinationGridKey = exactStepGrids[Math.floor(Math.random() * exactStepGrids.length)]
+          destinationGridKey = candidateEndpoints[Math.floor(Math.random() * candidateEndpoints.length)]
         }
         destination = gridKeyToLatLng(destinationGridKey)
       }
@@ -336,9 +343,12 @@ export default function BotTurnPlayer() {
                 const newExact = [...newReachable.entries()]
                   .filter(([, steps]) => steps === remaining)
                   .map(([key]) => key)
+                const newAb = newExact.filter(gridHasABRoad)
+                const newRoad = newAb.length > 0 ? newAb : newExact.filter(gridHasRoad)
+                const newCandidates = newRoad.length > 0 ? newRoad : newExact
 
-                if (newExact.length > 0) {
-                  const newPicked = newExact[Math.floor(Math.random() * newExact.length)]
+                if (newCandidates.length > 0) {
+                  const newPicked = newCandidates[Math.floor(Math.random() * newCandidates.length)]
                   finalDestination = gridKeyToLatLng(newPicked)
                   finalDestinationGridKey = newPicked
                 } else {

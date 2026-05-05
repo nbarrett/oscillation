@@ -1,8 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState, useRef } from "react"
-import dynamic from "next/dynamic"
-import { Check, Loader2, LocateFixed } from "lucide-react"
+import { Check, LocateFixed } from "lucide-react"
 import { useCurrentPlayer, useGameStore } from "@/stores/game-store"
 import { POI_CATEGORIES, POI_CATEGORY_LABELS, type PoiCategory } from "@/lib/poi-categories"
 import { POI_COLOURS, PUB_ICON_OPTIONS, SPIRE_ICON_OPTIONS, TOWER_ICON_OPTIONS, PHONE_ICON_OPTIONS, SCHOOL_ICON_OPTIONS } from "@/stores/poi-icons"
@@ -31,18 +30,6 @@ function styledSvg(svgTemplate: string, colour: string, size: number): string {
     .replace(/currentColor/g, colour)
     .replace(/<svg /, `<svg width="${size}" height="${size}" `)
 }
-
-const MapWithCars = dynamic(
-  () => import("@/components/MapWithCars"),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="h-[75vh] w-full flex items-center justify-center bg-muted rounded-lg">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    ),
-  }
-)
 
 function firstUnpickedCategory(pickedCategories: Set<string>): PoiCategory | null {
   return POI_CATEGORIES.find((c) => !pickedCategories.has(c)) ?? null
@@ -275,29 +262,20 @@ export default function PoiPicker() {
       </Card>
       </div>
 
-      <Card className="overflow-hidden">
-        <CardContent className="p-0">
-          <div className="h-[calc(100vh-300px)] min-h-[400px] relative">
-            <MapWithCars />
-
-            {celebration && (
-              <div className="absolute inset-0 z-[1000] flex items-center justify-center pointer-events-none animate-bounce-in">
-                <div className="bg-primary/95 text-primary-foreground px-8 py-4 rounded-xl shadow-2xl text-center">
-                  <div className="text-2xl font-bold">{celebration.placed} placed!</div>
-                  <div className="text-sm mt-1 opacity-90">
-                    {allPicked
-                      ? "All staging posts placed\u2026 Game on!"
-                      : celebration.next
-                        ? `Now place a staging post on a ${celebration.next}`
-                        : "Almost there!"}
-                  </div>
-                </div>
-              </div>
-            )}
-
+      {celebration && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center pointer-events-none animate-bounce-in">
+          <div className="bg-primary/95 text-primary-foreground px-8 py-4 rounded-xl shadow-2xl text-center">
+            <div className="text-2xl font-bold">{celebration.placed} placed!</div>
+            <div className="text-sm mt-1 opacity-90">
+              {allPicked
+                ? "All staging posts placed\u2026 Game on!"
+                : celebration.next
+                  ? `Now place a staging post on a ${celebration.next}`
+                  : "Almost there!"}
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      )}
     </>
   )
 }

@@ -438,10 +438,10 @@ export default function GamePage() {
           </div>
         ) : phase === "lobby" ? (
           <GameLobby />
-        ) : phase === "picking" ? (
-          <PoiPicker />
-        ) : (
+        ) : (phase === "picking" || phase === "playing") ? (
           <>
+            {phase === "picking" && <PoiPicker />}
+            {phase === "playing" && (
             <Card>
               <CardContent className="p-3 md:p-4 space-y-3">
                 <div className="flex flex-wrap items-center gap-4">
@@ -538,31 +538,34 @@ export default function GamePage() {
             </div>
           </CardContent>
         </Card>
+            )}
 
             <Card className="overflow-hidden">
               <CardContent className="p-0">
                 <div className="h-[calc(100vh-280px)] min-h-[400px] flex">
                   <div className="flex-1 relative min-w-0">
                     <MapWithCars />
-                    <MapPositions />
-                    <RoadDataIndicator />
-                    <MovementOverlay />
-                    {!chatOpen && <ChatToggleButton onClick={() => setChatOpen(true)} />}
+                    {phase === "playing" && <MapPositions />}
+                    {phase === "playing" && <RoadDataIndicator />}
+                    {phase === "playing" && <MovementOverlay />}
+                    {phase === "playing" && !chatOpen && <ChatToggleButton onClick={() => setChatOpen(true)} />}
                   </div>
-                  <ChatPanel
-                    isOpen={chatOpen}
-                    onClose={() => {
-                      setChatOpen(false)
-                      setTimeout(() => window.dispatchEvent(new Event("resize")), 50)
-                    }}
-                    width={chatWidth}
-                    onWidthChange={setChatWidth}
-                  />
+                  {phase === "playing" && (
+                    <ChatPanel
+                      isOpen={chatOpen}
+                      onClose={() => {
+                        setChatOpen(false)
+                        setTimeout(() => window.dispatchEvent(new Event("resize")), 50)
+                      }}
+                      width={chatWidth}
+                      onWidthChange={setChatWidth}
+                    />
+                  )}
                 </div>
               </CardContent>
             </Card>
           </>
-        )}
+        ) : null}
 
         {inSession && sessionId && (
           <CardBrowser

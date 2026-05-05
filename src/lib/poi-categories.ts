@@ -19,6 +19,7 @@ export interface PoiValidationResult {
   insufficient: PoiCategory[];
   hasMotorway: boolean;
   hasRailway: boolean;
+  onABRoad: boolean;
   error?: string;
   errorDetails?: string;
 }
