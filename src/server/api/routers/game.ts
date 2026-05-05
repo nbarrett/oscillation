@@ -610,10 +610,10 @@ export const gameRouter = createTRPCRouter({
         if (session.startLat != null && session.startLng != null) {
           const bounds = areaSizeBounds(session.startLat, session.startLng, (session as Record<string, unknown>).areaSize as AreaSize ?? DEFAULT_AREA_SIZE)
           const relaxed: GameBounds = {
-            south: bounds.south - (bounds.north - bounds.south) * 0.5,
-            north: bounds.north + (bounds.north - bounds.south) * 0.5,
-            west: bounds.west - (bounds.east - bounds.west) * 0.5,
-            east: bounds.east + (bounds.east - bounds.west) * 0.5,
+            south: bounds.south - (bounds.north - bounds.south) * 0.1,
+            north: bounds.north + (bounds.north - bounds.south) * 0.1,
+            west: bounds.west - (bounds.east - bounds.west) * 0.1,
+            east: bounds.east + (bounds.east - bounds.west) * 0.1,
             corners: bounds.corners,
           }
           if (!isWithinBounds(input.newLat, input.newLng, relaxed)) {

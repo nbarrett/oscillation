@@ -320,7 +320,7 @@ export default function BotTurnPlayer() {
     let finalDestinationGridKey = destinationGridKey
 
     if (destinationGridKey) {
-      const path = shortestPath(startGridKey, destinationGridKey, total, excluded)
+      const path = shortestPath(startGridKey, destinationGridKey, total, excluded, gameBounds)
       if (path) {
         const midResult = findBotMidMovementTrigger(path, gameBounds)
         if (midResult) {
@@ -367,7 +367,7 @@ export default function BotTurnPlayer() {
     }
 
     const movePath = finalDestinationGridKey
-      ? shortestPath(startGridKey, finalDestinationGridKey, total, excluded) ?? undefined
+      ? shortestPath(startGridKey, finalDestinationGridKey, total, excluded, gameBounds) ?? undefined
       : undefined
 
     return { finalDestination, finalDestinationGridKey, movePath, startGridKey, excluded }
@@ -423,19 +423,22 @@ export default function BotTurnPlayer() {
       )
     }
 
-    let visitedPoiIds: string[] = []
-    if (finalDestinationGridKey) {
-      const visits = detectPoiVisits(finalDestinationGridKey, pubs, spires, towers, phones, schools, selectedPois)
-      visitedPoiIds = visits.map(v => v.id)
+    const effectiveGridKey = finalDestinationGridKey
+      ?? latLngToGridKey(botPlayer.position[0], botPlayer.position[1])
 
-      if (visits.length > 0) {
-        const categoryLabel = POI_CATEGORY_LABELS[visits[0].category as PoiCategory] ?? visits[0].category
-        addNotification(`${botName} visited ${categoryLabel}`, "success")
+    let visitedPoiIds: string[] = []
+    const visits = detectPoiVisits(effectiveGridKey, pubs, spires, towers, phones, schools, selectedPois, movePath)
+    visitedPoiIds = visits.map(v => v.id)
+
+    if (visits.length > 0) {
+      const categoryLabel = POI_CATEGORY_LABELS[visits[0].category as PoiCategory] ?? visits[0].category
+      addNotification(`${botName} visited ${categoryLabel}`, "success")
+      if (sessionId && playerId) {
         drawCardMutation.mutate({
           sessionId,
           playerId,
           poiCategory: visits[0].category,
-          gridKey: finalDestinationGridKey,
+          gridKey: effectiveGridKey,
         })
       }
     }

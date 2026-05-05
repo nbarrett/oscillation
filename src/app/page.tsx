@@ -145,7 +145,7 @@ function MovementOverlay() {
       style={dragOffset ? { transform: `translate(calc(-50% + ${dragOffset.x}px), ${dragOffset.y}px)` } : undefined}
     >
       <div
-        className="bg-primary/95 text-primary-foreground px-6 py-3 rounded-xl shadow-2xl text-center cursor-grab active:cursor-grabbing select-none"
+        className="bg-primary/95 text-primary-foreground px-3 md:px-6 py-2 md:py-3 rounded-xl shadow-2xl text-center cursor-grab active:cursor-grabbing select-none max-w-[calc(100vw-2rem)]"
         onMouseDown={handleMouseDown}
       >
         {showBotRolling && (
@@ -223,7 +223,7 @@ function MovementOverlay() {
           </div>
         )}
         {showPreviews && (
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 md:gap-3">
             <button
               onClick={() => cyclePreviewPath(-1)}
               className="p-1.5 rounded-lg hover:bg-primary-foreground/20 transition-colors"
@@ -301,6 +301,7 @@ export default function GamePage() {
   const [showVictory, setShowVictory] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
   const [chatWidth, setChatWidth] = useState(320)
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
 
   const sessionCheck = trpc.game.state.useQuery(
     { sessionId: sessionId! },
@@ -427,7 +428,7 @@ export default function GamePage() {
       {inSession && <GameSync />}
       {inSession && (phase === "playing" || phase === "picking") && <BotTurnPlayer />}
 
-      <main className="w-full px-4 py-3 flex-1 flex flex-col gap-3">
+      <main className="w-full max-w-[100vw] overflow-x-hidden px-2 md:px-4 py-2 md:py-3 flex-1 flex flex-col gap-2 md:gap-3 pb-[12rem] md:pb-3">
         {validatingSession ? (
           <div className="flex-1 flex items-center justify-center py-8">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -442,22 +443,22 @@ export default function GamePage() {
           <>
             {phase === "picking" && <PoiPicker />}
             {phase === "playing" && (
-            <Card>
-              <CardContent className="p-3 md:p-4 space-y-3">
-                <div className="flex flex-wrap items-center gap-4">
+            <Card className="hidden md:block">
+              <CardContent className="p-3 lg:p-4 space-y-3">
+                <div className="flex flex-wrap items-center gap-3 lg:gap-4">
                   <PlayerPositions />
-                  <div className="hidden md:block h-8 w-px bg-border" />
+                  <div className="hidden lg:block h-8 w-px bg-border" />
                   <DiceRoller />
                   <button
                     onClick={() => setActivityExpanded(!activityExpanded)}
                     className={cn(
-                      "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                      "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors",
                       "hover:bg-muted border",
                       activityExpanded && "bg-muted"
                     )}
                   >
                     <ScrollText className="h-4 w-4" />
-                    <span className="hidden sm:inline">Activity</span>
+                    <span className="hidden lg:inline">Activity</span>
                     <ChevronDown
                       className={cn(
                         "h-3 w-3 transition-transform duration-200",
@@ -468,24 +469,24 @@ export default function GamePage() {
                   <button
                     onClick={() => setCardsOpen(true)}
                     className={cn(
-                      "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                      "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors",
                       "hover:bg-muted border",
                     )}
                   >
                     <Shuffle className="h-4 w-4" />
-                    <span className="hidden sm:inline">Cards</span>
+                    <span className="hidden lg:inline">Cards</span>
                   </button>
                   <div className="ml-auto">
                     <button
                       onClick={() => setSettingsExpanded(!settingsExpanded)}
                       className={cn(
-                        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                        "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors",
                         "hover:bg-muted border",
                         settingsExpanded && "bg-muted"
                       )}
                     >
                       <Settings className="h-4 w-4" />
-                      <span>Settings</span>
+                      <span className="hidden lg:inline">Settings</span>
                       <ChevronDown
                         className={cn(
                           "h-3 w-3 transition-transform duration-200",
@@ -542,7 +543,7 @@ export default function GamePage() {
 
             <Card className="overflow-hidden">
               <CardContent className="p-0">
-                <div className="h-[calc(100vh-280px)] min-h-[400px] flex">
+                <div className="h-[calc(100vh-8rem)] md:h-[calc(100vh-280px)] min-h-[300px] flex">
                   <div className="flex-1 relative min-w-0">
                     <MapWithCars />
                     {phase === "playing" && <MapPositions />}
@@ -564,6 +565,85 @@ export default function GamePage() {
                 </div>
               </CardContent>
             </Card>
+
+            {phase === "playing" && (
+            <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-background/95 backdrop-blur border-t px-3 py-2 safe-bottom">
+              <div className="flex items-center gap-2">
+                <GameObjectives />
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <DiceRoller />
+              </div>
+              <div className="flex items-center gap-1.5 mt-2">
+                <button
+                  onClick={() => setMobileDrawerOpen(!mobileDrawerOpen)}
+                  className={cn(
+                    "inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors",
+                    "hover:bg-muted border",
+                    mobileDrawerOpen && "bg-muted"
+                  )}
+                >
+                  <Users className="h-3.5 w-3.5" />
+                  <ChevronDown className={cn("h-3 w-3 transition-transform", mobileDrawerOpen && "rotate-180")} />
+                </button>
+                <button
+                  onClick={() => setActivityExpanded(!activityExpanded)}
+                  className={cn(
+                    "inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors",
+                    "hover:bg-muted border",
+                    activityExpanded && "bg-muted"
+                  )}
+                >
+                  <ScrollText className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => setCardsOpen(true)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors hover:bg-muted border"
+                >
+                  <Shuffle className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => setSettingsExpanded(!settingsExpanded)}
+                  className={cn(
+                    "inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors",
+                    "hover:bg-muted border",
+                    settingsExpanded && "bg-muted"
+                  )}
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              {mobileDrawerOpen && (
+                <div className="mt-2 pt-2 border-t">
+                  <PlayerPositions />
+                </div>
+              )}
+              {settingsExpanded && (
+                <div className="mt-2 pt-2 border-t">
+                  <div className="grid grid-cols-2 gap-2">
+                    <ProfileSelector />
+                    <MappingProviderSelector />
+                    <MapLayerSelector />
+                    <StartingPositionSelector />
+                    <CarIconSelector />
+                    <IconDetailToggle />
+                    <PubIconSelector />
+                    <SpireIconSelector />
+                    <TowerIconSelector />
+                    <PhoneIconSelector />
+                    <SchoolIconSelector />
+                    <ObstructionIconSelector />
+                    <ShowAllRoutesToggle />
+                  </div>
+                </div>
+              )}
+              {activityExpanded && (
+                <div className="mt-2 pt-2 border-t max-h-40 overflow-y-auto">
+                  <ActivityLog maxRows={4} />
+                </div>
+              )}
+            </div>
+            )}
           </>
         ) : null}
 

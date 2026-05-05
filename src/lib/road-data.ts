@@ -4,7 +4,7 @@ import { type GameBounds } from "@/lib/area-size";
 
 const BNG = "+proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy +towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 +units=m +no_defs";
 
-function isGridOutsideBounds(gridKey: string, gameBounds: GameBounds | null): boolean {
+export function isGridOutsideBounds(gridKey: string, gameBounds: GameBounds | null): boolean {
   if (!gameBounds) return false;
   const [eRaw, nRaw] = gridKey.split("-").map(Number);
   const e = eRaw + 500;
@@ -877,7 +877,9 @@ export function getAdjacentRoadGrids(gridKey: string): string[] {
   const candidates = allAdjacentGrids(gridKey);
   const withAdjacency = candidates.filter(g => roadDataCache!.gridAdjacency.has(g));
   if (withAdjacency.length > 0) return withAdjacency;
-  return candidates.filter(g => roadDataCache!.gridSquaresWithRoads.has(g));
+  const withRoads = candidates.filter(g => roadDataCache!.gridSquaresWithRoads.has(g));
+  if (withRoads.length > 0) return withRoads;
+  return candidates;
 }
 
 function allAdjacentGrids(gridKey: string): string[] {
@@ -1072,6 +1074,12 @@ export function allPathsToEndpoints(
 
 export function isRoadDataLoaded(): boolean {
   return roadDataCache !== null;
+}
+
+export function roadDataCoversPosition(lat: number, lng: number): boolean {
+  if (!roadDataCache) return false;
+  const { bounds } = roadDataCache;
+  return lat >= bounds.south && lat <= bounds.north && lng >= bounds.west && lng <= bounds.east;
 }
 
 

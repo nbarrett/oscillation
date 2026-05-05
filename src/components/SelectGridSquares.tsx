@@ -6,7 +6,7 @@ import L from "leaflet";
 import { trpc } from "@/lib/trpc/client";
 import { useGameStore, occupiedGridKeys, GameTurnState } from "@/stores/game-store";
 import { useDeckStore } from "@/stores/deck-store";
-import { latLngToGridKey, getAdjacentRoadGrids, shortestPath, reachableRoadGrids, isRoadDataLoaded, onRoadDataReady, gridHasABRoad, gridHasRoad, loadRoadData, gridKeyToLatLng, roadPathThroughGrids } from "@/lib/road-data";
+import { latLngToGridKey, getAdjacentRoadGrids, shortestPath, reachableRoadGrids, isRoadDataLoaded, onRoadDataReady, gridHasABRoad, gridHasRoad, loadRoadData, gridKeyToLatLng, roadPathThroughGrids, roadDataCoversPosition, isGridOutsideBounds } from "@/lib/road-data";
 import { gridKeyToLatLngs } from "@/lib/grid-polygon";
 import { isOnBoardEdge, isOnMotorwayOrRailway } from "@/lib/deck-triggers";
 import { type GameBounds } from "@/lib/area-size";
@@ -272,9 +272,14 @@ export default function SelectGridSquares() {
       effectiveStart = latLngToGridKey(currentPlayer.position[0], currentPlayer.position[1]);
       useGameStore.getState().setPlayerStartGridKey(effectiveStart);
     }
-    if (!isRoadDataLoaded()) {
-      log.warn("computeAndSetPaths: road data not loaded, triggering load");
-      const center = map.getCenter();
+    const playerPos = (() => {
+      const { players, currentPlayerName } = useGameStore.getState();
+      const p = players.find(pp => pp.name === currentPlayerName);
+      return p ? { lat: p.position[0], lng: p.position[1] } : null;
+    })();
+    if (!isRoadDataLoaded() || (playerPos && !roadDataCoversPosition(playerPos.lat, playerPos.lng))) {
+      log.warn("computeAndSetPaths: road data not loaded or does not cover player position, triggering load");
+      const center = playerPos ?? map.getCenter();
       void loadRoadData(center.lat, center.lng, 10);
       return;
     }
@@ -318,7 +323,7 @@ export default function SelectGridSquares() {
 
     const paths: string[][] = [];
     for (const endpoint of endpoints) {
-      const path = shortestPath(effectiveStart, endpoint, diceResult, occupied);
+      const path = shortestPath(effectiveStart, endpoint, diceResult, occupied, bounds);
       if (path) {
         paths.push(path);
       }
@@ -339,7 +344,7 @@ export default function SelectGridSquares() {
         }
       });
       for (const endpoint of furthest) {
-        const path = shortestPath(effectiveStart, endpoint, diceResult, occupied);
+        const path = shortestPath(effectiveStart, endpoint, diceResult, occupied, bounds);
         if (path) {
           paths.push(path);
         }
@@ -515,6 +520,11 @@ export default function SelectGridSquares() {
       const gridKey = latLngToGridKey(lat, lng);
       log.info("click grid:", gridKey, "start:", effectiveStartKey);
 
+      if (isGridOutsideBounds(gridKey, bounds)) {
+        log.info("click ignored: grid outside game bounds", gridKey);
+        return;
+      }
+
       if (gridKey === effectiveStartKey) return;
 
       const occupied = occupiedGridKeys(players, currentPlayerName ?? "");
@@ -546,7 +556,7 @@ export default function SelectGridSquares() {
       }
 
       if (path.length === 0) {
-        const found = shortestPath(effectiveStartKey, gridKey, dice, occupied);
+        const found = shortestPath(effectiveStartKey, gridKey, dice, occupied, bounds);
         log.info("shortestPath result:", found ? `length ${found.length}` : "null", "for grid", gridKey, "roadData:", isRoadDataLoaded());
         if (found && found.length <= dice) {
           setMovementPath(found);

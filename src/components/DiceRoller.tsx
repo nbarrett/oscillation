@@ -194,9 +194,13 @@ export default function DiceRoller() {
       ? latLngToGridKey(destination[0], destination[1])
       : null
 
+    const currentPlayer = store.players.find(p => p.name === store.localPlayerName)
+    const effectiveGridKey = destinationGridKey
+      ?? (currentPlayer ? latLngToGridKey(currentPlayer.position[0], currentPlayer.position[1]) : null)
+
     let visitedPoiIds: string[] = []
-    if (destinationGridKey) {
-      const visits = detectPoiVisits(destinationGridKey, pubs, spires, towers, phones, schools, selectedPois)
+    if (effectiveGridKey) {
+      const visits = detectPoiVisits(effectiveGridKey, pubs, spires, towers, phones, schools, selectedPois, currentPath)
       visitedPoiIds = visits.map(v => v.id)
 
       const existingVisited = new Set(useGameStore.getState().players.find(p => p.name === useGameStore.getState().localPlayerName)?.visitedPois ?? [])
@@ -336,9 +340,9 @@ export default function DiceRoller() {
 
   return (
     <>
-      <div className="flex flex-col sm:flex-row items-center gap-4">
+      <div className="flex flex-row items-center gap-2 md:gap-4 flex-wrap">
         {hasRolled && (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
             <div className={cn(!isRolling && showResult && "animate-dice-settle")}>
               <DiceDisplay
                 dice1={dice1Value}
@@ -349,7 +353,7 @@ export default function DiceRoller() {
 
             {showResult && (
               <div className="flex flex-col">
-                <div className="text-lg font-bold text-primary whitespace-nowrap">
+                <div className="text-sm md:text-lg font-bold text-primary whitespace-nowrap">
                   {isMyTurn ? `You threw ${total}!` : `${playerName} threw ${total}!`}
                 </div>
                 {diceResult && movementPath.length === 0 && previewPaths.length > 0 && (
@@ -386,37 +390,32 @@ export default function DiceRoller() {
           </div>
         )}
 
-        {showResult && (
-          <p className="text-sm text-muted-foreground sm:hidden">
-            {isMyTurn ? `You threw ${total}` : `${playerName} threw ${total}`}
-          </p>
-        )}
-
-        <div className="flex flex-1 items-center gap-2 w-full sm:w-auto">
+        <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
           <Button
-            className="flex-1 sm:flex-none gap-2"
+            className="gap-1.5 md:gap-2 h-8 md:h-9 px-2.5 md:px-4 text-xs md:text-sm"
             onClick={rollDice}
             disabled={isRolling || !isMyTurn || !isPlaying || gameTurnState !== GameTurnState.ROLL_DICE}
           >
-            <Dices className="h-4 w-4" />
+            <Dices className="h-3.5 w-3.5 md:h-4 md:w-4" />
             {isRolling ? "Rolling..." : isMyTurn ? "Roll Dice" : `${playerName}'s Turn`}
           </Button>
           <Button
-            className="flex-1 sm:flex-none gap-2"
+            className="gap-1.5 md:gap-2 h-8 md:h-9 px-2.5 md:px-4 text-xs md:text-sm"
             onClick={handleEndTurnClick}
             disabled={!isMyTurn || !isPlaying || gameTurnState !== GameTurnState.DICE_ROLLED}
           >
-            <CheckCircle2 className="h-4 w-4" />
+            <CheckCircle2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
             End Turn
           </Button>
           <Button
-            className="flex-1 sm:flex-none gap-2"
+            className="gap-1.5 md:gap-2 h-8 md:h-9 px-2.5 md:px-4 text-xs md:text-sm"
             variant="outline"
             onClick={() => setPlayerZoomRequest(playerName)}
             disabled={!playerName}
           >
-            <LocateFixed className="h-4 w-4" />
-            Find My Car
+            <LocateFixed className="h-3.5 w-3.5 md:h-4 md:w-4" />
+            <span className="hidden md:inline">Find My Car</span>
+            <span className="md:hidden">Find</span>
           </Button>
           <GridSelectionButton />
         </div>
