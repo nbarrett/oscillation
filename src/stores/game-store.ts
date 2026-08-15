@@ -7,6 +7,7 @@ import { type AreaSize, type GameBounds, DEFAULT_AREA_SIZE } from "@/lib/area-si
 import { useDeckStore } from "@/stores/deck-store"
 import { useChatStore } from "@/stores/chat-store"
 import { type PoiCategory } from "@/lib/poi-categories"
+import { cardTriggerForPath } from "@/lib/turn-resolution"
 
 export interface CardTrigger {
   type: "edge" | "motorway"
@@ -157,6 +158,8 @@ interface GameState {
     startHasRoad: boolean;
   } | null;
   cardDestinationKeys: string[];
+  startPosition: [number, number] | null;
+  setStartPosition: (position: [number, number] | null) => void;
   setRemotePreviewPath: (path: string[] | null) => void;
   setPathDiagnostics: (d: GameState["pathDiagnostics"]) => void;
   setShowPreviewPaths: (show: boolean) => void;
@@ -268,10 +271,12 @@ export const useGameStore = create<GameState>()(
       remotePreviewPath: null,
       pathDiagnostics: null,
       cardDestinationKeys: [],
+      startPosition: null,
       tokenInventory: {},
       activityLog: [],
       seenPoiIds: {},
 
+      setStartPosition: (startPosition) => set({ startPosition }),
       setRemotePreviewPath: (remotePreviewPath) => set({ remotePreviewPath }),
       setPathDiagnostics: (pathDiagnostics) => set({ pathDiagnostics }),
       setShowPreviewPaths: (showPreviewPaths) => set({ showPreviewPaths }),
@@ -297,7 +302,7 @@ export const useGameStore = create<GameState>()(
       },
 
       confirmPreviewPath: () => {
-        const { previewPaths, previewPathIndex, diceResult } = get();
+        const { previewPaths, previewPathIndex, diceResult, gameBounds, cardTrigger } = get();
         if (previewPaths.length === 0 || !diceResult) return;
         const path = previewPaths[previewPathIndex];
         if (!path) return;
@@ -306,6 +311,7 @@ export const useGameStore = create<GameState>()(
           selectedEndpoint: path[path.length - 1] ?? null,
           previewPaths: [],
           previewPathIndex: 0,
+          cardTrigger: cardTrigger ?? cardTriggerForPath(path, gameBounds),
         });
       },
 
@@ -346,7 +352,6 @@ export const useGameStore = create<GameState>()(
             showPreviewPaths: true,
             previewPaths: [],
             previewPathIndex: 0,
-            pendingServerUpdate: true,
           } as Partial<GameState> as GameState);
         }
       },
@@ -676,6 +681,7 @@ export const useGameStore = create<GameState>()(
           activityLog: [],
           seenPoiIds: {},
           cardDestinationKeys: [],
+          startPosition: null,
         });
       },
     }),

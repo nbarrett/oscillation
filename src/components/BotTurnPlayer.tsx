@@ -111,12 +111,15 @@ export default function BotTurnPlayer() {
   const rollDiceMutation = trpc.game.rollDice.useMutation()
   const endTurnMutation = trpc.game.endTurn.useMutation()
   const skipMissedTurnMutation = trpc.game.skipMissedTurn.useMutation()
-  const drawCardMutation = trpc.game.drawCard.useMutation()
   const applyChanceEffectMutation = trpc.game.applyChanceEffect.useMutation()
   const placeObstructionMutation = trpc.game.placeObstruction.useMutation()
   const removeObstructionMutation = trpc.game.removeObstruction.useMutation()
   const pickPoiMutation = trpc.game.pickPoi.useMutation()
+  const drawDeckCardMutation = trpc.game.drawDeckCard.useMutation()
+  const updatePositionMutation = trpc.game.updatePosition.useMutation()
   const utils = trpc.useUtils()
+  const botReturnToStartRef = useRef(false)
+  const botCollectedPoiRef = useRef<string[]>([])
 
   const currentPicker = players[pickingPlayerIndex % players.length]
   const isBotNeedingPick = phase === "picking"
@@ -177,6 +180,8 @@ export default function BotTurnPlayer() {
   }
 
   function advanceToNextPlayer() {
+    botCollectedPoiRef.current = []
+    botReturnToStartRef.current = false
     const state = useGameStore.getState()
     const currentIndex = state.players.findIndex(p => p.name === currentPlayerName)
     const nextIndex = (currentIndex + 1) % state.players.length
@@ -208,6 +213,7 @@ export default function BotTurnPlayer() {
           effectType: "miss_turn",
           missedTurns: effect.turns,
         })
+        deckStore.setMissedTurns(currentPlayerName, effect.turns)
         break
 
       case "return_to_start":
@@ -216,10 +222,16 @@ export default function BotTurnPlayer() {
           playerId,
           effectType: "return_to_start",
         })
+        botReturnToStartRef.current = true
         break
 
       case "extra_throw":
         deckStore.setExtraThrow(true)
+        applyChanceEffectMutation.mutate({
+          sessionId,
+          playerId,
+          effectType: "extra_throw",
+        })
         break
 
       case "shortcut_token":
@@ -433,14 +445,6 @@ export default function BotTurnPlayer() {
     if (visits.length > 0) {
       const categoryLabel = POI_CATEGORY_LABELS[visits[0].category as PoiCategory] ?? visits[0].category
       addNotification(`${botName} visited ${categoryLabel}`, "success")
-      if (sessionId && playerId) {
-        drawCardMutation.mutate({
-          sessionId,
-          playerId,
-          poiCategory: visits[0].category,
-          gridKey: effectiveGridKey,
-        })
-      }
     }
 
     if (dice1 === dice2) {
@@ -469,13 +473,74 @@ export default function BotTurnPlayer() {
       }
     }
 
+    if (visitedPoiIds.length > 0 && sessionId && playerId) {
+      drawDeckCardMutation.mutate(
+        { sessionId, playerId, deckType: "chance" },
+        {
+          onSuccess: (result) => {
+            if (result?.card && result.card.deck === "chance") {
+              processBotCardEffect(result.card as ChanceCard)
+            }
+            completeBotTurn(botName, finalDestination, visitedPoiIds, movePath)
+          },
+          onError: () => {
+            completeBotTurn(botName, finalDestination, visitedPoiIds, movePath)
+          },
+        },
+      )
+      return
+    }
+
+    completeBotTurn(botName, finalDestination, visitedPoiIds, movePath)
+  }
+
+  function completeBotTurn(
+    botName: string,
+    finalDestination: [number, number] | null,
+    visitedPoiIds: string[],
+    movePath: string[] | undefined,
+  ) {
+    if (!sessionId || !playerId) return
+
+    if (visitedPoiIds.length > 0) {
+      botCollectedPoiRef.current = [...new Set([...botCollectedPoiRef.current, ...visitedPoiIds])]
+    }
+
+    if (useDeckStore.getState().extraThrow) {
+      useDeckStore.getState().setExtraThrow(false)
+      botReturnToStartRef.current = false
+      if (finalDestination) {
+        updatePositionMutation.mutate({
+          sessionId,
+          playerId,
+          lat: finalDestination[0],
+          lng: finalDestination[1],
+        })
+      }
+      clearGridSelections()
+      setPlayerStartGridKey(null)
+      setDiceResult(null)
+      setDiceValues(null)
+      setGameTurnState(GameTurnState.ROLL_DICE)
+      botTimerRef.current = setTimeout(() => playBotTurn(), 1500)
+      return
+    }
+
+    const start = useGameStore.getState().startPosition
+    const returnedToStart = botReturnToStartRef.current && start
+    botReturnToStartRef.current = false
+    const destination = returnedToStart ? start : finalDestination
+    const endPath = returnedToStart ? [latLngToGridKey(start[0], start[1])] : movePath
+    const allVisited = [...new Set([...botCollectedPoiRef.current, ...visitedPoiIds])]
+    botCollectedPoiRef.current = []
+
     endTurnMutation.mutate({
       sessionId,
       playerId,
-      newLat: finalDestination?.[0],
-      newLng: finalDestination?.[1],
-      visitedPoiIds: visitedPoiIds.length > 0 ? visitedPoiIds : undefined,
-      movePath,
+      newLat: destination?.[0],
+      newLng: destination?.[1],
+      visitedPoiIds: allVisited.length > 0 ? allVisited : undefined,
+      movePath: endPath,
     }, {
       onSuccess: () => {
         void utils.game.state.invalidate()
@@ -485,17 +550,7 @@ export default function BotTurnPlayer() {
       },
     })
 
-    if (useDeckStore.getState().extraThrow) {
-      useDeckStore.getState().setExtraThrow(false)
-      clearGridSelections()
-      setPlayerStartGridKey(null)
-      setDiceResult(null)
-      setDiceValues(null)
-      setGameTurnState(GameTurnState.ROLL_DICE)
-      botTimerRef.current = setTimeout(() => playBotTurn(), 1500)
-    } else {
-      advanceToNextPlayer()
-    }
+    advanceToNextPlayer()
   }
 
   function resumeBotMove() {

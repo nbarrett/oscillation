@@ -5,10 +5,14 @@ import { resolve } from "path"
 const BOT_TURN_PLAYER_PATH = resolve(__dirname, "../BotTurnPlayer.tsx")
 const DICE_ROLLER_PATH = resolve(__dirname, "../DiceRoller.tsx")
 const SELECT_GRID_SQUARES_PATH = resolve(__dirname, "../SelectGridSquares.tsx")
+const GAME_STORE_PATH = resolve(__dirname, "../../stores/game-store.ts")
+const GAME_SYNC_PATH = resolve(__dirname, "../GameSync.tsx")
 
 const botCode = readFileSync(BOT_TURN_PLAYER_PATH, "utf-8")
 const humanCode = readFileSync(DICE_ROLLER_PATH, "utf-8")
 const gridSquaresCode = readFileSync(SELECT_GRID_SQUARES_PATH, "utf-8")
+const gameStoreCode = readFileSync(GAME_STORE_PATH, "utf-8")
+const gameSyncCode = readFileSync(GAME_SYNC_PATH, "utf-8")
 
 describe("Bot Rule Compliance - Deck Card Triggers", () => {
   it("human player checks isOnBoardEdge trigger via SelectGridSquares", () => {
@@ -54,6 +58,8 @@ describe("Bot Rule Compliance - Card Drawing", () => {
 describe("Bot Rule Compliance - Chance Card Effects", () => {
   it("human player handles extra throw from chance cards", () => {
     expect(humanCode).toContain("extraThrow")
+    expect(humanCode).toContain("shouldGrantExtraThrow")
+    expect(humanCode).toContain("getState().extraThrow")
   })
 
   it("bot player handles extra throw from chance cards", () => {
@@ -96,12 +102,13 @@ describe("Bot Rule Compliance - POI Visits", () => {
     expect(botCode).toContain("detectPoiVisits")
   })
 
-  it("human player draws POI cards on visit via drawCardMutation", () => {
-    expect(humanCode).toContain("drawCardMutation")
+  it("human player draws a chance card on POI visit", () => {
+    expect(humanCode).toContain("requestDeckDraw(\"chance\")")
   })
 
-  it("bot player draws POI cards on visit via drawCardMutation", () => {
-    expect(botCode).toContain("drawCardMutation")
+  it("bot player draws a chance card on POI visit", () => {
+    expect(botCode).toContain("deckType: \"chance\"")
+    expect(botCode).toContain("processBotCardEffect")
   })
 })
 
@@ -151,6 +158,24 @@ describe("Bot Rule Compliance - Movement Rules", () => {
   })
 })
 
+describe("Turn loop safety", () => {
+  it("confirming a preview path records any edge or motorway trigger", () => {
+    expect(gameStoreCode).toContain("cardTriggerForPath")
+  })
+
+  it("GameSync keeps the local car put during the current player's move", () => {
+    expect(gameSyncCode).toContain("midTurnName")
+  })
+
+  it("card relocation does not pretend a server update is in flight", () => {
+    const relocation = gameStoreCode.slice(
+      gameStoreCode.indexOf("handleCardRelocation"),
+      gameStoreCode.indexOf("setReachableGrids"),
+    )
+    expect(relocation).not.toContain("pendingServerUpdate: true")
+  })
+})
+
 describe("Bot Rule Compliance - Extra Throw", () => {
   it("bot player checks extraThrow after processing cards", () => {
     expect(botCode).toContain("extraThrow")
@@ -174,7 +199,6 @@ describe("Feature Parity Summary", () => {
     { name: "extraThrow", pattern: "extraThrow", source: "human" },
     { name: "applyChanceEffectMutation", pattern: "applyChanceEffectMutation", source: "human" },
     { name: "detectPoiVisits", pattern: "detectPoiVisits", source: "human" },
-    { name: "drawCardMutation", pattern: "drawCardMutation", source: "human" },
     { name: "missedTurns", pattern: "missedTurns", source: "human" },
     { name: "obstructions", pattern: "obstructions", source: "gridSquares" },
   ]

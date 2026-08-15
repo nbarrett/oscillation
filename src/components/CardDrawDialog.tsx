@@ -59,7 +59,7 @@ function chanceActionLabel(card: ChanceCard): string {
 }
 
 export default function CardDrawDialog({ card, deckCard, onClose, onDeckCardClose }: CardDrawDialogProps) {
-  const { setPlacingObstruction, setRemovingObstruction, setExtraThrow, setMissedTurns } = useDeckStore()
+  const { setPlacingObstruction, setRemovingObstruction, setExtraThrow } = useDeckStore()
 
   if (deckCard) {
     const icon = DECK_ICONS[deckCard.deck]

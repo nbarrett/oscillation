@@ -15,6 +15,7 @@ import { detectPoiVisits } from "@/lib/poi-detection"
 import { POI_CATEGORY_LABELS, type PoiCategory } from "@/lib/poi-categories"
 import { type ChanceCard, type DeckType, type EdgeCard, type MotorwayCard } from "@/lib/card-decks"
 import { listEdgeCardMatches, listMotorwayCardMatches, resolveEdgeCard, resolveMotorwayCard } from "@/lib/card-resolution"
+import { cardTriggerForPath, chanceEffectOf, doublesObstructionMode, shouldGrantExtraThrow } from "@/lib/turn-resolution"
 import { Button } from "@/components/ui/button"
 import { DiceDisplay } from "@/components/ui/dice"
 import GridSelectionButton from "./GridSelectionButton"
@@ -71,11 +72,11 @@ export default function DiceRoller() {
     queueDraw,
     processNextDraw,
     clearDrawnCard,
-    extraThrow,
     setExtraThrow,
     setDrawnDeckCard,
     setPlacingObstruction,
     setRemovingObstruction,
+    setMissedTurns,
     isPlacingObstruction,
     isRemovingObstruction,
   } = useDeckStore()
@@ -113,6 +114,10 @@ export default function DiceRoller() {
     visitedPoiIds: string[]
     currentPath: string[]
   } | null>(null)
+  const finishingRef = useRef(false)
+  const chanceDrawnRef = useRef(false)
+  const doublesResolvedRef = useRef(false)
+  const collectedPoiRef = useRef<string[]>([])
 
   function requestDeckDraw(deckType: DeckType) {
     if (sessionId && playerId) {
@@ -141,10 +146,10 @@ export default function DiceRoller() {
 
   const rollDiceMutation = trpc.game.rollDice.useMutation()
   const endTurnMutation = trpc.game.endTurn.useMutation()
-  const drawCardMutation = trpc.game.drawCard.useMutation()
   const applyChanceEffectMutation = trpc.game.applyChanceEffect.useMutation()
   const skipMissedTurnMutation = trpc.game.skipMissedTurn.useMutation()
   const drawDeckCardMutation = trpc.game.drawDeckCard.useMutation()
+  const updatePositionMutation = trpc.game.updatePosition.useMutation()
 
   useEffect(() => {
     if (pendingEndTurn && isMyTurn && gameTurnState === GameTurnState.DICE_ROLLED) {
@@ -159,6 +164,10 @@ export default function DiceRoller() {
       if (processingDeckDraws) setProcessingDeckDraws(false)
       if (drawnDeckCard) clearDrawnCard()
       if (cardTrigger) setCardTrigger(null)
+      finishingRef.current = false
+      chanceDrawnRef.current = false
+      doublesResolvedRef.current = false
+      collectedPoiRef.current = []
       return
     }
     if (cardTrigger && !processingDeckDraws && !drawnDeckCard) {
@@ -173,7 +182,7 @@ export default function DiceRoller() {
     const pending = pendingFinishRef.current
     if (!pending) return
     pendingFinishRef.current = null
-    finishEndTurn(pending.destination, pending.visitedPoiIds, pending.currentPath)
+    resolveAfterMove(pending.destination, pending.visitedPoiIds, pending.currentPath)
   }, [isMyTurn, isPlacingObstruction, isRemovingObstruction])
 
   useEffect(() => {
@@ -215,6 +224,10 @@ export default function DiceRoller() {
       return
     }
 
+    finishingRef.current = false
+    chanceDrawnRef.current = false
+    doublesResolvedRef.current = false
+    collectedPoiRef.current = []
     setRolling(true)
     setHasRolled(true)
     setPendingServerUpdate(true)
@@ -252,16 +265,28 @@ export default function DiceRoller() {
     }, 700)
   }
 
-  function handleEndTurnClick() {
-    const preStore = useGameStore.getState()
-    if (preStore.movementPath.length === 0 && preStore.previewPaths.length > 0) {
-      preStore.confirmPreviewPath()
+  function notifyPoiVisits(visitedPoiIds: string[], visits: ReturnType<typeof detectPoiVisits>) {
+    const existingVisited = new Set(useGameStore.getState().players.find(p => p.name === useGameStore.getState().localPlayerName)?.visitedPois ?? [])
+    const newVisits = visits.filter(v => !existingVisited.has(v.id))
+
+    newVisits.forEach(v => {
+      const categoryLabel = POI_CATEGORY_LABELS[v.category as PoiCategory] ?? v.category
+      addNotification(`Collected ${categoryLabel} token: ${v.name ?? "Unknown"}`, "success")
+    })
+
+    if (newVisits.length > 0) {
+      const first = newVisits[0]
+      setPendingTokenCollection({
+        poiId: first.id,
+        poiName: first.name ?? null,
+        category: first.category,
+        colour: CATEGORY_TO_COLOUR[first.category] ?? "blue",
+      })
     }
+  }
+
+  function visitsForPath(currentPath: string[]) {
     const store = useGameStore.getState()
-    if (store.cardTrigger) {
-      return
-    }
-    const currentPath = store.movementPath
     const lastGridKey = currentPath.length > 0
       ? currentPath[currentPath.length - 1]
       : null
@@ -271,54 +296,36 @@ export default function DiceRoller() {
     const destinationGridKey = destination
       ? latLngToGridKey(destination[0], destination[1])
       : null
-
     const currentPlayer = store.players.find(p => p.name === store.localPlayerName)
     const effectiveGridKey = destinationGridKey
       ?? (currentPlayer ? latLngToGridKey(currentPlayer.position[0], currentPlayer.position[1]) : null)
 
-    let visitedPoiIds: string[] = []
-    if (effectiveGridKey) {
-      const visits = detectPoiVisits(effectiveGridKey, pubs, spires, towers, phones, schools, selectedPois, currentPath)
-      visitedPoiIds = visits.map(v => v.id)
-
-      const existingVisited = new Set(useGameStore.getState().players.find(p => p.name === useGameStore.getState().localPlayerName)?.visitedPois ?? [])
-      const newVisits = visits.filter(v => !existingVisited.has(v.id))
-
-      newVisits.forEach(v => {
-        const categoryLabel = POI_CATEGORY_LABELS[v.category as PoiCategory] ?? v.category
-        addNotification(`Collected ${categoryLabel} token: ${v.name ?? "Unknown"}`, "success")
-      })
-
-      if (newVisits.length > 0) {
-        const first = newVisits[0]
-        setPendingTokenCollection({
-          poiId: first.id,
-          poiName: first.name ?? null,
-          category: first.category,
-          colour: CATEGORY_TO_COLOUR[first.category] ?? "blue",
-        })
-      }
-
-      if (visits.length > 0 && sessionId && playerId && lastGridKey) {
-        const firstVisit = visits[0]
-        drawCardMutation.mutate({
-          sessionId,
-          playerId,
-          poiCategory: firstVisit.category,
-          gridKey: lastGridKey,
-        }, {
-          onSuccess: (card) => {
-            if (card && useGameStore.getState().localPlayerName === useGameStore.getState().currentPlayerName) {
-              setDrawnCard(card)
-            }
-          },
-        })
-      }
+    if (!effectiveGridKey) {
+      return { destination, visitedPoiIds: [] as string[], visits: [] as ReturnType<typeof detectPoiVisits> }
     }
 
-    if (dice1Value === dice2Value) {
+    const visits = detectPoiVisits(effectiveGridKey, pubs, spires, towers, phones, schools, selectedPois, currentPath)
+    return { destination, visitedPoiIds: visits.map(v => v.id), visits }
+  }
+
+  function resolveAfterMove(
+    destination: [number, number] | null,
+    visitedPoiIds: string[],
+    currentPath: string[],
+  ) {
+    if (visitedPoiIds.length > 0) {
+      collectedPoiRef.current = [...new Set([...collectedPoiRef.current, ...visitedPoiIds])]
+    }
+    const store = useGameStore.getState()
+    const values = store.diceValues
+    const obstructionMode = values
+      ? doublesObstructionMode(values[0], values[1])
+      : null
+
+    if (obstructionMode && !doublesResolvedRef.current) {
+      doublesResolvedRef.current = true
       pendingFinishRef.current = { destination, visitedPoiIds, currentPath }
-      if (dice1Value <= 4) {
+      if (obstructionMode === "place") {
         setPlacingObstruction("pick")
         addNotification("Doubles 1-4: place an obstruction on an A or B road", "info")
       } else {
@@ -328,38 +335,109 @@ export default function DiceRoller() {
       return
     }
 
+    if (visitedPoiIds.length > 0 && !chanceDrawnRef.current) {
+      chanceDrawnRef.current = true
+      pendingFinishRef.current = { destination, visitedPoiIds, currentPath }
+      requestDeckDraw("chance")
+      return
+    }
+
     finishEndTurn(destination, visitedPoiIds, currentPath)
   }
 
+  function handleEndTurnClick() {
+    const preStore = useGameStore.getState()
+    if (preStore.movementPath.length === 0 && preStore.previewPaths.length > 0) {
+      preStore.confirmPreviewPath()
+    }
+    const store = useGameStore.getState()
+    if (!store.cardTrigger) {
+      const trigger = cardTriggerForPath(store.movementPath, store.gameBounds)
+      if (trigger) {
+        store.setCardTrigger(trigger)
+      }
+    }
+    if (useGameStore.getState().cardTrigger) {
+      return
+    }
+    const currentPath = useGameStore.getState().movementPath
+    const { destination, visitedPoiIds, visits } = visitsForPath(currentPath)
+    notifyPoiVisits(visitedPoiIds, visits)
+    resolveAfterMove(destination, visitedPoiIds, currentPath)
+  }
+
+  function beginExtraThrow() {
+    const pending = pendingFinishRef.current
+    const store = useGameStore.getState()
+    const dest = pending?.destination
+    const name = store.currentPlayerName
+    if (dest && name) {
+      store.updatePlayerPosition(name, dest)
+      if (sessionId && playerId) {
+        updatePositionMutation.mutate({
+          sessionId,
+          playerId,
+          lat: dest[0],
+          lng: dest[1],
+        })
+      }
+    }
+    setExtraThrow(false)
+    finishingRef.current = false
+    chanceDrawnRef.current = false
+    doublesResolvedRef.current = false
+    pendingFinishRef.current = null
+    addNotification("Extra throw! Roll again!", "success")
+    store.clearGridSelections()
+    store.setPlayerStartGridKey(null)
+    store.setGameTurnState(GameTurnState.ROLL_DICE)
+    store.setDiceResult(null)
+    store.setDiceValues(null)
+    setHasRolled(false)
+  }
+
   function handleDeckCardClose() {
-    const card = drawnDeckCard
-    const trigger = cardTrigger
+    const deckState = useDeckStore.getState()
+    const card = deckState.drawnDeckCard
+    const trigger = useGameStore.getState().cardTrigger
+    const effect = chanceEffectOf(card)
     clearDrawnCard()
 
-    if (card && card.deck === "chance") {
+    if (card && card.deck === "chance" && sessionId && playerId) {
       const chance = card as ChanceCard
-      if (sessionId && playerId) {
-        if (chance.effect.type === "miss_turn") {
-          applyChanceEffectMutation.mutate({
-            sessionId,
-            playerId,
-            effectType: "miss_turn",
-            missedTurns: chance.effect.turns,
-          })
-        } else if (chance.effect.type === "return_to_start") {
-          applyChanceEffectMutation.mutate({
-            sessionId,
-            playerId,
-            effectType: "return_to_start",
-          })
-        } else if (chance.effect.type === "shortcut_token") {
-          applyChanceEffectMutation.mutate({
-            sessionId,
-            playerId,
-            effectType: "shortcut_token",
-            shortcutColor: chance.effect.color,
-          })
+      if (chance.effect.type === "miss_turn") {
+        applyChanceEffectMutation.mutate({
+          sessionId,
+          playerId,
+          effectType: "miss_turn",
+          missedTurns: chance.effect.turns,
+        })
+        const name = useGameStore.getState().currentPlayerName
+        if (name) setMissedTurns(name, chance.effect.turns)
+      } else if (chance.effect.type === "return_to_start") {
+        applyChanceEffectMutation.mutate({
+          sessionId,
+          playerId,
+          effectType: "return_to_start",
+        })
+        const start = useGameStore.getState().startPosition
+        const name = useGameStore.getState().currentPlayerName
+        if (start && name) {
+          useGameStore.getState().updatePlayerPosition(name, start)
         }
+      } else if (chance.effect.type === "shortcut_token") {
+        applyChanceEffectMutation.mutate({
+          sessionId,
+          playerId,
+          effectType: "shortcut_token",
+          shortcutColor: chance.effect.color,
+        })
+      } else if (chance.effect.type === "extra_throw") {
+        applyChanceEffectMutation.mutate({
+          sessionId,
+          playerId,
+          effectType: "extra_throw",
+        })
       }
     }
 
@@ -383,11 +461,23 @@ export default function DiceRoller() {
         addNotification(`Relocated! ${remaining > 0 ? `${remaining} moves remaining` : "Turn ending"}`, "info")
         handleCardRelocation(destination, remaining)
         useGameStore.getState().setCardDestinationKeys([])
-        if (remaining <= 0) {
-          finishEndTurn(destLatLng, [], [destination])
+        if (sessionId && playerId) {
+          updatePositionMutation.mutate({
+            sessionId,
+            playerId,
+            lat: destLatLng[0],
+            lng: destLatLng[1],
+          })
         }
+        if (remaining > 0) {
+          pendingFinishRef.current = null
+          return
+        }
+        const { visitedPoiIds, visits } = visitsForPath([destination])
+        notifyPoiVisits(visitedPoiIds, visits)
+        resolveAfterMove(destLatLng, visitedPoiIds, [destination])
       } else {
-        addNotification("No valid destination found — continuing normally", "info")
+        addNotification("No valid destination found - continuing normally", "info")
         setCardTrigger(null)
         useGameStore.getState().setCardDestinationKeys([])
       }
@@ -395,28 +485,55 @@ export default function DiceRoller() {
     }
 
     const nextCard = processNextDraw()
-    if (!nextCard) {
-      setProcessingDeckDraws(false)
-      if (extraThrow) {
-        setExtraThrow(false)
-        addNotification("Extra throw! Roll again!", "success")
-        useGameStore.getState().setGameTurnState(GameTurnState.ROLL_DICE)
-        useGameStore.getState().setDiceResult(null)
-        setHasRolled(false)
+    if (nextCard) return
+
+    setProcessingDeckDraws(false)
+
+    if (deckState.isPlacingObstruction || deckState.isRemovingObstruction) {
+      return
+    }
+
+    if (shouldGrantExtraThrow(useDeckStore.getState().extraThrow, effect)) {
+      beginExtraThrow()
+      return
+    }
+
+    const pending = pendingFinishRef.current
+    if (pending) {
+      pendingFinishRef.current = null
+      if (effect?.type === "return_to_start") {
+        const start = useGameStore.getState().startPosition
+        finishEndTurn(start, pending.visitedPoiIds, start ? [latLngToGridKey(start[0], start[1])] : pending.currentPath)
         return
       }
-      const currentPath = movementPath
-      const lastGridKey = currentPath.length > 0
-        ? currentPath[currentPath.length - 1]
-        : null
-      const destination = lastGridKey
-        ? gridKeyToLatLng(lastGridKey)
-        : null
-      finishEndTurn(destination, [], currentPath)
+      resolveAfterMove(pending.destination, pending.visitedPoiIds, pending.currentPath)
+      return
     }
+
+    if (effect?.type === "return_to_start") {
+      const start = useGameStore.getState().startPosition
+      finishEndTurn(start, [], start ? [latLngToGridKey(start[0], start[1])] : [])
+      return
+    }
+
+    const currentPath = useGameStore.getState().movementPath
+    const lastGridKey = currentPath.length > 0
+      ? currentPath[currentPath.length - 1]
+      : null
+    const destination = lastGridKey
+      ? gridKeyToLatLng(lastGridKey)
+      : null
+    finishEndTurn(destination, [], currentPath)
   }
 
   function finishEndTurn(destination: [number, number] | null, visitedPoiIds: string[], movePath: string[]) {
+    if (finishingRef.current) return
+    finishingRef.current = true
+    chanceDrawnRef.current = false
+    doublesResolvedRef.current = false
+    pendingFinishRef.current = null
+    const allVisited = [...new Set([...collectedPoiRef.current, ...visitedPoiIds])]
+    collectedPoiRef.current = []
     setPendingServerUpdate(true)
     handleEndTurn()
     if (sessionId && playerId) {
@@ -425,17 +542,19 @@ export default function DiceRoller() {
         playerId,
         newLat: destination?.[0],
         newLng: destination?.[1],
-        visitedPoiIds: visitedPoiIds.length > 0 ? visitedPoiIds : undefined,
+        visitedPoiIds: allVisited.length > 0 ? allVisited : undefined,
         movePath: movePath.length > 0 ? movePath : undefined,
       }, {
         onSuccess: () => {
           void utils.game.state.invalidate()
         },
         onError: () => {
+          finishingRef.current = false
           setPendingServerUpdate(false)
         },
       })
     } else {
+      finishingRef.current = false
       setPendingServerUpdate(false)
     }
   }

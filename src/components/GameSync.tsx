@@ -25,7 +25,7 @@ function samePlayers(local: Player[], next: Player[]): boolean {
 }
 
 export default function GameSync() {
-  const { sessionId, playerId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setDiceValues, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setPoiCandidates, setPickingPlayerIndex, setWinnerName, leaveSession, setTokenInventory, setActivityLog, setRemotePreviewPath } = useGameStore()
+  const { sessionId, playerId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setDiceValues, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setPoiCandidates, setPickingPlayerIndex, setWinnerName, leaveSession, setTokenInventory, setActivityLog, setRemotePreviewPath, setStartPosition } = useGameStore()
   const { addNotification } = useNotificationStore()
   const { initDecks, setObstructions, setMissedTurns } = useDeckStore()
   const hasCheckedSession = useRef(false)
@@ -100,9 +100,18 @@ export default function GameSync() {
         lastProcessedMoveRef.current = moveKey
       }
 
+      const syncState = useGameStore.getState()
+      const midTurnName =
+        syncState.gameTurnState === GameTurnState.DICE_ROLLED
+        && syncState.localPlayerName
+        && syncState.localPlayerName === syncState.currentPlayerName
+          ? syncState.localPlayerName
+          : null
+
       const players: Player[] = gameState.players.map(p => {
         const localPlayer = localPlayers.find(lp => lp.name === p.name)
-        if (localPlayer?.previousPosition) {
+        const keepLocal = !!localPlayer && (!!localPlayer.previousPosition || p.name === midTurnName)
+        if (keepLocal && localPlayer) {
           return {
             name: p.name,
             iconType: p.iconType,
@@ -187,6 +196,10 @@ export default function GameSync() {
         setLocalPlayerName(myPlayer.name)
       }
 
+      if (gameState.startLat != null && gameState.startLng != null) {
+        setStartPosition([gameState.startLat, gameState.startLng])
+      }
+
       if (gameState.areaSize) {
         setAreaSize(gameState.areaSize)
         if (gameState.startLat != null && gameState.startLng != null) {
@@ -263,7 +276,7 @@ export default function GameSync() {
         setRemotePreviewPath(null)
       }
     }
-  }, [gameState, playerId, addNotification, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setPoiCandidates, setWinnerName, initDecks, setObstructions, setMissedTurns, setTokenInventory, setActivityLog, setRemotePreviewPath])
+  }, [gameState, playerId, addNotification, setPlayers, setCurrentPlayer, setDiceResult, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setPoiCandidates, setWinnerName, initDecks, setObstructions, setMissedTurns, setTokenInventory, setActivityLog, setRemotePreviewPath, setStartPosition])
 
   return null
 }
