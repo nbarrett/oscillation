@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import L from "leaflet"
 import { Marker, Popup } from "react-leaflet"
-import { useGameStore, GameTurnState, Player } from "@/stores/game-store"
+import { useGameStore, Player } from "@/stores/game-store"
 import { carImageForStyle, useCarStore } from "@/stores/car-store"
 import PlayerMoveRoute from "./PlayerMoveRoute"
 
@@ -83,23 +83,19 @@ interface PlayerCarProps {
   player: Player
 }
 
-const ANIMATION_MS_PER_SEGMENT = 200
+const ANIMATION_MS_PER_SEGMENT = 120
 
 export default function PlayerCar({ player }: PlayerCarProps) {
   const markerRef = useRef<L.Marker>(null)
-  const {
-    gameTurnState,
-    currentPlayerName,
-    localPlayerName,
-  } = useGameStore()
+  const currentPlayerName = useGameStore((s) => s.currentPlayerName)
+  const localPlayerName = useGameStore((s) => s.localPlayerName)
+  const gameTurnState = useGameStore((s) => s.gameTurnState)
   const { carSize } = useCarStore()
 
   const [routeAnim, setRouteAnim] = useState<[number, number][] | null>(null)
   const [animatedPosition, setAnimatedPosition] = useState<[number, number] | null>(null)
 
   const active = player.name === currentPlayerName
-  const isAnimating = animatedPosition !== null
-  const hide = !active && gameTurnState === GameTurnState.DICE_ROLLED && !isAnimating
 
   const icon = useMemo(
     () => createCarIcon(player.iconType || CAR_FALLBACK, active, carSize),
@@ -169,10 +165,6 @@ export default function PlayerCar({ player }: PlayerCarProps) {
 
   function popupCaption() {
     return isLocalPlayer ? `${player.name} (You)` : player.name
-  }
-
-  if (hide) {
-    return null
   }
 
   return (

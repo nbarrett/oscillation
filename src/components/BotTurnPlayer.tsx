@@ -154,7 +154,7 @@ export default function BotTurnPlayer() {
       } else {
         playBotTurn()
       }
-    }, 1500)
+    }, 900)
 
     return () => {
       if (botTimerRef.current) clearTimeout(botTimerRef.current)
@@ -388,7 +388,7 @@ export default function BotTurnPlayer() {
 
     botTimerRef.current = setTimeout(() => {
       botExecuteMove(botName, dice1, dice2, finalDestination, finalDestinationGridKey, movePath)
-    }, 2500)
+    }, 1400)
   }
 
   function botExecuteMove(

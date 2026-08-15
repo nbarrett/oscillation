@@ -4,20 +4,36 @@ import { type GameBounds } from "@/lib/area-size";
 
 const BNG = "+proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy +towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 +units=m +no_defs";
 
-export function isGridOutsideBounds(gridKey: string, gameBounds: GameBounds | null): boolean {
-  if (!gameBounds) return false;
-  const [eRaw, nRaw] = gridKey.split("-").map(Number);
-  const e = eRaw + 500;
-  const n = nRaw + 500;
+interface BngBox {
+  minE: number
+  maxE: number
+  minN: number
+  maxN: number
+}
+
+let pathfindingBox: BngBox | null = null
+const neighborArrayCache = new Map<string, string[]>()
+
+function bngBoxFromBounds(gameBounds: GameBounds): BngBox {
   const corners = gameBounds.corners.map((c) => {
-    const [easting, northing] = proj4("EPSG:4326", BNG, [c.lng, c.lat]);
-    return [easting, northing] as [number, number];
-  });
-  const minE = Math.floor(Math.min(...corners.map(([ce]) => ce)) / 1000) * 1000 + 500;
-  const maxE = Math.floor(Math.max(...corners.map(([ce]) => ce)) / 1000) * 1000 + 500;
-  const minN = Math.floor(Math.min(...corners.map(([, cn]) => cn)) / 1000) * 1000 + 500;
-  const maxN = Math.floor(Math.max(...corners.map(([, cn]) => cn)) / 1000) * 1000 + 500;
-  return e < minE || e > maxE || n < minN || n > maxN;
+    const [easting, northing] = proj4("EPSG:4326", BNG, [c.lng, c.lat])
+    return [easting, northing] as [number, number]
+  })
+  return {
+    minE: Math.floor(Math.min(...corners.map(([ce]) => ce)) / 1000) * 1000 + 500,
+    maxE: Math.floor(Math.max(...corners.map(([ce]) => ce)) / 1000) * 1000 + 500,
+    minN: Math.floor(Math.min(...corners.map(([, cn]) => cn)) / 1000) * 1000 + 500,
+    maxN: Math.floor(Math.max(...corners.map(([, cn]) => cn)) / 1000) * 1000 + 500,
+  }
+}
+
+export function isGridOutsideBounds(gridKey: string, gameBounds: GameBounds | null): boolean {
+  const box = pathfindingBox ?? (gameBounds ? bngBoxFromBounds(gameBounds) : null)
+  if (!box) return false
+  const dash = gridKey.indexOf("-")
+  const e = Number(gridKey.slice(0, dash)) + 500
+  const n = Number(gridKey.slice(dash + 1)) + 500
+  return e < box.minE || e > box.maxE || n < box.minN || n > box.maxN
 }
 
 export interface RoadSegment {
@@ -93,7 +109,8 @@ export function setRoadDataStatusCallback(cb: (status: "loading" | "loaded" | "e
   roadDataStatusCallback = cb;
 }
 
-export function setPathfindingBounds(_bounds: GameBounds | null): void {
+export function setPathfindingBounds(bounds: GameBounds | null): void {
+  pathfindingBox = bounds ? bngBoxFromBounds(bounds) : null
 }
 
 export function onRoadDataReady(callback: () => void): () => void {
@@ -838,6 +855,7 @@ export async function loadRoadData(
     const gridAdjacency = calculateGridAdjacency(abRoads);
 
     gridRoadIndex = null;
+    neighborArrayCache.clear();
     roadDataCache = {
       bounds: { south, west, north, east },
       roads,
@@ -880,18 +898,26 @@ export function gridHasABRoad(gridKey: string): boolean {
 }
 
 export function getAdjacentRoadGrids(gridKey: string): string[] {
+  const cached = neighborArrayCache.get(gridKey)
+  if (cached) return cached
+
+  let result: string[]
   if (!roadDataCache) {
-    return allAdjacentGrids(gridKey);
+    result = allAdjacentGrids(gridKey)
+  } else if (roadDataCache.gridAdjacency.has(gridKey)) {
+    result = Array.from(roadDataCache.gridAdjacency.get(gridKey)!)
+  } else {
+    const candidates = allAdjacentGrids(gridKey)
+    const withAdjacency = candidates.filter((g) => roadDataCache!.gridAdjacency.has(g))
+    if (withAdjacency.length > 0) {
+      result = withAdjacency
+    } else {
+      const withRoads = candidates.filter((g) => roadDataCache!.gridSquaresWithRoads.has(g))
+      result = withRoads.length > 0 ? withRoads : candidates
+    }
   }
-  if (roadDataCache.gridAdjacency.has(gridKey)) {
-    return Array.from(roadDataCache.gridAdjacency.get(gridKey)!);
-  }
-  const candidates = allAdjacentGrids(gridKey);
-  const withAdjacency = candidates.filter(g => roadDataCache!.gridAdjacency.has(g));
-  if (withAdjacency.length > 0) return withAdjacency;
-  const withRoads = candidates.filter(g => roadDataCache!.gridSquaresWithRoads.has(g));
-  if (withRoads.length > 0) return withRoads;
-  return candidates;
+  neighborArrayCache.set(gridKey, result)
+  return result
 }
 
 function allAdjacentGrids(gridKey: string): string[] {
@@ -916,13 +942,14 @@ export function reachableRoadGrids(
   const abRoadCount = hasCache ? roadDataCache!.gridSquaresWithABRoads.size : 0;
   const adjCount = hasCache ? roadDataCache!.gridAdjacency.size : 0;
   const startNeighbors = getAdjacentRoadGrids(startGridKey);
-  log.info(`reachableRoadGrids: start=${startGridKey} maxSteps=${maxSteps} excludeKeys=${excludeKeys.size} roadDataLoaded=${hasCache} abRoads=${abRoadCount} adjEntries=${adjCount} startHasRoad=${startHasRoad} startNeighbors=${startNeighbors.length} [${startNeighbors.slice(0, 4).join(", ")}]`);
+  log.debug(`reachableRoadGrids: start=${startGridKey} maxSteps=${maxSteps} excludeKeys=${excludeKeys.size} roadDataLoaded=${hasCache} abRoads=${abRoadCount} adjEntries=${adjCount} startHasRoad=${startHasRoad} startNeighbors=${startNeighbors.length} [${startNeighbors.slice(0, 4).join(", ")}]`);
 
   const queue: Array<{ key: string; depth: number }> = [{ key: startGridKey, depth: 0 }];
   visited.set(startGridKey, 0);
+  let head = 0
 
-  while (queue.length > 0) {
-    const current = queue.shift()!;
+  while (head < queue.length) {
+    const current = queue[head++]
     if (current.depth >= maxSteps) continue;
 
     const neighbors = getAdjacentRoadGrids(current.key);
@@ -936,7 +963,7 @@ export function reachableRoadGrids(
   }
 
   visited.delete(startGridKey);
-  log.info(`reachableRoadGrids: found ${visited.size} reachable grids from ${startGridKey} in ${maxSteps} steps`);
+  log.debug(`reachableRoadGrids: found ${visited.size} reachable grids from ${startGridKey} in ${maxSteps} steps`);
   return visited;
 }
 
@@ -950,9 +977,10 @@ export function shortestPath(
   const cameFrom = new Map<string, string>();
   const queue: Array<{ key: string; depth: number }> = [{ key: startGridKey, depth: 0 }];
   const visited = new Set<string>([startGridKey]);
+  let head = 0
 
-  while (queue.length > 0) {
-    const current = queue.shift()!;
+  while (head < queue.length) {
+    const current = queue[head++]
     if (current.key === targetGridKey && current.depth > 0) {
       const path: string[] = [];
       let step = targetGridKey;
@@ -978,6 +1006,48 @@ export function shortestPath(
   }
 
   return null;
+}
+
+export function pathsAtExactSteps(
+  startGridKey: string,
+  exactSteps: number,
+  excludeKeys: Set<string> = new Set(),
+  gameBounds: GameBounds | null = null
+): string[][] {
+  const cameFrom = new Map<string, string>()
+  const depth = new Map<string, number>([[startGridKey, 0]])
+  const queue = [startGridKey]
+  let head = 0
+
+  while (head < queue.length) {
+    const current = queue[head++]
+    const currentDepth = depth.get(current)!
+    if (currentDepth >= exactSteps) continue
+
+    const neighbors = getAdjacentRoadGrids(current)
+    for (const neighbor of neighbors) {
+      if (depth.has(neighbor) || excludeKeys.has(neighbor)) continue
+      if (isGridOutsideBounds(neighbor, gameBounds)) continue
+      depth.set(neighbor, currentDepth + 1)
+      cameFrom.set(neighbor, current)
+      queue.push(neighbor)
+    }
+  }
+
+  const paths: string[][] = []
+  for (const [key, steps] of depth) {
+    if (steps !== exactSteps) continue
+    const path: string[] = []
+    let step = key
+    while (step !== startGridKey) {
+      path.unshift(step)
+      const prev = cameFrom.get(step)
+      if (!prev) break
+      step = prev
+    }
+    if (path.length === exactSteps) paths.push(path)
+  }
+  return paths
 }
 
 export function exactStepEndpoints(

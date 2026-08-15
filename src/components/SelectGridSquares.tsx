@@ -6,7 +6,7 @@ import L from "leaflet";
 import { trpc } from "@/lib/trpc/client";
 import { useGameStore, occupiedGridKeys, GameTurnState } from "@/stores/game-store";
 import { useDeckStore } from "@/stores/deck-store";
-import { latLngToGridKey, getAdjacentRoadGrids, shortestPath, reachableRoadGrids, isRoadDataLoaded, onRoadDataReady, gridHasABRoad, gridHasRoad, loadRoadData, gridKeyToLatLng, roadPathThroughGrids, roadDataCoversPosition, isGridOutsideBounds } from "@/lib/road-data";
+import { latLngToGridKey, getAdjacentRoadGrids, shortestPath, reachableRoadGrids, isRoadDataLoaded, onRoadDataReady, gridHasABRoad, gridHasRoad, loadRoadData, gridKeyToLatLng, roadPathThroughGrids, roadDataCoversPosition, isGridOutsideBounds, pathsAtExactSteps } from "@/lib/road-data";
 import { gridKeyToLatLngs } from "@/lib/grid-polygon";
 import { firstPathTrigger } from "@/lib/deck-triggers";
 import { type GameBounds } from "@/lib/area-size";
@@ -353,13 +353,9 @@ export default function SelectGridSquares() {
       });
     }
 
-    const paths: string[][] = [];
-    for (const endpoint of endpoints) {
-      const path = shortestPath(effectiveStart, endpoint, diceResult, occupied, bounds);
-      if (path) {
-        paths.push(path);
-      }
-    }
+    const endpointSet = new Set(endpoints)
+    let paths = pathsAtExactSteps(effectiveStart, diceResult, occupied, bounds)
+      .filter((path) => endpointSet.has(path[path.length - 1]))
 
     if (paths.length === 0) {
       const furthest: string[] = [];
@@ -375,12 +371,42 @@ export default function SelectGridSquares() {
           }
         }
       });
-      for (const endpoint of furthest) {
-        const path = shortestPath(effectiveStart, endpoint, diceResult, occupied, bounds);
-        if (path) {
-          paths.push(path);
+      const furthestSet = new Set(furthest)
+      paths = pathsAtExactSteps(effectiveStart, maxDist || diceResult, occupied, bounds)
+        .filter((path) => furthestSet.has(path[path.length - 1]))
+      if (paths.length === 0) {
+        for (const endpoint of furthest) {
+          const path = shortestPath(effectiveStart, endpoint, diceResult, occupied, bounds);
+          if (path) {
+            paths.push(path);
+          }
         }
       }
+    }
+
+    const { selectedPois, localPlayerName } = useGameStore.getState()
+    const localPlayer = players.find((p) => p.name === localPlayerName)
+    const visited = new Set(localPlayer?.visitedPois ?? [])
+    const targets = (selectedPois ?? []).filter((poi) => !visited.has(`${poi.category}:${poi.osmId}`))
+    if (targets.length > 0 && paths.length > 1) {
+      const score = (path: string[]) => {
+        const end = path[path.length - 1]
+        const [lat, lng] = gridKeyToLatLng(end)
+        let best = Infinity
+        for (const poi of targets) {
+          const dLat = lat - poi.lat
+          const dLng = lng - poi.lng
+          const dist = dLat * dLat + dLng * dLng
+          if (dist < best) best = dist
+        }
+        return best
+      }
+      paths.sort((a, b) => score(a) - score(b))
+    }
+
+    const MAX_PREVIEW_PATHS = 20
+    if (paths.length > MAX_PREVIEW_PATHS) {
+      paths = paths.slice(0, MAX_PREVIEW_PATHS)
     }
     log.info(`computeAndSetPaths: ${endpoints.length} exact-step endpoints → ${paths.length} valid paths (reachable=${reachable.size} dice=${diceResult})`);
 
@@ -395,19 +421,20 @@ export default function SelectGridSquares() {
       startHasRoad: gridHasRoad(effectiveStart),
     });
 
-    const allEndpointKeys = paths.map(p => p[p.length - 1]);
+    const allEndpointKeys = endpoints.length > 0 ? endpoints : paths.map((p) => p[p.length - 1]);
     drawEndpoints(allEndpointKeys);
 
     if (allEndpointKeys.length > 0 && fitBoundsDiceRef.current !== diceResult) {
       fitBoundsDiceRef.current = diceResult;
       const startLatLng = gridKeyToLatLng(effectiveStart);
       const points: L.LatLng[] = [L.latLng(startLatLng[0], startLatLng[1])];
-      for (const key of allEndpointKeys) {
+      const fitSample = allEndpointKeys.length > 12 ? allEndpointKeys.slice(0, 12) : allEndpointKeys
+      for (const key of fitSample) {
         const [lat, lng] = gridKeyToLatLng(key);
         points.push(L.latLng(lat, lng));
       }
       const bounds = L.latLngBounds(points);
-      map.fitBounds(bounds, { padding: [80, 80], maxZoom: 13 });
+      map.fitBounds(bounds, { padding: [48, 48], maxZoom: 14 });
     }
 
     useGameStore.getState().setPreviewPaths(paths);

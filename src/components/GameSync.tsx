@@ -9,6 +9,21 @@ import { areaSizeBounds, type AreaSize } from "@/lib/area-size"
 import { gridKeyToLatLng, setPathfindingBounds } from "@/lib/road-data"
 import { log } from "@/lib/utils"
 
+function samePlayers(local: Player[], next: Player[]): boolean {
+  if (local.length !== next.length) return false
+  for (let i = 0; i < next.length; i++) {
+    const a = local[i]
+    const b = next[i]
+    if (a.name !== b.name || a.iconType !== b.iconType) return false
+    if (a.position[0] !== b.position[0] || a.position[1] !== b.position[1]) return false
+    if (a.hasReturnedToStart !== b.hasReturnedToStart) return false
+    if ((a.visitedPois?.length ?? 0) !== (b.visitedPois?.length ?? 0)) return false
+    if (JSON.stringify(a.tokens ?? {}) !== JSON.stringify(b.tokens ?? {})) return false
+    if (a.previousPosition || b.previousPosition || a.completedRoute || b.completedRoute) return false
+  }
+  return true
+}
+
 export default function GameSync() {
   const { sessionId, playerId, players: localPlayers, setPlayers, setCurrentPlayer, setDiceResult, setDiceValues, setGameTurnState, setLocalPlayerName, setAreaSize, setGameBounds, setPhase, setCreatorPlayerId, setSelectedPois, setPoiCandidates, setPickingPlayerIndex, setWinnerName, leaveSession, setTokenInventory, setActivityLog, setRemotePreviewPath } = useGameStore()
   const { addNotification } = useNotificationStore()
@@ -20,14 +35,17 @@ export default function GameSync() {
   const lastActivityLengthRef = useRef<number>(0)
 
   const phase = useGameStore((s) => s.phase)
-  const pollInterval = phase === "playing" ? 3000 : phase === "lobby" ? 5000 : 5000
+  const pollInterval = phase === "playing" ? 2500 : 5000
 
   const { data: gameState, isFetched } = trpc.game.state.useQuery(
     { sessionId: sessionId! },
     {
       enabled: !!sessionId,
-      refetchInterval: pollInterval,
-      refetchOnWindowFocus: false,
+      refetchInterval: () => {
+        if (typeof document !== "undefined" && document.hidden) return 12000
+        return pollInterval
+      },
+      refetchOnWindowFocus: true,
     }
   )
 
@@ -129,7 +147,9 @@ export default function GameSync() {
         }
       })
 
-      setPlayers(players)
+      if (!samePlayers(localPlayers, players)) {
+        setPlayers(players)
+      }
 
       if (gameState.deckState) {
         initDecks(gameState.deckState)

@@ -235,7 +235,7 @@ export default function DiceRoller() {
       } else {
         store.setPendingServerUpdate(false)
       }
-    }, 1200)
+    }, 700)
   }
 
   function handleEndTurnClick() {

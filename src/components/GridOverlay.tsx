@@ -32,17 +32,19 @@ export default function GridOverlay() {
       gridLayerRef.current = L.layerGroup().addTo(map)
     }
 
+    let drawTimer: ReturnType<typeof setTimeout> | null = null
+
     const drawGrid = () => {
       if (!gridLayerRef.current) return
 
       gridLayerRef.current.clearLayers()
 
-      if (!gameBounds) return
+      if (!gameBounds || map.getZoom() < 8) return
 
       const gridSpacing = 1000
-
-      const sw = latLngToOSGrid(gameBounds.south, gameBounds.west)
-      const ne = latLngToOSGrid(gameBounds.north, gameBounds.east)
+      const view = map.getBounds().pad(0.15)
+      const sw = latLngToOSGrid(view.getSouth(), view.getWest())
+      const ne = latLngToOSGrid(view.getNorth(), view.getEast())
 
       const startX = Math.floor(sw.easting / gridSpacing) * gridSpacing
       const endX = Math.ceil(ne.easting / gridSpacing) * gridSpacing
@@ -52,7 +54,7 @@ export default function GridOverlay() {
       const gridLineStyle: L.PolylineOptions = {
         color: colours.osMapsPurple,
         weight: 1,
-        opacity: 0.6,
+        opacity: 0.45,
         interactive: false,
       }
 
@@ -73,13 +75,19 @@ export default function GridOverlay() {
       }
     }
 
+    const scheduleDraw = () => {
+      if (drawTimer) clearTimeout(drawTimer)
+      drawTimer = setTimeout(drawGrid, 80)
+    }
+
     drawGrid()
-    map.on("moveend", drawGrid)
-    map.on("zoomend", drawGrid)
+    map.on("moveend", scheduleDraw)
+    map.on("zoomend", scheduleDraw)
 
     return () => {
-      map.off("moveend", drawGrid)
-      map.off("zoomend", drawGrid)
+      if (drawTimer) clearTimeout(drawTimer)
+      map.off("moveend", scheduleDraw)
+      map.off("zoomend", scheduleDraw)
       if (gridLayerRef.current) {
         gridLayerRef.current.clearLayers()
         map.removeLayer(gridLayerRef.current)

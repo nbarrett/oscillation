@@ -36,7 +36,8 @@ function categoryColour(category: string): string {
 
 export default function ObjectiveArrows() {
   const map = useMap()
-  const { selectedPois, phase } = useGameStore()
+  const selectedPois = useGameStore((s) => s.selectedPois)
+  const phase = useGameStore((s) => s.phase)
   const currentPlayer = useCurrentPlayer()
   const [indicators, setIndicators] = useState<ArrowIndicator[]>([])
 

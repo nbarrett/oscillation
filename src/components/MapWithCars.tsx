@@ -40,7 +40,16 @@ function createBritishNationalGridCRS(): L.Proj.CRS | null {
 }
 
 export default function MapWithCars() {
-  const { players, mapZoom, mapCentre, setMapZoom, playerZoomRequest, setPlayerZoomRequest, areaSize, phase, gameBounds, sessionId } = useGameStore();
+  const players = useGameStore((s) => s.players)
+  const mapZoom = useGameStore((s) => s.mapZoom)
+  const mapCentre = useGameStore((s) => s.mapCentre)
+  const setMapZoom = useGameStore((s) => s.setMapZoom)
+  const playerZoomRequest = useGameStore((s) => s.playerZoomRequest)
+  const setPlayerZoomRequest = useGameStore((s) => s.setPlayerZoomRequest)
+  const areaSize = useGameStore((s) => s.areaSize)
+  const phase = useGameStore((s) => s.phase)
+  const gameBounds = useGameStore((s) => s.gameBounds)
+  const sessionId = useGameStore((s) => s.sessionId)
   const { accessToken, mapLayer, mappingProvider } = useMapStore();
   const { startingPosition } = useRouteStore();
 
@@ -141,39 +150,6 @@ export default function MapWithCars() {
 
   const tileUrl = buildTileUrl();
 
-  useEffect(() => {
-    if (!map || !gameBounds || !tileUrl) return;
-    const crs = map.options.crs;
-    if (!crs) return;
-    const TILE_SIZE = 256;
-    const PREWARM_ZOOM_LEVELS = usesBritishNationalGrid ? [3, 4, 5, 6, 7] : [7, 8, 9, 10, 11, 12];
-    const sw = L.latLng(gameBounds.south, gameBounds.west);
-    const ne = L.latLng(gameBounds.north, gameBounds.east);
-    const subdomains = ["a", "b", "c"];
-    let firedCount = 0;
-    for (const z of PREWARM_ZOOM_LEVELS) {
-      const swPoint = crs.latLngToPoint(sw, z);
-      const nePoint = crs.latLngToPoint(ne, z);
-      const minX = Math.floor(Math.min(swPoint.x, nePoint.x) / TILE_SIZE);
-      const maxX = Math.floor(Math.max(swPoint.x, nePoint.x) / TILE_SIZE);
-      const minY = Math.floor(Math.min(swPoint.y, nePoint.y) / TILE_SIZE);
-      const maxY = Math.floor(Math.max(swPoint.y, nePoint.y) / TILE_SIZE);
-      for (let x = minX; x <= maxX; x++) {
-        for (let y = minY; y <= maxY; y++) {
-          const url = tileUrl
-            .replace("{s}", subdomains[(x + y) % subdomains.length])
-            .replace("{z}", String(z))
-            .replace("{x}", String(x))
-            .replace("{y}", String(y));
-          const img = new Image();
-          img.src = url;
-          firedCount++;
-        }
-      }
-    }
-    log.info(`MapWithCars: pre-warmed ${firedCount} tiles across ${PREWARM_ZOOM_LEVELS.length} zoom levels`);
-  }, [map, gameBounds, tileUrl, usesBritishNationalGrid]);
-
   if (!canRender) {
     return null;
   }
@@ -202,7 +178,9 @@ export default function MapWithCars() {
           <TileLayer
             url={tileUrl}
             attribution='© <a href="https://www.ordnancesurvey.co.uk/">Ordnance Survey Crown copyright and database rights 2024 OS 100018976</a>'
-            keepBuffer={6}
+            keepBuffer={3}
+            updateWhenZooming={false}
+            updateWhenIdle={true}
           />
         ) : (
           <div>waiting for access token</div>
