@@ -141,6 +141,7 @@ export default function PlayerCar({ player }: PlayerCarProps) {
           if (cancelled) return
           setAnimatedPosition(null)
           setRouteAnim(null)
+          useGameStore.getState().playerRouteReceived()
         }, ANIMATION_MS_PER_SEGMENT)
       }
     }

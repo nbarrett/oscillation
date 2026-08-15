@@ -114,7 +114,7 @@ function ChatToggleButton({ onClick }: { onClick: () => void }) {
 
 export default function GamePage() {
   const setAccessToken = useMapStore((state) => state.setAccessToken)
-  const { sessionId, sessionCode, playerId, phase, winnerName, leaveSession } = useGameStore()
+  const { sessionId, sessionCode, playerId, phase, winnerName, leaveSession, creatorPlayerId } = useGameStore()
   const { data: tokenData } = trpc.token.getRawToken.useQuery()
   const { data: locations } = trpc.locations.getAll.useQuery()
   const [settingsExpanded, setSettingsExpanded] = useState(false)
@@ -257,7 +257,7 @@ export default function GamePage() {
       </header>
 
       {inSession && <GameSync />}
-      {inSession && (phase === "playing" || phase === "picking") && <BotTurnPlayer />}
+      {inSession && (phase === "playing" || phase === "picking") && playerId === creatorPlayerId && <BotTurnPlayer />}
 
       <main className={cn(
         "w-full max-w-[100vw] overflow-x-hidden flex-1 flex flex-col min-h-0",

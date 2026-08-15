@@ -116,6 +116,7 @@ export default function BotTurnPlayer() {
   const placeObstructionMutation = trpc.game.placeObstruction.useMutation()
   const removeObstructionMutation = trpc.game.removeObstruction.useMutation()
   const pickPoiMutation = trpc.game.pickPoi.useMutation()
+  const utils = trpc.useUtils()
 
   const currentPicker = players[pickingPlayerIndex % players.length]
   const isBotNeedingPick = phase === "picking"
@@ -476,7 +477,10 @@ export default function BotTurnPlayer() {
       visitedPoiIds: visitedPoiIds.length > 0 ? visitedPoiIds : undefined,
       movePath,
     }, {
-      onSettled: () => {
+      onSuccess: () => {
+        void utils.game.state.invalidate()
+      },
+      onError: () => {
         setPendingServerUpdate(false)
       },
     })

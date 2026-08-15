@@ -342,9 +342,12 @@ export const useGameStore = create<GameState>()(
             reachableGrids: reachable,
             selectedEndpoint: null,
             gridClearRequest: get().gridClearRequest + 1,
+            requestPreviewRecompute: get().requestPreviewRecompute + 1,
+            showPreviewPaths: true,
+            previewPaths: [],
+            previewPathIndex: 0,
+            pendingServerUpdate: true,
           } as Partial<GameState> as GameState);
-        } else {
-          get().handleEndTurn();
         }
       },
       setReachableGrids: (reachableGrids) => set({ reachableGrids }),

@@ -12,7 +12,6 @@ interface PlayerMoveRouteProps {
 }
 
 export default function PlayerMoveRoute({ player }: PlayerMoveRouteProps) {
-  const { playerRouteReceived } = useGameStore();
   const [positions, setPositions] = useState<LatLngTuple[]>([]);
 
   useEffect(() => {
@@ -28,9 +27,8 @@ export default function PlayerMoveRoute({ player }: PlayerMoveRouteProps) {
 
       log.debug("PlayerMoveRoute: showing", fullPath.length, "road points for player:", player.name);
       setPositions(fullPath);
-      playerRouteReceived();
     }
-  }, [player.completedRoute, player.name, playerRouteReceived]);
+  }, [player.completedRoute, player.name]);
 
   useEffect(() => {
     if (positions.length > 0 && !player.completedRoute) {

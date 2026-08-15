@@ -33,6 +33,7 @@ export default function GameSync() {
   const previousPhaseRef = useRef<string | null>(null)
   const lastProcessedMoveRef = useRef<string | null>(null)
   const lastActivityLengthRef = useRef<number>(0)
+  const pendingTicksRef = useRef(0)
 
   const phase = useGameStore((s) => s.phase)
   const pollInterval = phase === "playing" ? 2500 : 5000
@@ -195,10 +196,24 @@ export default function GameSync() {
         }
       }
 
-      const { pendingServerUpdate } = useGameStore.getState()
-      if (!pendingServerUpdate) {
-        const serverCurrentPlayer = gameState.players[gameState.currentTurn]
-        const localState = useGameStore.getState()
+      const localState = useGameStore.getState()
+      const serverCurrentPlayer = gameState.players[gameState.currentTurn]
+      const pendingServerUpdate = localState.pendingServerUpdate
+
+      if (pendingServerUpdate) {
+        pendingTicksRef.current += 1
+        const serverName = serverCurrentPlayer?.name ?? null
+        const localName = localState.currentPlayerName
+        const serverHasDice = gameState.dice1 !== null && gameState.dice2 !== null
+        const localRolled = localState.gameTurnState === GameTurnState.DICE_ROLLED
+        const localWaitingToRoll = localState.gameTurnState === GameTurnState.ROLL_DICE
+        const caughtUp = serverName === localName && ((localRolled && serverHasDice) || (localWaitingToRoll && !serverHasDice))
+        if (caughtUp || pendingTicksRef.current >= 8) {
+          pendingTicksRef.current = 0
+          localState.setPendingServerUpdate(false)
+        }
+      } else {
+        pendingTicksRef.current = 0
         const turnChanged = serverCurrentPlayer && serverCurrentPlayer.name !== localState.currentPlayerName
 
         if (turnChanged) {
@@ -210,20 +225,29 @@ export default function GameSync() {
           setCurrentPlayer(serverCurrentPlayer.name)
         }
 
-        if (gameState.dice1 !== null && gameState.dice2 !== null) {
-          const total = gameState.dice1 + gameState.dice2
-          setDiceValues([gameState.dice1, gameState.dice2])
-          const freshState = useGameStore.getState()
-          if (!freshState.playerStartGridKey) {
-            freshState.handleDiceRoll(total)
-          } else {
-            setDiceResult(total)
-            setGameTurnState(GameTurnState.DICE_ROLLED)
+        const midMove =
+          localState.gameTurnState === GameTurnState.DICE_ROLLED
+          && localState.diceResult !== null
+          && localState.localPlayerName !== null
+          && localState.localPlayerName === localState.currentPlayerName
+          && serverCurrentPlayer?.name === localState.localPlayerName
+
+        if (!midMove) {
+          if (gameState.dice1 !== null && gameState.dice2 !== null) {
+            const total = gameState.dice1 + gameState.dice2
+            setDiceValues([gameState.dice1, gameState.dice2])
+            const freshState = useGameStore.getState()
+            if (!freshState.playerStartGridKey) {
+              freshState.handleDiceRoll(total)
+            } else {
+              setDiceResult(total)
+              setGameTurnState(GameTurnState.DICE_ROLLED)
+            }
+          } else if (turnChanged || !localState.diceResult) {
+            setDiceResult(null)
+            setDiceValues(null)
+            setGameTurnState(GameTurnState.ROLL_DICE)
           }
-        } else if (turnChanged || !localState.diceResult) {
-          setDiceResult(null)
-          setDiceValues(null)
-          setGameTurnState(GameTurnState.ROLL_DICE)
         }
       }
 
@@ -233,7 +257,6 @@ export default function GameSync() {
       }
 
       const localPlayer = gameState.players.find(p => p.id === playerId)
-      const serverCurrentPlayer = gameState.players[gameState.currentTurn]
       if (serverCurrentPlayer && serverCurrentPlayer.name !== localPlayer?.name) {
         setRemotePreviewPath((gameState as Record<string, unknown>).previewPath as string[] | null ?? null)
       } else {

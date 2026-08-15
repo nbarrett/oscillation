@@ -107,6 +107,7 @@ export default function DiceRoller() {
 
   const pendingEndTurn = useGameStore((s) => s.pendingEndTurn)
   const setPendingEndTurn = useGameStore((s) => s.setPendingEndTurn)
+  const utils = trpc.useUtils()
   const pendingFinishRef = useRef<{
     destination: [number, number] | null
     visitedPoiIds: string[]
@@ -197,12 +198,20 @@ export default function DiceRoller() {
     if (currentPlayerName && (missedTurns[currentPlayerName] ?? 0) > 0) {
       addNotification(isMyTurn ? "You must miss this turn!" : `${currentPlayerName} must miss this turn!`, "info")
       decrementMissedTurns(currentPlayerName)
-      if (sessionId && playerId) {
-        skipMissedTurnMutation.mutate({ sessionId, playerId })
-      }
       setPendingServerUpdate(true)
       handleEndTurn()
-      setPendingServerUpdate(false)
+      if (sessionId && playerId) {
+        skipMissedTurnMutation.mutate({ sessionId, playerId }, {
+          onSuccess: () => {
+            void utils.game.state.invalidate()
+          },
+          onError: () => {
+            useGameStore.getState().setPendingServerUpdate(false)
+          },
+        })
+      } else {
+        setPendingServerUpdate(false)
+      }
       return
     }
 
@@ -230,7 +239,12 @@ export default function DiceRoller() {
           dice1: d1,
           dice2: d2,
         }, {
-          onSettled: () => useGameStore.getState().setPendingServerUpdate(false),
+          onSuccess: () => {
+            void utils.game.state.invalidate()
+          },
+          onError: () => {
+            useGameStore.getState().setPendingServerUpdate(false)
+          },
         })
       } else {
         store.setPendingServerUpdate(false)
@@ -239,10 +253,14 @@ export default function DiceRoller() {
   }
 
   function handleEndTurnClick() {
-    if (movementPath.length === 0 && previewPaths.length > 0) {
-      confirmPreviewPath()
+    const preStore = useGameStore.getState()
+    if (preStore.movementPath.length === 0 && preStore.previewPaths.length > 0) {
+      preStore.confirmPreviewPath()
     }
     const store = useGameStore.getState()
+    if (store.cardTrigger) {
+      return
+    }
     const currentPath = store.movementPath
     const lastGridKey = currentPath.length > 0
       ? currentPath[currentPath.length - 1]
@@ -361,9 +379,13 @@ export default function DiceRoller() {
 
       if (destination) {
         const remaining = (diceResult ?? 0) - trigger.stepsUsed
+        const destLatLng = gridKeyToLatLng(destination)
         addNotification(`Relocated! ${remaining > 0 ? `${remaining} moves remaining` : "Turn ending"}`, "info")
         handleCardRelocation(destination, remaining)
         useGameStore.getState().setCardDestinationKeys([])
+        if (remaining <= 0) {
+          finishEndTurn(destLatLng, [], [destination])
+        }
       } else {
         addNotification("No valid destination found — continuing normally", "info")
         setCardTrigger(null)
@@ -406,7 +428,12 @@ export default function DiceRoller() {
         visitedPoiIds: visitedPoiIds.length > 0 ? visitedPoiIds : undefined,
         movePath: movePath.length > 0 ? movePath : undefined,
       }, {
-        onSettled: () => setPendingServerUpdate(false),
+        onSuccess: () => {
+          void utils.game.state.invalidate()
+        },
+        onError: () => {
+          setPendingServerUpdate(false)
+        },
       })
     } else {
       setPendingServerUpdate(false)
@@ -479,7 +506,7 @@ export default function DiceRoller() {
           <Button
             className="gap-1.5 md:gap-2 h-8 md:h-9 px-2.5 md:px-4 text-xs md:text-sm"
             onClick={handleEndTurnClick}
-            disabled={!isMyTurn || !isPlaying || gameTurnState !== GameTurnState.DICE_ROLLED}
+            disabled={!isMyTurn || !isPlaying || gameTurnState !== GameTurnState.DICE_ROLLED || !!cardTrigger}
           >
             <CheckCircle2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
             End Turn
