@@ -1,7 +1,7 @@
 FROM node:22-slim AS deps
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@9 --activate
 
 # Install OpenSSL for Prisma
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
@@ -14,7 +14,7 @@ RUN pnpm install --frozen-lockfile
 FROM node:22-slim AS builder
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@9 --activate
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 COPY --from=deps /app/node_modules ./node_modules
@@ -31,7 +31,7 @@ WORKDIR /app
 
 # Install OpenSSL for Prisma runtime and enable corepack for pnpm
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@9 --activate
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
