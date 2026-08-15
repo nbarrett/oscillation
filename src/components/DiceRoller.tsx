@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Dices, CheckCircle2, LocateFixed, ChevronLeft, ChevronRight } from "lucide-react"
 import { GameTurnState, useCurrentPlayer, useGameStore } from "@/stores/game-store"
 import { gridKeyToLatLng, latLngToGridKey } from "@/lib/road-data"
@@ -13,8 +13,8 @@ import { useNotificationStore } from "@/stores/notification-store"
 import { useDeckStore } from "@/stores/deck-store"
 import { detectPoiVisits } from "@/lib/poi-detection"
 import { POI_CATEGORY_LABELS, type PoiCategory } from "@/lib/poi-categories"
-import { type ChanceCard, type EdgeCard, type MotorwayCard } from "@/lib/card-decks"
-import { resolveEdgeCard, resolveMotorwayCard } from "@/lib/card-resolution"
+import { type ChanceCard, type DeckType, type EdgeCard, type MotorwayCard } from "@/lib/card-decks"
+import { listEdgeCardMatches, listMotorwayCardMatches, resolveEdgeCard, resolveMotorwayCard } from "@/lib/card-resolution"
 import { Button } from "@/components/ui/button"
 import { DiceDisplay } from "@/components/ui/dice"
 import GridSelectionButton from "./GridSelectionButton"
@@ -73,6 +73,11 @@ export default function DiceRoller() {
     clearDrawnCard,
     extraThrow,
     setExtraThrow,
+    setDrawnDeckCard,
+    setPlacingObstruction,
+    setRemovingObstruction,
+    isPlacingObstruction,
+    isRemovingObstruction,
   } = useDeckStore()
 
   const [localRolling, setRolling] = useState(false)
@@ -102,12 +107,43 @@ export default function DiceRoller() {
 
   const pendingEndTurn = useGameStore((s) => s.pendingEndTurn)
   const setPendingEndTurn = useGameStore((s) => s.setPendingEndTurn)
+  const pendingFinishRef = useRef<{
+    destination: [number, number] | null
+    visitedPoiIds: string[]
+    currentPath: string[]
+  } | null>(null)
+
+  function requestDeckDraw(deckType: DeckType) {
+    if (sessionId && playerId) {
+      drawDeckCardMutation.mutate(
+        { sessionId, playerId, deckType },
+        {
+          onSuccess: (result) => {
+            if (result?.card) {
+              setDrawnDeckCard(result.card)
+            } else {
+              queueDraw(deckType)
+              processNextDraw()
+            }
+          },
+          onError: () => {
+            queueDraw(deckType)
+            processNextDraw()
+          },
+        },
+      )
+      return
+    }
+    queueDraw(deckType)
+    processNextDraw()
+  }
 
   const rollDiceMutation = trpc.game.rollDice.useMutation()
   const endTurnMutation = trpc.game.endTurn.useMutation()
   const drawCardMutation = trpc.game.drawCard.useMutation()
   const applyChanceEffectMutation = trpc.game.applyChanceEffect.useMutation()
   const skipMissedTurnMutation = trpc.game.skipMissedTurn.useMutation()
+  const drawDeckCardMutation = trpc.game.drawDeckCard.useMutation()
 
   useEffect(() => {
     if (pendingEndTurn && isMyTurn && gameTurnState === GameTurnState.DICE_ROLLED) {
@@ -125,11 +161,35 @@ export default function DiceRoller() {
       return
     }
     if (cardTrigger && !processingDeckDraws && !drawnDeckCard) {
-      queueDraw(cardTrigger.type)
       setProcessingDeckDraws(true)
-      processNextDraw()
+      requestDeckDraw(cardTrigger.type)
     }
-  }, [isMyTurn, cardTrigger, processingDeckDraws, drawnDeckCard, queueDraw, processNextDraw])
+  }, [isMyTurn, cardTrigger, processingDeckDraws, drawnDeckCard])
+
+  useEffect(() => {
+    if (!isMyTurn) return
+    if (isPlacingObstruction || isRemovingObstruction) return
+    const pending = pendingFinishRef.current
+    if (!pending) return
+    pendingFinishRef.current = null
+    finishEndTurn(pending.destination, pending.visitedPoiIds, pending.currentPath)
+  }, [isMyTurn, isPlacingObstruction, isRemovingObstruction])
+
+  useEffect(() => {
+    if (!drawnDeckCard || !cardTrigger) {
+      useGameStore.getState().setCardDestinationKeys([])
+      return
+    }
+    if (drawnDeckCard.deck === "edge" && gameBounds) {
+      useGameStore.getState().setCardDestinationKeys(
+        listEdgeCardMatches(drawnDeckCard as EdgeCard, cardTrigger.gridKey, gameBounds),
+      )
+    } else if (drawnDeckCard.deck === "motorway") {
+      useGameStore.getState().setCardDestinationKeys(
+        listMotorwayCardMatches(drawnDeckCard as MotorwayCard, cardTrigger.gridKey),
+      )
+    }
+  }, [drawnDeckCard, cardTrigger, gameBounds])
 
   function rollDice() {
     if (isRolling) return
@@ -239,10 +299,14 @@ export default function DiceRoller() {
     }
 
     if (dice1Value === dice2Value) {
-      setPendingServerUpdate(true)
-      queueDraw("chance")
-      setProcessingDeckDraws(true)
-      processNextDraw()
+      pendingFinishRef.current = { destination, visitedPoiIds, currentPath }
+      if (dice1Value <= 4) {
+        setPlacingObstruction("pick")
+        addNotification("Doubles 1-4: place an obstruction on an A or B road", "info")
+      } else {
+        setRemovingObstruction("any")
+        addNotification("Doubles 5-6: tap an obstruction to remove it, or skip", "info")
+      }
       return
     }
 
@@ -270,27 +334,40 @@ export default function DiceRoller() {
             playerId,
             effectType: "return_to_start",
           })
+        } else if (chance.effect.type === "shortcut_token") {
+          applyChanceEffectMutation.mutate({
+            sessionId,
+            playerId,
+            effectType: "shortcut_token",
+            shortcutColor: chance.effect.color,
+          })
         }
       }
     }
 
     if (trigger && card && (card.deck === "edge" || card.deck === "motorway")) {
       let destination: string | null = null
+      let matches: string[] = []
       if (card.deck === "edge" && gameBounds) {
         destination = resolveEdgeCard(card as EdgeCard, trigger.gridKey, gameBounds)
+        matches = listEdgeCardMatches(card as EdgeCard, trigger.gridKey, gameBounds)
       } else if (card.deck === "motorway") {
         destination = resolveMotorwayCard(card as MotorwayCard, trigger.gridKey)
+        matches = listMotorwayCardMatches(card as MotorwayCard, trigger.gridKey)
       }
 
+      useGameStore.getState().setCardDestinationKeys(matches)
       setProcessingDeckDraws(false)
 
       if (destination) {
         const remaining = (diceResult ?? 0) - trigger.stepsUsed
         addNotification(`Relocated! ${remaining > 0 ? `${remaining} moves remaining` : "Turn ending"}`, "info")
         handleCardRelocation(destination, remaining)
+        useGameStore.getState().setCardDestinationKeys([])
       } else {
         addNotification("No valid destination found — continuing normally", "info")
         setCardTrigger(null)
+        useGameStore.getState().setCardDestinationKeys([])
       }
       return
     }

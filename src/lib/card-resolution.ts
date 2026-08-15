@@ -59,15 +59,26 @@ export function resolveEdgeCard(
   const checker = card.roadType === "A" ? gridHasARoad : gridHasBRoad
   const target = ordinalToNumber(card.ordinal)
   let count = 0
+  const matches: string[] = []
 
   for (const key of ordered) {
     if (checker(key)) {
       count++
+      matches.push(key)
       if (count === target) return key
     }
   }
 
-  return null
+  return matches.length > 0 ? matches[matches.length - 1] : null
+}
+
+export function listEdgeCardMatches(
+  card: EdgeCard,
+  triggerGridKey: string,
+  gameBounds: GameBounds
+): string[] {
+  const destination = resolveEdgeCard(card, triggerGridKey, gameBounds)
+  return destination ? [destination] : []
 }
 
 function bearingBetween(e1: number, n1: number, e2: number, n2: number): number {
@@ -119,9 +130,17 @@ export function resolveMotorwayCard(
     .filter((p) => p.diff <= 45 && p.dist > 500)
     .sort((a, b) => a.dist - b.dist)
 
-  if (candidates.length < target) return null
+  if (candidates.length === 0) return null
 
-  const chosen = candidates[target - 1]
+  const chosen = candidates[Math.min(target, candidates.length) - 1]
   const [lng, lat] = proj4(BNG, "EPSG:4326", [chosen.easting, chosen.northing])
   return latLngToGridKey(lat, lng)
+}
+
+export function listMotorwayCardMatches(
+  card: MotorwayCard,
+  triggerGridKey: string
+): string[] {
+  const destination = resolveMotorwayCard(card, triggerGridKey)
+  return destination ? [destination] : []
 }

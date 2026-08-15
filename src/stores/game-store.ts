@@ -156,6 +156,7 @@ interface GameState {
     pathsFound: number;
     startHasRoad: boolean;
   } | null;
+  cardDestinationKeys: string[];
   setRemotePreviewPath: (path: string[] | null) => void;
   setPathDiagnostics: (d: GameState["pathDiagnostics"]) => void;
   setShowPreviewPaths: (show: boolean) => void;
@@ -168,6 +169,7 @@ interface GameState {
   cyclePreviewPath: (direction: 1 | -1) => void;
   confirmPreviewPath: () => void;
   setCardTrigger: (trigger: CardTrigger | null) => void;
+  setCardDestinationKeys: (keys: string[]) => void;
   handleCardRelocation: (destinationGridKey: string, remainingMoves: number) => void;
   setReachableGrids: (grids: Map<string, number> | null) => void;
   setSelectedEndpoint: (endpoint: string | null) => void;
@@ -265,6 +267,7 @@ export const useGameStore = create<GameState>()(
       pendingEndTurn: false,
       remotePreviewPath: null,
       pathDiagnostics: null,
+      cardDestinationKeys: [],
       tokenInventory: {},
       activityLog: [],
       seenPoiIds: {},
@@ -307,6 +310,7 @@ export const useGameStore = create<GameState>()(
       },
 
       setCardTrigger: (cardTrigger) => set({ cardTrigger }),
+      setCardDestinationKeys: (cardDestinationKeys) => set({ cardDestinationKeys }),
 
       handleCardRelocation: (destinationGridKey, remainingMoves) => {
         const state = get();
@@ -668,6 +672,7 @@ export const useGameStore = create<GameState>()(
           tokenInventory: {},
           activityLog: [],
           seenPoiIds: {},
+          cardDestinationKeys: [],
         });
       },
     }),

@@ -51,6 +51,8 @@ function chanceActionLabel(card: ChanceCard): string {
       return "Place Obstruction"
     case "remove_obstruction":
       return "Remove Obstruction"
+    case "shortcut_token":
+      return `Take ${card.effect.color} token`
     default:
       return "Continue"
   }

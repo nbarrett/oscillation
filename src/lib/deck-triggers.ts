@@ -114,6 +114,24 @@ export function boundaryGridKeys(gameBounds: GameBounds): string[] {
   return keys
 }
 
+export function firstPathTrigger(
+  path: string[],
+  gameBounds: GameBounds | null,
+  railwayStations?: Array<{ lat: number; lng: number }>
+): { type: "edge" | "motorway"; gridKey: string; stepsUsed: number } | null {
+  for (let i = 0; i < path.length; i++) {
+    const gridKey = path[i]
+    if (isOnBoardEdge(gridKey, gameBounds)) {
+      return { type: "edge", gridKey, stepsUsed: i + 1 }
+    }
+    const mwResult = isOnMotorwayOrRailway(gridKey, railwayStations)
+    if (mwResult.triggered) {
+      return { type: "motorway", gridKey, stepsUsed: i + 1 }
+    }
+  }
+  return null
+}
+
 export function isOnMotorwayOrRailway(
   gridKey: string,
   railwayStations?: Array<{ lat: number; lng: number }>

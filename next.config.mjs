@@ -1,11 +1,15 @@
+import path from "node:path"
+import { fileURLToPath } from "node:url"
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   output: "standalone",
+  outputFileTracingRoot: __dirname,
   transpilePackages: ["leaflet", "react-leaflet", "proj4leaflet"],
-  experimental: {
-    serverComponentsExternalPackages: ["better-sqlite3"],
-  },
+  serverExternalPackages: ["better-sqlite3"],
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve = config.resolve || {}

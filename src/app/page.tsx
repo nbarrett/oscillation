@@ -1,13 +1,13 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import packageJson from "../../package.json"
-import { Loader2, Gamepad2, ChevronDown, ChevronLeft, ChevronRight, Settings, Users, LogOut, Copy, Check, Trophy, MessageCircle, ScrollText, Shuffle } from "lucide-react"
+import { Loader2, Gamepad2, ChevronDown, Settings, Users, LogOut, Copy, Check, Trophy, MessageCircle, ScrollText, Shuffle } from "lucide-react"
 import { AuthDialog } from "@/components/auth/auth-dialog"
 import { UserMenu } from "@/components/auth/user-menu"
 import { useMapStore } from "@/stores/map-store"
-import { useGameStore, GameTurnState } from "@/stores/game-store"
+import { useGameStore } from "@/stores/game-store"
 import { useChatStore } from "@/stores/chat-store"
 import { carImageForStyle } from "@/stores/car-store"
 import { trpc } from "@/lib/trpc/client"
@@ -53,6 +53,8 @@ const ChatPanel = dynamic(() => import("@/components/ChatPanel"), { ssr: false }
 const PoiPicker = dynamic(() => import("@/components/PoiPicker"), { ssr: false })
 const ActivityLog = dynamic(() => import("@/components/ActivityLog"), { ssr: false })
 const CardBrowser = dynamic(() => import("@/components/CardBrowser"), { ssr: false })
+const MovementOverlay = dynamic(() => import("@/components/MovementOverlay"), { ssr: false })
+const SplashScreen = dynamic(() => import("@/components/SplashScreen"), { ssr: false })
 
 
 function ShowAllRoutesToggle() {
@@ -93,185 +95,6 @@ function RoadDataIndicator() {
   )
 }
 
-function MovementOverlay() {
-  const gameTurnState = useGameStore((s) => s.gameTurnState)
-  const diceResult = useGameStore((s) => s.diceResult)
-  const movementPath = useGameStore((s) => s.movementPath)
-  const currentPlayerName = useGameStore((s) => s.currentPlayerName)
-  const previewPaths = useGameStore((s) => s.previewPaths)
-  const previewPathIndex = useGameStore((s) => s.previewPathIndex)
-  const cyclePreviewPath = useGameStore((s) => s.cyclePreviewPath)
-  const confirmPreviewPath = useGameStore((s) => s.confirmPreviewPath)
-  const setPendingEndTurn = useGameStore((s) => s.setPendingEndTurn)
-  const pathDiagnostics = useGameStore((s) => s.pathDiagnostics)
-
-  const [diagOpen, setDiagOpen] = useState(false)
-  const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null)
-  const dragStart = useRef<{ mx: number; my: number; ox: number; oy: number } | null>(null)
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest("button")) return
-    dragStart.current = { mx: e.clientX, my: e.clientY, ox: dragOffset?.x ?? 0, oy: dragOffset?.y ?? 0 }
-    const onMove = (ev: MouseEvent) => {
-      if (!dragStart.current) return
-      setDragOffset({ x: dragStart.current.ox + ev.clientX - dragStart.current.mx, y: dragStart.current.oy + ev.clientY - dragStart.current.my })
-    }
-    const onUp = () => {
-      dragStart.current = null
-      window.removeEventListener("mousemove", onMove)
-      window.removeEventListener("mouseup", onUp)
-    }
-    window.addEventListener("mousemove", onMove)
-    window.addEventListener("mouseup", onUp)
-  }
-
-  const diceRolling = useGameStore((s) => s.diceRolling)
-  const diceValues = useGameStore((s) => s.diceValues)
-  const localPlayerName = useGameStore((s) => s.localPlayerName)
-  const roadDataStatus = useGameStore((s) => s.roadDataStatus)
-  const isMyTurn = localPlayerName !== null && localPlayerName === currentPlayerName
-  const isBotTurn = currentPlayerName?.startsWith("Bot ") ?? false
-  const showPreviews = isMyTurn && gameTurnState === GameTurnState.DICE_ROLLED && diceResult && movementPath.length === 0 && previewPaths.length > 0
-  const showRollDice = isMyTurn && gameTurnState === GameTurnState.ROLL_DICE
-  const showFreeSelection = isMyTurn && gameTurnState === GameTurnState.DICE_ROLLED && diceResult && previewPaths.length === 0
-  const showBotRolling = isBotTurn && diceRolling
-  const showBotResult = isBotTurn && !diceRolling && diceValues && gameTurnState === GameTurnState.DICE_ROLLED
-
-  if (!showPreviews && !showRollDice && !showFreeSelection && !showBotRolling && !showBotResult) return null
-
-  return (
-    <div
-      className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] animate-bounce-in"
-      style={dragOffset ? { transform: `translate(calc(-50% + ${dragOffset.x}px), ${dragOffset.y}px)` } : undefined}
-    >
-      <div
-        className="bg-primary/95 text-primary-foreground px-3 md:px-6 py-2 md:py-3 rounded-xl shadow-2xl text-center cursor-grab active:cursor-grabbing select-none max-w-[calc(100vw-2rem)]"
-        onMouseDown={handleMouseDown}
-      >
-        {showBotRolling && (
-          <div className="text-lg font-bold pointer-events-none">
-            {currentPlayerName} is rolling the dice...
-          </div>
-        )}
-        {showBotResult && (
-          <div className="text-lg font-bold pointer-events-none">
-            {currentPlayerName} threw {diceValues[0] + diceValues[1]}!
-          </div>
-        )}
-        {showRollDice && (
-          <div className="text-lg font-bold pointer-events-none">
-            {isMyTurn ? "Your" : `${currentPlayerName}\u2019s`} turn — Roll the dice!
-          </div>
-        )}
-        {showFreeSelection && (
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-3">
-              <div className="text-lg font-bold">
-                {roadDataStatus === "loading"
-                  ? "Loading road data..."
-                  : roadDataStatus === "error"
-                    ? "Road data failed to load"
-                    : movementPath.length > 0
-                      ? `Moves: ${movementPath.length}/${diceResult} — click to extend`
-                      : `Move ${diceResult} squares — click a square on the road`}
-              </div>
-              {roadDataStatus === "error" ? (
-                <button
-                  onClick={() => {
-                    useGameStore.getState().setRoadDataStatus("idle")
-                    useGameStore.getState().triggerPreviewRecompute()
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-red-100 text-red-700 text-sm font-bold hover:bg-red-200 transition-colors"
-                >
-                  Retry
-                </button>
-              ) : (
-                <button
-                  onClick={() => {
-                    useGameStore.getState().setShowPreviewPaths(true)
-                    useGameStore.getState().triggerPreviewRecompute()
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-primary-foreground text-primary text-sm font-bold hover:bg-primary-foreground/90 transition-colors"
-                >
-                  Show Routes
-                </button>
-              )}
-            </div>
-            {pathDiagnostics && (
-              <div className="text-xs">
-                <button
-                  onClick={() => setDiagOpen(o => !o)}
-                  className="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity"
-                >
-                  <ChevronDown className={cn("h-3 w-3 transition-transform", diagOpen && "rotate-180")} />
-                  Why no routes?
-                </button>
-                {diagOpen && (
-                  <div className="mt-1.5 bg-black/20 rounded-lg px-3 py-2 text-left space-y-0.5 font-mono">
-                    <div>Dice: {pathDiagnostics.dice}</div>
-                    <div>Reachable grids (BFS): {pathDiagnostics.reachable}</div>
-                    <div>At exact {pathDiagnostics.dice} steps: {pathDiagnostics.atExactSteps}</div>
-                    <div>↳ with A/B road: {pathDiagnostics.atExactStepsABRoad}</div>
-                    <div>↳ with any road: {pathDiagnostics.atExactStepsAnyRoad}</div>
-                    <div>Occupied grids: {pathDiagnostics.occupied}</div>
-                    <div>Start has road: {pathDiagnostics.startHasRoad ? "yes" : "no"}</div>
-                    <div>Paths found: {pathDiagnostics.pathsFound}</div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-        {showPreviews && (
-          <div className="flex flex-wrap items-center gap-2 md:gap-3">
-            <button
-              onClick={() => cyclePreviewPath(-1)}
-              className="p-1.5 rounded-lg hover:bg-primary-foreground/20 transition-colors"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-            <div className="min-w-[120px]">
-              <div className="text-lg font-bold">
-                Possible Move {previewPathIndex + 1} of {previewPaths.length}
-              </div>
-              <div className="text-xs opacity-80">
-                or click a green square
-              </div>
-            </div>
-            <button
-              onClick={() => cyclePreviewPath(1)}
-              className="p-1.5 rounded-lg hover:bg-primary-foreground/20 transition-colors"
-            >
-              <ChevronRight className="h-5 w-5" />
-            </button>
-            <button
-              onClick={() => confirmPreviewPath()}
-              className="ml-2 px-3 py-1.5 rounded-lg bg-primary-foreground text-primary text-sm font-bold hover:bg-primary-foreground/90 transition-colors"
-            >
-              Select
-            </button>
-            <button
-              onClick={() => {
-                confirmPreviewPath()
-                setPendingEndTurn(true)
-              }}
-              className="px-3 py-1.5 rounded-lg bg-primary-foreground text-primary text-sm font-bold hover:bg-primary-foreground/90 transition-colors"
-            >
-              Select &amp; End Turn
-            </button>
-            <button
-              onClick={() => useGameStore.getState().setPreviewPaths([])}
-              className="px-3 py-1.5 rounded-lg bg-primary-foreground text-primary text-sm font-bold hover:bg-primary-foreground/90 transition-colors"
-            >
-              Free Selection
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 function ChatToggleButton({ onClick }: { onClick: () => void }) {
   const unreadCount = useChatStore((s) => s.unreadCount)
   return (
@@ -302,6 +125,7 @@ export default function GamePage() {
   const [chatOpen, setChatOpen] = useState(false)
   const [chatWidth, setChatWidth] = useState(320)
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
+  const [showSplash, setShowSplash] = useState(true)
 
   const sessionCheck = trpc.game.state.useQuery(
     { sessionId: sessionId! },
@@ -361,8 +185,15 @@ export default function GamePage() {
   const inSession = !!sessionId && sessionCheck.isFetched && !!sessionCheck.data
   const winningPlayer = useGameStore.getState().players.find(p => p.name === winnerName)
 
+  if (showSplash && !inSession && !validatingSession) {
+    return <SplashScreen onStart={() => setShowSplash(false)} />
+  }
+
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className={cn(
+      "min-h-dvh bg-background flex flex-col",
+      inSession && (phase === "playing" || phase === "picking") && "h-dvh overflow-hidden",
+    )}>
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="w-full flex h-14 items-center justify-between px-4">
           <div className="flex items-center gap-3">
@@ -428,7 +259,12 @@ export default function GamePage() {
       {inSession && <GameSync />}
       {inSession && (phase === "playing" || phase === "picking") && <BotTurnPlayer />}
 
-      <main className="w-full max-w-[100vw] overflow-x-hidden px-2 md:px-4 py-2 md:py-3 flex-1 flex flex-col gap-2 md:gap-3 pb-[12rem] md:pb-3">
+      <main className={cn(
+        "w-full max-w-[100vw] overflow-x-hidden flex-1 flex flex-col min-h-0",
+        inSession && phase === "playing"
+          ? "px-0 py-0 md:px-4 md:py-3 gap-0 md:gap-3 pb-[7.5rem] md:pb-3"
+          : "px-2 md:px-4 py-2 md:py-3 gap-2 md:gap-3",
+      )}>
         {validatingSession ? (
           <div className="flex-1 flex items-center justify-center py-8">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -543,7 +379,7 @@ export default function GamePage() {
 
             <Card className="overflow-hidden">
               <CardContent className="p-0">
-                <div className="h-[calc(100vh-8rem)] md:h-[calc(100vh-280px)] min-h-[300px] flex">
+                <div className="h-[calc(100dvh-3.5rem-7.5rem)] md:h-[calc(100vh-280px)] min-h-[280px] flex">
                   <div className="flex-1 relative min-w-0">
                     <MapWithCars />
                     {phase === "playing" && <MapPositions />}
@@ -567,11 +403,11 @@ export default function GamePage() {
             </Card>
 
             {phase === "playing" && (
-            <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-background/95 backdrop-blur border-t px-3 py-2 safe-bottom">
-              <div className="flex items-center gap-2">
+            <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-background/95 backdrop-blur border-t px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+              <div className="flex items-center gap-2 overflow-x-auto">
                 <GameObjectives />
               </div>
-              <div className="flex items-center gap-2 mt-2">
+              <div className="flex items-center gap-2 mt-1 overflow-x-auto">
                 <DiceRoller />
               </div>
               <div className="flex items-center gap-1.5 mt-2">
@@ -689,7 +525,10 @@ export default function GamePage() {
           </DialogContent>
         </Dialog>
 
-        <footer className="flex flex-col sm:flex-row items-center justify-between gap-2 py-3 text-xs text-muted-foreground">
+        <footer className={cn(
+          "flex flex-col sm:flex-row items-center justify-between gap-2 py-3 text-xs text-muted-foreground",
+          inSession && (phase === "playing" || phase === "picking") && "hidden md:flex",
+        )}>
           <p>
             Built with{" "}
             <a href="https://create.t3.gg" className="font-medium underline underline-offset-4 hover:text-primary">

@@ -13,7 +13,7 @@ import { trpc } from "@/lib/trpc/client"
 import { latLngToGridKey, nearestRoadPosition, reachableRoadGrids, gridKeyToLatLng, shortestPath, gridHasABRoad, gridHasRoad } from "@/lib/road-data"
 import { detectPoiVisits } from "@/lib/poi-detection"
 import { POI_CATEGORY_LABELS, type PoiCategory } from "@/lib/poi-categories"
-import { isOnBoardEdge, isOnMotorwayOrRailway } from "@/lib/deck-triggers"
+import { firstPathTrigger } from "@/lib/deck-triggers"
 import { resolveEdgeCard, resolveMotorwayCard } from "@/lib/card-resolution"
 import { type GameBounds } from "@/lib/area-size"
 import { type DeckType, type ChanceCard, type EdgeCard, type MotorwayCard } from "@/lib/card-decks"
@@ -221,6 +221,15 @@ export default function BotTurnPlayer() {
         deckStore.setExtraThrow(true)
         break
 
+      case "shortcut_token":
+        applyChanceEffectMutation.mutate({
+          sessionId,
+          playerId,
+          effectType: "shortcut_token",
+          shortcutColor: effect.color,
+        })
+        break
+
       case "place_obstruction": {
         const botPlayer = players.find(p => p.name === currentPlayerName)
         if (botPlayer) {
@@ -254,17 +263,7 @@ export default function BotTurnPlayer() {
     path: string[],
     gameBounds: GameBounds | null
   ): { type: "edge" | "motorway"; gridKey: string; stepsUsed: number } | null {
-    for (let i = 0; i < path.length; i++) {
-      const gridKey = path[i]
-      if (isOnBoardEdge(gridKey, gameBounds)) {
-        return { type: "edge", gridKey, stepsUsed: i + 1 }
-      }
-      const mwResult = isOnMotorwayOrRailway(gridKey)
-      if (mwResult.triggered) {
-        return { type: "motorway", gridKey, stepsUsed: i + 1 }
-      }
-    }
-    return null
+    return firstPathTrigger(path, gameBounds)
   }
 
   function computeBotPath(botName: string, total: number) {
@@ -445,13 +444,27 @@ export default function BotTurnPlayer() {
 
     if (dice1 === dice2) {
       const deckStore = useDeckStore.getState()
-      deckStore.queueDraw("chance")
-      let drawnCard = deckStore.processNextDraw()
-      while (drawnCard) {
-        if (drawnCard.deck === "chance") {
-          processBotCardEffect(drawnCard as ChanceCard)
+      const colors = ["blue", "yellow", "green"] as const
+      if (dice1 <= 4) {
+        const botPlayer = players.find(p => p.name === botName)
+        if (botPlayer) {
+          const snapped = nearestRoadPosition(botPlayer.position[0], botPlayer.position[1])
+          const pos = snapped ?? botPlayer.position
+          const nearGridKey = latLngToGridKey(pos[0], pos[1])
+          const nearby = reachableRoadGrids(nearGridKey, 3, new Set(), gameBounds)
+          if (nearby && nearby.size > 0) {
+            const keys = [...nearby.keys()].filter(gridHasABRoad)
+            const pool = keys.length > 0 ? keys : [...nearby.keys()]
+            const gridKey = pool[Math.floor(Math.random() * pool.length)]
+            const color = colors[Math.floor(Math.random() * colors.length)]
+            deckStore.addObstruction({ gridKey, color, placedByPlayerId: playerId })
+            placeObstructionMutation.mutate({ sessionId, playerId, gridKey, color })
+          }
         }
-        drawnCard = useDeckStore.getState().processNextDraw()
+      } else if (deckStore.obstructions.length > 0) {
+        const target = deckStore.obstructions[Math.floor(Math.random() * deckStore.obstructions.length)]
+        deckStore.removeObstruction(target.gridKey)
+        removeObstructionMutation.mutate({ sessionId, gridKey: target.gridKey })
       }
     }
 

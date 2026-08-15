@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { useSession } from "next-auth/react"
 import { Trash2, Users, Gamepad2, Settings, RefreshCw, AlertTriangle, Shield, ShieldOff, Clock } from "lucide-react"
 import { toast } from "sonner"
@@ -130,7 +131,7 @@ export default function AdminPage() {
             )}
             <ThemeToggle />
             <Button variant="outline" size="sm" asChild>
-              <a href="/">Back to Game</a>
+              <Link href="/">Back to Game</Link>
             </Button>
           </div>
         </div>

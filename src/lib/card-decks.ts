@@ -7,10 +7,15 @@ export type CompassDirection = "N" | "S" | "E" | "W" | "NE" | "NW" | "SE" | "SW"
 export type InfrastructureType = "motorway junction" | "railway station"
 export type ObstructionColor = "blue" | "yellow" | "green"
 
+export type ShortcutColor = "red" | "magenta" | "black" | "green" | "yellow"
+
+export const SHORTCUT_COLOURS: ShortcutColor[] = ["red", "magenta", "black", "green", "yellow"]
+
 export type ChanceEffect =
   | { type: "miss_turn"; turns: number }
   | { type: "return_to_start" }
   | { type: "extra_throw" }
+  | { type: "shortcut_token"; color: ShortcutColor }
   | { type: "place_obstruction"; color: ObstructionColor }
   | { type: "remove_obstruction"; color: ObstructionColor }
 
@@ -95,25 +100,25 @@ function buildMotorwayDeck(): MotorwayCard[] {
 
 function buildChanceDeck(): ChanceCard[] {
   return [
-    { id: "chance-miss-1a", deck: "chance", title: "Flat Tyre", body: "You've got a flat tyre! Miss a turn while you change it.", effect: { type: "miss_turn", turns: 1 } },
-    { id: "chance-miss-1b", deck: "chance", title: "Road Works", body: "The road ahead is closed for repairs. Miss a turn.", effect: { type: "miss_turn", turns: 1 } },
-    { id: "chance-miss-1c", deck: "chance", title: "Traffic Jam", body: "You're stuck in a traffic jam. Miss a turn.", effect: { type: "miss_turn", turns: 1 } },
-    { id: "chance-miss-2a", deck: "chance", title: "Engine Trouble", body: "Your engine has overheated! Miss 2 turns while it cools down.", effect: { type: "miss_turn", turns: 2 } },
-    { id: "chance-miss-2b", deck: "chance", title: "Out of Fuel", body: "You've run out of fuel and need a tow. Miss 2 turns.", effect: { type: "miss_turn", turns: 2 } },
-    { id: "chance-return", deck: "chance", title: "Wrong Turn!", body: "You've taken a completely wrong turn. Return to start!", effect: { type: "return_to_start" } },
-    { id: "chance-extra-1", deck: "chance", title: "Tailwind", body: "A strong tailwind pushes you forward. Take an extra throw!", effect: { type: "extra_throw" } },
-    { id: "chance-extra-2", deck: "chance", title: "Shortcut Found", body: "You've found a shortcut! Take an extra throw!", effect: { type: "extra_throw" } },
-    { id: "chance-extra-3", deck: "chance", title: "Clear Roads", body: "The roads are empty — put your foot down! Take an extra throw!", effect: { type: "extra_throw" } },
-    { id: "chance-obs-blue", deck: "chance", title: "Blue Obstruction", body: "Place a blue obstruction on any grid square to block opponents.", effect: { type: "place_obstruction", color: "blue" } },
-    { id: "chance-obs-yellow", deck: "chance", title: "Yellow Obstruction", body: "Place a yellow obstruction on any grid square to block opponents.", effect: { type: "place_obstruction", color: "yellow" } },
-    { id: "chance-obs-green", deck: "chance", title: "Green Obstruction", body: "Place a green obstruction on any grid square to block opponents.", effect: { type: "place_obstruction", color: "green" } },
-    { id: "chance-rm-blue", deck: "chance", title: "Road Cleared", body: "Remove a blue obstruction from the map.", effect: { type: "remove_obstruction", color: "blue" } },
-    { id: "chance-rm-yellow", deck: "chance", title: "Detour Found", body: "Remove a yellow obstruction from the map.", effect: { type: "remove_obstruction", color: "yellow" } },
-    { id: "chance-rm-green", deck: "chance", title: "Path Cleared", body: "Remove a green obstruction from the map.", effect: { type: "remove_obstruction", color: "green" } },
-    { id: "chance-miss-1d", deck: "chance", title: "Speed Camera", body: "Caught by a speed camera! Pull over and miss a turn.", effect: { type: "miss_turn", turns: 1 } },
-    { id: "chance-extra-4", deck: "chance", title: "Downhill Coast", body: "A long downhill stretch — coast ahead! Take an extra throw!", effect: { type: "extra_throw" } },
-    { id: "chance-obs-blue-2", deck: "chance", title: "Flooded Road", body: "Place a blue obstruction to block a flooded road.", effect: { type: "place_obstruction", color: "blue" } },
+    { id: "chance-engine-overheated", deck: "chance", title: "Engine overheated", body: "Miss a go", effect: { type: "miss_turn", turns: 1 } },
+    { id: "chance-traffic-accident", deck: "chance", title: "Traffic accident", body: "Miss a go", effect: { type: "miss_turn", turns: 1 } },
+    { id: "chance-fails-orientate", deck: "chance", title: "Fails to orientate map", body: "Miss a go", effect: { type: "miss_turn", turns: 1 } },
+    { id: "chance-old-map", deck: "chance", title: "Using old map", body: "Miss a go", effect: { type: "miss_turn", turns: 1 } },
+    { id: "chance-missed-turning", deck: "chance", title: "Missed a turning", body: "Miss a go to consult map", effect: { type: "miss_turn", turns: 1 } },
+    { id: "chance-car-crash", deck: "chance", title: "Car crash", body: "Go back to start", effect: { type: "return_to_start" } },
+    { id: "chance-tyre-punctured", deck: "chance", title: "Tyre punctured", body: "Go back to start square", effect: { type: "return_to_start" } },
+    { id: "chance-up-to-date-map", deck: "chance", title: "Using up-to-date map", body: "Have another throw", effect: { type: "extra_throw" } },
+    { id: "chance-by-pass", deck: "chance", title: "Uses by-pass", body: "Take another throw", effect: { type: "extra_throw" } },
+    { id: "chance-shortcut-red", deck: "chance", title: "Take a chance on a short cut", body: "Take OR REPLACE Red token", effect: { type: "shortcut_token", color: "red" } },
+    { id: "chance-shortcut-magenta", deck: "chance", title: "Take a chance on a short cut", body: "Take OR REPLACE Magenta token", effect: { type: "shortcut_token", color: "magenta" } },
+    { id: "chance-shortcut-black", deck: "chance", title: "Take a chance on a short cut", body: "Take OR REPLACE Black token", effect: { type: "shortcut_token", color: "black" } },
+    { id: "chance-shortcut-green", deck: "chance", title: "Take a chance on a short cut", body: "Take OR REPLACE Green token", effect: { type: "shortcut_token", color: "green" } },
+    { id: "chance-shortcut-yellow", deck: "chance", title: "Take a chance on a short cut", body: "Take OR REPLACE Yellow token", effect: { type: "shortcut_token", color: "yellow" } },
   ]
+}
+
+export function shortcutTokenKey(color: ShortcutColor): string {
+  return `shortcut:${color}`
 }
 
 export const EDGE_DECK: EdgeCard[] = buildEdgeDeck()

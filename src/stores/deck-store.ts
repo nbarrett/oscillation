@@ -40,6 +40,7 @@ interface DeckActions {
   removeObstruction: (gridKey: string) => void
   setMissedTurns: (playerName: string, turns: number) => void
   decrementMissedTurns: (playerName: string) => void
+  setDrawnDeckCard: (card: GameCard | null) => void
   setPlacingObstruction: (color: string | null) => void
   setRemovingObstruction: (color: string | null) => void
   setExtraThrow: (value: boolean) => void
@@ -171,6 +172,7 @@ export const useDeckStore = create<DeckState & DeckActions>()((set, get) => ({
   },
 
   clearDrawnCard: () => set({ drawnDeckCard: null }),
+  setDrawnDeckCard: (card) => set({ drawnDeckCard: card }),
 
   setObstructions: (obstructions) => set({ obstructions }),
 

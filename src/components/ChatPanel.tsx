@@ -230,9 +230,12 @@ export default function ChatPanel({ isOpen, onClose, width, onWidthChange }: Cha
   if (!isOpen) return null
 
   return (
-    <div className="flex h-full" style={{ width: `${width}px`, minWidth: `${width}px` }}>
+    <div
+      className="flex h-full max-md:fixed max-md:inset-0 max-md:z-[1200] max-md:w-full max-md:min-w-0"
+      style={{ width: `${width}px`, minWidth: `${width}px` }}
+    >
       <div
-        className="w-1.5 cursor-col-resize bg-border hover:bg-primary/30 transition-colors shrink-0"
+        className="w-1.5 cursor-col-resize bg-border hover:bg-primary/30 transition-colors shrink-0 max-md:hidden"
         onMouseDown={handleMouseDown}
       />
       <div className="flex-1 flex flex-col bg-card border-l min-w-0">

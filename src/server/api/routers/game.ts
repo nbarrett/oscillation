@@ -7,7 +7,7 @@ import { AREA_SIZES, DEFAULT_AREA_SIZE, areaSizeBounds, isWithinBounds, type Are
 import { snapToGridCenter } from "@/lib/road-data"
 import { validatePoiCoverage, fetchPoiCandidates, prewarmPoiCandidates } from "@/server/overpass"
 import { POI_CATEGORIES } from "@/lib/poi-categories"
-import { EDGE_DECK, MOTORWAY_DECK, CHANCE_DECK, shuffleDeck, cardById, type ObstructionToken } from "@/lib/card-decks"
+import { EDGE_DECK, MOTORWAY_DECK, CHANCE_DECK, shuffleDeck, cardById, shortcutTokenKey, type ObstructionToken } from "@/lib/card-decks"
 import { log } from "@/lib/utils"
 
 const CATEGORY_TO_COLOUR: Record<string, string> = {
@@ -926,8 +926,9 @@ export const gameRouter = createTRPCRouter({
     .input(z.object({
       sessionId: z.string(),
       playerId: z.string(),
-      effectType: z.enum(["miss_turn", "return_to_start", "extra_throw"]),
+      effectType: z.enum(["miss_turn", "return_to_start", "extra_throw", "shortcut_token"]),
       missedTurns: z.number().optional(),
+      shortcutColor: z.enum(["red", "magenta", "black", "green", "yellow"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const session = await ctx.db.gameSession.findUnique({
@@ -959,6 +960,27 @@ export const gameRouter = createTRPCRouter({
               positionLng: session.startLng,
             },
           })
+        }
+      }
+
+      if (input.effectType === "shortcut_token" && input.shortcutColor) {
+        const currentPlayer = session.players[session.currentTurn]
+        const tokenKey = shortcutTokenKey(input.shortcutColor)
+        if (currentPlayer) {
+          for (const player of session.players) {
+            const tokens = (player.tokens as Record<string, number>) ?? {}
+            if (player.id === currentPlayer.id) {
+              tokens[tokenKey] = 1
+            } else if (tokens[tokenKey]) {
+              delete tokens[tokenKey]
+            } else {
+              continue
+            }
+            await ctx.db.gamePlayer.update({
+              where: { id: player.id },
+              data: { tokens: JSON.parse(JSON.stringify(tokens)) },
+            })
+          }
         }
       }
 

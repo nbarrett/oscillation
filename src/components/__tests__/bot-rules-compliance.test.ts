@@ -12,19 +12,19 @@ const gridSquaresCode = readFileSync(SELECT_GRID_SQUARES_PATH, "utf-8")
 
 describe("Bot Rule Compliance - Deck Card Triggers", () => {
   it("human player checks isOnBoardEdge trigger via SelectGridSquares", () => {
-    expect(gridSquaresCode).toContain("isOnBoardEdge")
+    expect(gridSquaresCode).toContain("firstPathTrigger")
   })
 
   it("bot player checks isOnBoardEdge trigger", () => {
-    expect(botCode).toContain("isOnBoardEdge")
+    expect(botCode).toContain("firstPathTrigger")
   })
 
   it("human player checks isOnMotorwayOrRailway trigger via SelectGridSquares", () => {
-    expect(gridSquaresCode).toContain("isOnMotorwayOrRailway")
+    expect(gridSquaresCode).toContain("firstPathTrigger")
   })
 
   it("bot player checks isOnMotorwayOrRailway trigger", () => {
-    expect(botCode).toContain("isOnMotorwayOrRailway")
+    expect(botCode).toContain("firstPathTrigger")
   })
 
   it("both import deck trigger functions", () => {
@@ -133,7 +133,7 @@ describe("Bot Rule Compliance - Obstructions", () => {
   })
 
   it("bot player passes excluded grids to reachableRoadGrids", () => {
-    expect(botCode).toContain("reachableRoadGrids(startGridKey, total, excluded)")
+    expect(botCode).toContain("reachableRoadGrids(startGridKey, total, excluded")
   })
 })
 
@@ -167,8 +167,8 @@ describe("Bot Rule Compliance - Extra Throw", () => {
 
 describe("Feature Parity Summary", () => {
   const humanFeatures = [
-    { name: "isOnBoardEdge", pattern: "isOnBoardEdge", source: "gridSquares" },
-    { name: "isOnMotorwayOrRailway", pattern: "isOnMotorwayOrRailway", source: "gridSquares" },
+    { name: "isOnBoardEdge", pattern: "firstPathTrigger", source: "gridSquares" },
+    { name: "isOnMotorwayOrRailway", pattern: "firstPathTrigger", source: "gridSquares" },
     { name: "queueDraw", pattern: "queueDraw", source: "human" },
     { name: "processNextDraw", pattern: "processNextDraw", source: "human" },
     { name: "extraThrow", pattern: "extraThrow", source: "human" },

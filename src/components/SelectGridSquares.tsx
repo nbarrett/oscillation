@@ -8,11 +8,11 @@ import { useGameStore, occupiedGridKeys, GameTurnState } from "@/stores/game-sto
 import { useDeckStore } from "@/stores/deck-store";
 import { latLngToGridKey, getAdjacentRoadGrids, shortestPath, reachableRoadGrids, isRoadDataLoaded, onRoadDataReady, gridHasABRoad, gridHasRoad, loadRoadData, gridKeyToLatLng, roadPathThroughGrids, roadDataCoversPosition, isGridOutsideBounds } from "@/lib/road-data";
 import { gridKeyToLatLngs } from "@/lib/grid-polygon";
-import { isOnBoardEdge, isOnMotorwayOrRailway } from "@/lib/deck-triggers";
+import { firstPathTrigger } from "@/lib/deck-triggers";
 import { type GameBounds } from "@/lib/area-size";
 import { colours, log } from "@/lib/utils";
 
-type OscLayerType = "identified" | "preview" | "endpoint" | "route";
+type OscLayerType = "identified" | "preview" | "endpoint" | "route" | "card-destination";
 
 class IdentifiedPolygon extends L.Polygon {
   _oscType: OscLayerType = "identified";
@@ -63,6 +63,16 @@ class RoutePolyline extends L.Polyline {
   }
 }
 
+class CardDestinationPolygon extends L.Polygon {
+  _oscType: OscLayerType = "card-destination";
+  gridKey: string;
+
+  constructor(gridSquareLatLongs: L.LatLng[], gridKey: string, options?: L.PolylineOptions) {
+    super(gridSquareLatLongs, options);
+    this.gridKey = gridKey;
+  }
+}
+
 function oscType(layer: L.Layer): OscLayerType | undefined {
   return (layer as unknown as Record<string, unknown>)._oscType as OscLayerType | undefined;
 }
@@ -87,6 +97,10 @@ function isRemotePreviewPolygon(layer: L.Layer): layer is RemotePreviewPolygon {
   return layer instanceof RemotePreviewPolygon;
 }
 
+function isCardDestinationPolygon(layer: L.Layer): layer is CardDestinationPolygon {
+  return oscType(layer) === "card-destination";
+}
+
 export default function SelectGridSquares() {
   const map = useMap();
   const gridClearRequest = useGameStore((s) => s.gridClearRequest);
@@ -103,7 +117,10 @@ export default function SelectGridSquares() {
   const previewPathIndex = useGameStore((s) => s.previewPathIndex);
   const remotePreviewPath = useGameStore((s) => s.remotePreviewPath);
   const sessionId = useGameStore((s) => s.sessionId);
+  const cardDestinationKeys = useGameStore((s) => s.cardDestinationKeys);
   const updatePreviewPath = trpc.game.updatePreviewPath.useMutation();
+  const placeObstructionMutation = trpc.game.placeObstruction.useMutation();
+  const removeObstructionMutation = trpc.game.removeObstruction.useMutation();
 
   log.debug("SelectGridSquares render, turnState:", gameTurnState, "dice:", diceResult);
 
@@ -112,18 +129,9 @@ export default function SelectGridSquares() {
   const fitBoundsDiceRef = useRef<number | null>(null);
 
   function checkMidMovementTrigger(path: string[], gameBounds: GameBounds | null) {
-    const lastKey = path[path.length - 1];
-    if (!lastKey) return;
-
-    if (isOnBoardEdge(lastKey, gameBounds)) {
-      useGameStore.getState().setCardTrigger({ type: "edge", gridKey: lastKey, stepsUsed: path.length });
-      return;
-    }
-
-    const mwResult = isOnMotorwayOrRailway(lastKey);
-    if (mwResult.triggered) {
-      useGameStore.getState().setCardTrigger({ type: "motorway", gridKey: lastKey, stepsUsed: path.length });
-    }
+    const trigger = firstPathTrigger(path, gameBounds);
+    if (!trigger) return;
+    useGameStore.getState().setCardTrigger(trigger);
   }
 
   function clearPathPolygons() {
@@ -170,6 +178,30 @@ export default function SelectGridSquares() {
         weight: isLast ? 3 : 2,
         fillOpacity: isLast ? 0.5 : 0.25,
         fillColor: colours.remotePreview,
+      });
+      polygon.addTo(map);
+    }
+  }
+
+  function clearCardDestinationPolygons() {
+    map.eachLayer((layer) => {
+      if (isCardDestinationPolygon(layer)) {
+        layer.remove();
+      }
+    });
+  }
+
+  function drawCardDestinations(keys: string[]) {
+    clearCardDestinationPolygons();
+    for (const key of keys) {
+      const latLngs = gridKeyToLatLngs(map, key);
+      const polygon = new CardDestinationPolygon(latLngs, key, {
+        interactive: false,
+        color: "#f59e0b",
+        weight: 3,
+        fillOpacity: 0.35,
+        fillColor: "#f59e0b",
+        dashArray: "6 4",
       });
       polygon.addTo(map);
     }
@@ -494,6 +526,39 @@ export default function SelectGridSquares() {
       } = state;
 
       const localName = state.localPlayerName;
+      const gridKey = latLngToGridKey(lat, lng);
+      const deck = useDeckStore.getState();
+
+      if (deck.isPlacingObstruction && deck.isPlacingObstruction !== "pick") {
+        if (!gridHasABRoad(gridKey)) {
+          log.info("obstruction ignored: square has no A/B road", gridKey);
+          return;
+        }
+        const color = deck.isPlacingObstruction as "blue" | "yellow" | "green";
+        const pid = useGameStore.getState().playerId;
+        if (!pid) return;
+        deck.addObstruction({ gridKey, color, placedByPlayerId: pid });
+        const sid = useGameStore.getState().sessionId;
+        if (sid) {
+          placeObstructionMutation.mutate({ sessionId: sid, playerId: pid, gridKey, color });
+        }
+        return;
+      }
+
+      if (deck.isRemovingObstruction) {
+        const match = deck.obstructions.find((o) => o.gridKey === gridKey);
+        if (!match) {
+          log.info("remove obstruction ignored: no token on", gridKey);
+          return;
+        }
+        deck.removeObstruction(gridKey);
+        const sid = useGameStore.getState().sessionId;
+        if (sid) {
+          removeObstructionMutation.mutate({ sessionId: sid, gridKey });
+        }
+        return;
+      }
+
       if (localName === null || localName !== currentPlayerName) {
         log.info("click ignored: not local player's turn");
         return;
@@ -517,7 +582,6 @@ export default function SelectGridSquares() {
         useGameStore.getState().setPlayerStartGridKey(effectiveStartKey);
       }
 
-      const gridKey = latLngToGridKey(lat, lng);
       log.info("click grid:", gridKey, "start:", effectiveStartKey);
 
       if (isGridOutsideBounds(gridKey, bounds)) {
@@ -623,6 +687,14 @@ export default function SelectGridSquares() {
       clearRemotePreviewPolygons();
     }
   }, [remotePreviewPath]);
+
+  useEffect(() => {
+    if (cardDestinationKeys.length > 0) {
+      drawCardDestinations(cardDestinationKeys);
+    } else {
+      clearCardDestinationPolygons();
+    }
+  }, [cardDestinationKeys]);
 
   const broadcastDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {

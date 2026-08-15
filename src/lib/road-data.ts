@@ -28,6 +28,26 @@ export interface RoadSegment {
   coordinates: [number, number][];
 }
 
+export function classifyRoadType(highway: string, ref?: string | null): "A" | "B" | "M" | null {
+  const refUpper = (ref ?? "").trim().toUpperCase()
+  if (/^A\d/.test(refUpper)) return "A"
+  if (/^B\d/.test(refUpper)) return "B"
+  if (/^M\d/.test(refUpper)) return "M"
+
+  if (highway === "motorway" || highway === "motorway_link") return "M"
+  if (highway === "trunk" || highway === "trunk_link" || highway === "primary" || highway === "primary_link") return "A"
+  if (
+    highway === "secondary" ||
+    highway === "secondary_link" ||
+    highway === "tertiary" ||
+    highway === "tertiary_link" ||
+    highway === "unclassified"
+  ) {
+    return "B"
+  }
+  return null
+}
+
 export interface MotorwayJunction {
   id: number;
   lat: number;
@@ -305,15 +325,7 @@ async function queryOverpassForRoads(
 
     if (element.type === 'way' && element.tags?.highway) {
       const highway = element.tags.highway;
-      let roadType: 'A' | 'B' | 'M' | null = null;
-
-      if (highway === 'motorway' || highway === 'motorway_link') {
-        roadType = 'M';
-      } else if (highway === 'trunk' || highway === 'trunk_link' || highway === 'primary' || highway === 'primary_link') {
-        roadType = 'A';
-      } else if (highway === 'secondary' || highway === 'secondary_link' || highway === 'tertiary' || highway === 'tertiary_link' || highway === 'unclassified') {
-        roadType = 'B';
-      }
+      const roadType = classifyRoadType(highway, element.tags.ref);
 
       if (roadType && element.nodes) {
         const coordinates: [number, number][] = [];
