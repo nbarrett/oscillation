@@ -49,8 +49,7 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/package.json ./package.json
 
-# Install only prisma CLI for migrations and fix ownership
-RUN pnpm add prisma --save-dev && chown -R nextjs:nodejs node_modules
+RUN npm install -g prisma@5.22.0 && chown -R nextjs:nodejs /app
 
 USER nextjs
 
