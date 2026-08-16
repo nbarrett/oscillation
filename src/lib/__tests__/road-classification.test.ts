@@ -17,6 +17,7 @@ describe("classifyRoadType", () => {
   it("classifies motorways from ref or highway", () => {
     expect(classifyRoadType("motorway", "M25")).toBe("M")
     expect(classifyRoadType("motorway_link", null)).toBe("M")
+    expect(classifyRoadType("motorway", "A1(M)")).toBe("M")
   })
 
   it("falls back to highway class when there is no numbered ref", () => {

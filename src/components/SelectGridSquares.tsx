@@ -6,7 +6,8 @@ import L from "leaflet";
 import { trpc } from "@/lib/trpc/client";
 import { useGameStore, occupiedGridKeys, GameTurnState } from "@/stores/game-store";
 import { useDeckStore } from "@/stores/deck-store";
-import { latLngToGridKey, getAdjacentRoadGrids, shortestPath, reachableRoadGrids, isRoadDataLoaded, onRoadDataReady, gridHasABRoad, gridHasRoad, loadRoadData, gridKeyToLatLng, roadPathThroughGrids, roadDataCoversPosition, isGridOutsideBounds, pathsAtExactSteps } from "@/lib/road-data";
+import { latLngToGridKey, getAdjacentRoadGrids, shortestPath, reachableRoadGrids, isRoadDataLoaded, onRoadDataReady, gridHasABRoad, gridHasRoad, loadRoadData, gridKeyToLatLng, roadPathThroughGrids, roadDataCoversPosition, isGridOutsideBounds, pathsAtExactSteps, railwayStations } from "@/lib/road-data";
+import { AREA_SIZE_PRESETS } from "@/lib/area-size";
 import { gridKeyToLatLngs } from "@/lib/grid-polygon";
 import { firstPathTrigger } from "@/lib/deck-triggers";
 import { type GameBounds } from "@/lib/area-size";
@@ -129,7 +130,7 @@ export default function SelectGridSquares() {
   const fitBoundsDiceRef = useRef<number | null>(null);
 
   function checkMidMovementTrigger(path: string[], gameBounds: GameBounds | null) {
-    const trigger = firstPathTrigger(path, gameBounds);
+    const trigger = firstPathTrigger(path, gameBounds, railwayStations());
     if (!trigger) return;
     useGameStore.getState().setCardTrigger(trigger);
   }
@@ -312,7 +313,8 @@ export default function SelectGridSquares() {
     if (!isRoadDataLoaded() || (playerPos && !roadDataCoversPosition(playerPos.lat, playerPos.lng))) {
       log.warn("computeAndSetPaths: road data not loaded or does not cover player position, triggering load");
       const center = playerPos ?? map.getCenter();
-      void loadRoadData(center.lat, center.lng, 10);
+      const areaSize = useGameStore.getState().areaSize;
+      void loadRoadData(center.lat, center.lng, AREA_SIZE_PRESETS[areaSize].roadRadiusKm);
       return;
     }
     const { players, currentPlayerName, reachableGrids } = useGameStore.getState();

@@ -28,7 +28,7 @@ function bngBoxFromBounds(gameBounds: GameBounds): BngBox {
 }
 
 export function isGridOutsideBounds(gridKey: string, gameBounds: GameBounds | null): boolean {
-  const box = pathfindingBox ?? (gameBounds ? bngBoxFromBounds(gameBounds) : null)
+  const box = gameBounds ? bngBoxFromBounds(gameBounds) : pathfindingBox
   if (!box) return false
   const dash = gridKey.indexOf("-")
   const e = Number(gridKey.slice(0, dash)) + 500
@@ -45,12 +45,13 @@ export interface RoadSegment {
 }
 
 export function classifyRoadType(highway: string, ref?: string | null): "A" | "B" | "M" | null {
+  if (highway === "motorway" || highway === "motorway_link") return "M"
+
   const refUpper = (ref ?? "").trim().toUpperCase()
   if (/^A\d/.test(refUpper)) return "A"
   if (/^B\d/.test(refUpper)) return "B"
   if (/^M\d/.test(refUpper)) return "M"
 
-  if (highway === "motorway" || highway === "motorway_link") return "M"
   if (highway === "trunk" || highway === "trunk_link" || highway === "primary" || highway === "primary_link") return "A"
   if (
     highway === "secondary" ||
@@ -199,7 +200,7 @@ function loadFromStorage(): RoadDataCache | null {
       roads: parsed.roads ?? [],
       motorways: parsed.motorways ?? [],
       gridSquaresWithRoads: gridSquaresWithRoads,
-      gridSquaresWithABRoads: gridSquaresWithRoads,
+      gridSquaresWithABRoads: new Set<string>(parsed.gridSquaresWithABRoads ?? []),
       gridSquaresWithARoads: new Set(parsed.gridSquaresWithARoads),
       gridSquaresWithBRoads: new Set(parsed.gridSquaresWithBRoads),
       gridAdjacency: deserializeAdjacency(parsed.gridAdjacency),
@@ -377,20 +378,19 @@ async function queryOverpassForRoads(
 export function gridKeyToLatLng(gridKey: string): [number, number] {
   const [e, n] = gridKey.split("-").map(Number);
   const [lng, lat] = proj4(BNG, "EPSG:4326", [e + 500, n + 500]);
-  const snapped = nearestRoadPosition(lat, lng);
-  return snapped ?? [lat, lng];
+  return [lat, lng];
 }
-
-const MAX_SNAP_DIST_SQ = 0.0002;
 
 export function nearestRoadPosition(lat: number, lng: number): [number, number] | null {
   if (!roadDataCache) return null;
 
+  const homeKey = latLngToGridKey(lat, lng);
   let bestDist = Infinity;
   let bestCoord: [number, number] | null = null;
 
   for (const road of roadDataCache.roads) {
     for (const [rLat, rLng] of road.coordinates) {
+      if (latLngToGridKey(rLat, rLng) !== homeKey) continue;
       const dLat = rLat - lat;
       const dLng = rLng - lng;
       const dist = dLat * dLat + dLng * dLng;
@@ -400,8 +400,6 @@ export function nearestRoadPosition(lat: number, lng: number): [number, number] 
       }
     }
   }
-
-  if (bestDist > MAX_SNAP_DIST_SQ) return null;
 
   return bestCoord;
 }
@@ -763,6 +761,19 @@ function calculateGridSquaresWithRoads(roads: RoadSegment[]): Set<string> {
   return gridSquares;
 }
 
+function linkCardinal(adj: Map<string, Set<string>>, gridA: string, gridB: string) {
+  if (gridA === gridB) return;
+  const [eA, nA] = gridA.split("-").map(Number);
+  const [eB, nB] = gridB.split("-").map(Number);
+  const de = Math.abs(eA - eB);
+  const dn = Math.abs(nA - nB);
+  if (de + dn !== 1000) return;
+  if (!adj.has(gridA)) adj.set(gridA, new Set());
+  if (!adj.has(gridB)) adj.set(gridB, new Set());
+  adj.get(gridA)!.add(gridB);
+  adj.get(gridB)!.add(gridA);
+}
+
 function addAdjacency(adj: Map<string, Set<string>>, gridA: string, gridB: string) {
   if (gridA === gridB) return;
   const [eA, nA] = gridA.split("-").map(Number);
@@ -770,10 +781,16 @@ function addAdjacency(adj: Map<string, Set<string>>, gridA: string, gridB: strin
   const de = Math.abs(eA - eB);
   const dn = Math.abs(nA - nB);
   if (de + dn === 1000) {
-    if (!adj.has(gridA)) adj.set(gridA, new Set());
-    if (!adj.has(gridB)) adj.set(gridB, new Set());
-    adj.get(gridA)!.add(gridB);
-    adj.get(gridB)!.add(gridA);
+    linkCardinal(adj, gridA, gridB);
+    return;
+  }
+  if (de === 1000 && dn === 1000) {
+    const mid1 = `${eA}-${nB}`;
+    const mid2 = `${eB}-${nA}`;
+    linkCardinal(adj, gridA, mid1);
+    linkCardinal(adj, mid1, gridB);
+    linkCardinal(adj, gridA, mid2);
+    linkCardinal(adj, mid2, gridB);
   }
 }
 
@@ -824,15 +841,16 @@ export async function loadRoadData(
     roadDataCache = loadFromStorage();
   }
 
+  const requestBounds = { south, west, north, east };
+
   if (roadDataCache) {
     const { bounds } = roadDataCache;
     if (
-      south >= bounds.south &&
-      north <= bounds.north &&
-      west >= bounds.west &&
-      east <= bounds.east &&
+      boundsContain(bounds, requestBounds) &&
       Date.now() - roadDataCache.timestamp < STORAGE_MAX_AGE
     ) {
+      neighborArrayCache.clear();
+      gridRoadIndex = null;
       roadDataStatusCallback?.("loaded");
       notifyRoadDataListeners();
       return;
@@ -853,6 +871,18 @@ export async function loadRoadData(
     const bRoads = roads.filter((r) => r.type === "B");
     const gridSquaresWithBRoads = calculateGridSquaresWithRoads(bRoads);
     const gridAdjacency = calculateGridAdjacency(abRoads);
+
+    if (
+      roadDataCache &&
+      boundsContain(roadDataCache.bounds, requestBounds) &&
+      Date.now() - roadDataCache.timestamp < STORAGE_MAX_AGE
+    ) {
+      neighborArrayCache.clear();
+      gridRoadIndex = null;
+      roadDataStatusCallback?.("loaded");
+      notifyRoadDataListeners();
+      return;
+    }
 
     gridRoadIndex = null;
     neighborArrayCache.clear();
@@ -897,25 +927,28 @@ export function gridHasABRoad(gridKey: string): boolean {
   return roadDataCache.gridSquaresWithABRoads.has(gridKey);
 }
 
+function boundsContain(
+  outer: { south: number; north: number; west: number; east: number },
+  inner: { south: number; north: number; west: number; east: number },
+): boolean {
+  return (
+    inner.south >= outer.south &&
+    inner.north <= outer.north &&
+    inner.west >= outer.west &&
+    inner.east <= outer.east
+  )
+}
+
 export function getAdjacentRoadGrids(gridKey: string): string[] {
+  if (!roadDataCache) {
+    return allAdjacentGrids(gridKey)
+  }
+
   const cached = neighborArrayCache.get(gridKey)
   if (cached) return cached
 
-  let result: string[]
-  if (!roadDataCache) {
-    result = allAdjacentGrids(gridKey)
-  } else if (roadDataCache.gridAdjacency.has(gridKey)) {
-    result = Array.from(roadDataCache.gridAdjacency.get(gridKey)!)
-  } else {
-    const candidates = allAdjacentGrids(gridKey)
-    const withAdjacency = candidates.filter((g) => roadDataCache!.gridAdjacency.has(g))
-    if (withAdjacency.length > 0) {
-      result = withAdjacency
-    } else {
-      const withRoads = candidates.filter((g) => roadDataCache!.gridSquaresWithRoads.has(g))
-      result = withRoads.length > 0 ? withRoads : candidates
-    }
-  }
+  const linked = roadDataCache.gridAdjacency.get(gridKey)
+  const result = linked ? Array.from(linked) : []
   neighborArrayCache.set(gridKey, result)
   return result
 }

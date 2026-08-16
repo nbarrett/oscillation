@@ -10,7 +10,7 @@ import { usePhoneStore } from "@/stores/phone-store"
 import { useSchoolStore } from "@/stores/school-store"
 import { useRouteStore } from "@/stores/route-store"
 import { trpc } from "@/lib/trpc/client"
-import { latLngToGridKey, nearestRoadPosition, reachableRoadGrids, gridKeyToLatLng, shortestPath, gridHasABRoad, gridHasRoad } from "@/lib/road-data"
+import { latLngToGridKey, nearestRoadPosition, reachableRoadGrids, gridKeyToLatLng, shortestPath, gridHasABRoad, gridHasRoad, railwayStations } from "@/lib/road-data"
 import { detectPoiVisits } from "@/lib/poi-detection"
 import { POI_CATEGORY_LABELS, type PoiCategory } from "@/lib/poi-categories"
 import { firstPathTrigger } from "@/lib/deck-triggers"
@@ -276,7 +276,7 @@ export default function BotTurnPlayer() {
     path: string[],
     gameBounds: GameBounds | null
   ): { type: "edge" | "motorway"; gridKey: string; stepsUsed: number } | null {
-    return firstPathTrigger(path, gameBounds)
+    return firstPathTrigger(path, gameBounds, railwayStations())
   }
 
   function computeBotPath(botName: string, total: number) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { pathsAtExactSteps, reachableRoadGrids, shortestPath } from "@/lib/road-data"
+import { gridKeyToLatLng, latLngToGridKey, pathsAtExactSteps, reachableRoadGrids, shortestPath } from "@/lib/road-data"
 
 describe("pathfinding", () => {
   it("finds the orthogonal 1-step neighbours without road data", () => {
@@ -26,5 +26,11 @@ describe("pathfinding", () => {
     const target = "502000-200000"
     const found = shortestPath(start, target, 3)
     expect(found).toEqual(["501000-200000", "502000-200000"])
+  })
+
+  it("gridKeyToLatLng stays inside the named square", () => {
+    const key = "549000-217000"
+    const [lat, lng] = gridKeyToLatLng(key)
+    expect(latLngToGridKey(lat, lng)).toBe(key)
   })
 })

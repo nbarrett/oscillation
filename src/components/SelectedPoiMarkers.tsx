@@ -11,8 +11,6 @@ import { usePhoneStore } from "@/stores/phone-store"
 import { useSchoolStore } from "@/stores/school-store"
 import { usePoiSettingsStore } from "@/stores/poi-settings-store"
 import { type PoiIconOption } from "@/stores/poi-types"
-import { isNearMotorway } from "@/lib/road-data"
-
 const ICON_SIZE = 52
 const COLLECTED_SIZE = 56
 
@@ -105,7 +103,6 @@ export default function SelectedPoiMarkers() {
 
     for (const poi of selectedPois) {
       const poiId = `${poi.category}:${poi.osmId}`
-      if (isNearMotorway(poi.lat, poi.lng)) continue
 
       const svgTemplate = categoryIconSvgs[poi.category as keyof typeof categoryIconSvgs]
       if (!svgTemplate) continue

@@ -7,7 +7,7 @@ export interface PoiVisit {
   name: string | null;
 }
 
-const COLLECTION_RADIUS_METRES = 1500
+const COLLECTION_RADIUS_METRES = 1000
 
 function haversineMetres(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000
@@ -20,6 +20,22 @@ function haversineMetres(lat1: number, lng1: number, lat2: number, lng2: number)
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
+type SelectedPoiInput = {
+  category: string
+  osmId: number
+  name?: string | null
+  lat?: number
+  lng?: number
+}
+
+const STORE_BY_CATEGORY: Record<string, number> = {
+  pub: 0,
+  spire: 1,
+  tower: 2,
+  phone: 3,
+  school: 4,
+}
+
 export function detectPoiVisits(
   destinationGridKey: string,
   pubs: PoiItem[],
@@ -27,45 +43,45 @@ export function detectPoiVisits(
   towers: PoiItem[],
   phones: PoiItem[],
   schools: PoiItem[],
-  selectedPois: Array<{ category: string; osmId: number }> | null,
+  selectedPois: SelectedPoiInput[] | null,
   movementPath?: string[],
 ): PoiVisit[] {
   if (!selectedPois || selectedPois.length === 0) return []
 
-  const selectedSet = new Set(selectedPois.map(p => `${p.category}:${p.osmId}`))
+  const stores = [pubs, spires, towers, phones, schools]
+  const pathKeys = new Set<string>([destinationGridKey, ...(movementPath ?? [])])
+  const pathCentres: Array<[number, number]> = []
+  for (const key of pathKeys) {
+    pathCentres.push(gridKeyToLatLng(key))
+  }
+
   const visits: PoiVisit[] = []
   const visitedIds = new Set<string>()
 
-  const playerPositions: Array<[number, number]> = []
-  playerPositions.push(gridKeyToLatLng(destinationGridKey))
-  if (movementPath) {
-    for (const key of movementPath) {
-      playerPositions.push(gridKeyToLatLng(key))
+  for (const selected of selectedPois) {
+    const poiId = `${selected.category}:${selected.osmId}`
+    if (visitedIds.has(poiId)) continue
+
+    let lat = selected.lat
+    let lng = selected.lng
+    let name = selected.name ?? null
+    if (lat == null || lng == null) {
+      const storeIdx = STORE_BY_CATEGORY[selected.category]
+      const match = storeIdx == null ? null : stores[storeIdx].find((item) => item.id === selected.osmId)
+      if (!match) continue
+      lat = match.lat
+      lng = match.lng
+      name = match.name
     }
-  }
 
-  const allPois: Array<{ category: string; items: PoiItem[] }> = [
-    { category: "pub", items: pubs },
-    { category: "spire", items: spires },
-    { category: "tower", items: towers },
-    { category: "phone", items: phones },
-    { category: "school", items: schools },
-  ]
+    const poiGrid = latLngToGridKey(lat, lng)
+    const onPath = pathKeys.has(poiGrid) || pathCentres.some(([pLat, pLng]) => (
+      haversineMetres(pLat, pLng, lat, lng) <= COLLECTION_RADIUS_METRES
+    ))
+    if (!onPath) continue
 
-  for (const { category, items } of allPois) {
-    for (const poi of items) {
-      const poiId = `${category}:${poi.id}`
-      if (!selectedSet.has(poiId)) continue
-      if (visitedIds.has(poiId)) continue
-
-      for (const [lat, lng] of playerPositions) {
-        if (haversineMetres(lat, lng, poi.lat, poi.lng) <= COLLECTION_RADIUS_METRES) {
-          visits.push({ id: poiId, category, name: poi.name })
-          visitedIds.add(poiId)
-          break
-        }
-      }
-    }
+    visits.push({ id: poiId, category: selected.category, name })
+    visitedIds.add(poiId)
   }
 
   return visits

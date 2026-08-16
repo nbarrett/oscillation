@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import { persist, createJSONStorage } from "zustand/middleware"
 import { log } from "@/lib/utils"
-import { latLngToGridKey, gridKeyToLatLng, isRoadDataLoaded, reachableRoadGrids, onRoadDataReady, setPathfindingBounds } from "@/lib/road-data"
+import { latLngToGridKey, gridKeyToLatLng, isRoadDataLoaded, reachableRoadGrids, onRoadDataReady, setPathfindingBounds, railwayStations } from "@/lib/road-data"
 import { CAR_STYLES } from "@/stores/car-store"
 import { type AreaSize, type GameBounds, DEFAULT_AREA_SIZE } from "@/lib/area-size"
 import { useDeckStore } from "@/stores/deck-store"
@@ -311,7 +311,7 @@ export const useGameStore = create<GameState>()(
           selectedEndpoint: path[path.length - 1] ?? null,
           previewPaths: [],
           previewPathIndex: 0,
-          cardTrigger: cardTrigger ?? cardTriggerForPath(path, gameBounds),
+          cardTrigger: cardTrigger ?? cardTriggerForPath(path, gameBounds, railwayStations()),
         });
       },
 

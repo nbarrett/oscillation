@@ -5,9 +5,10 @@ import { type GameBounds } from "@/lib/area-size"
 export function cardTriggerForPath(
   path: string[],
   gameBounds: GameBounds | null,
+  stations?: Array<{ lat: number; lng: number }>,
 ) {
   if (path.length === 0) return null
-  return firstPathTrigger(path, gameBounds)
+  return firstPathTrigger(path, gameBounds, stations)
 }
 
 export function shouldGrantExtraThrow(

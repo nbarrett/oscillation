@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Dices, CheckCircle2, LocateFixed, ChevronLeft, ChevronRight } from "lucide-react"
 import { GameTurnState, useCurrentPlayer, useGameStore } from "@/stores/game-store"
-import { gridKeyToLatLng, latLngToGridKey } from "@/lib/road-data"
+import { gridKeyToLatLng, latLngToGridKey, railwayStations } from "@/lib/road-data"
 import { trpc } from "@/lib/trpc/client"
 import { usePubStore } from "@/stores/pub-store"
 import { useSpireStore, useTowerStore } from "@/stores/church-store"
@@ -352,7 +352,7 @@ export default function DiceRoller() {
     }
     const store = useGameStore.getState()
     if (!store.cardTrigger) {
-      const trigger = cardTriggerForPath(store.movementPath, store.gameBounds)
+      const trigger = cardTriggerForPath(store.movementPath, store.gameBounds, railwayStations())
       if (trigger) {
         store.setCardTrigger(trigger)
       }
